@@ -1,0 +1,17 @@
+steps:
+  # Build python package and push it to cloud Artifact Registry
+  - name: python
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        # Installing required packages
+        pip install --upgrade build twine keyrings.google-artifactregistry-auth
+        # Changing project directory
+        cd legal-doc-ai
+        # Building the source code
+        python -m build
+        twine upload --repository-url https://us-central1-python.pkg.dev/tableau-to-looker-migration/tableau-to-looker-parser dist/*
+
+options:
+  logging: CLOUD_LOGGING_ONLY
