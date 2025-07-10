@@ -84,7 +84,7 @@ steps:
         ~/.local/bin/twine upload dist/*
 substitutions:
   _REGION: us-central1
-  _REPO_NAME: python-packages
+  _REPO_NAME: Packages for tableau-to-looker-parser
 timeout: 1200s
 options:
   logging: CLOUD_LOGGING_ONLY
