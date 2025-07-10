@@ -86,3 +86,5 @@ substitutions:
   _REGION: us-central1
   _REPO_NAME: python-packages
 timeout: 1200s
+options:
+  logging: CLOUD_LOGGING_ONLY
