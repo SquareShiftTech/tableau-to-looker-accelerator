@@ -150,7 +150,7 @@ PROJECT_ID=my-project
 **Decision:** Use GCP Artifact Registry for all packages
 ```
 tableau-looker-lib → Python Package Repository
-tableau-cli       → Docker Image Repository  
+tableau-cli       → Docker Image Repository
 tableau-api       → Docker Image Repository
 ```
 

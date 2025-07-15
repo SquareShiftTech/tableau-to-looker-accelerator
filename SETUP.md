@@ -149,7 +149,7 @@ class MyCustomHandler(BaseHandler):
         if data.get("type") == "my_element":
             return 1.0
         return 0.0
-    
+
     def convert_to_json(self, raw_data: Dict) -> Dict:
         # Convert raw data to schema-compliant JSON
         return {

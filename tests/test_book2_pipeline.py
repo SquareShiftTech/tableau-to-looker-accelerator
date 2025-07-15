@@ -13,9 +13,7 @@ logging.basicConfig(
     force=True,
 )
 
-SAMPLE_TWB = Path(
-    "sample_twb_files/Book2.twb"
-)
+SAMPLE_TWB = Path("sample_twb_files/Book2.twb")
 
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
