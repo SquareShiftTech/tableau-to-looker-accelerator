@@ -1,0 +1,175 @@
+{
+  "model": {
+    "name": "tableau_migration",
+    "connection": {
+      "name": "elastic_pocs_bigquery",
+      "type": "bigquery",
+      "properties": {
+        "project": "elastic-pocs",
+        "dataset": "Super_Store_Sales",
+        "authentication": "service-account",
+        "service_account": "bq-tableau-looker@elastic-pocs.iam.gserviceaccount.com"
+      }
+    }
+  },
+  "views": [
+    {
+      "name": "tableau_parameters",
+      "label": "Tableau Parameters",
+      "parameters": [
+        {
+          "name": "top_customers",
+          "type": "number",
+          "label": "Top Customers",
+          "default_value": "5",
+          "min": "5",
+          "max": "20",
+          "step": "5"
+        },
+        {
+          "name": "profit_bin_size",
+          "type": "number",
+          "label": "Profit Bin Size",
+          "default_value": "200",
+          "min": "50",
+          "max": "200",
+          "step": "50"
+        }
+      ]
+    },
+    {
+      "name": "super_store_sales",
+      "label": "Super Store Sales",
+      "sql_table_name": "Super_Store_Sales",
+      "dimensions": {
+        "geographic": [
+          {
+            "name": "country_region",
+            "type": "string",
+            "label": "Country Region",
+            "group_label": "Geography",
+            "map_layer": {
+              "name": "countries",
+              "format": "iso_3166_2"
+            }
+          },
+          {
+            "name": "state_province",
+            "type": "string",
+            "label": "State/Province",
+            "group_label": "Geography",
+            "map_layer": {
+              "name": "states",
+              "format": "name"
+            }
+          },
+          {
+            "name": "city",
+            "type": "string",
+            "group_label": "Geography",
+            "map_layer": {
+              "name": "cities",
+              "format": "name"
+            }
+          },
+          {
+            "name": "postal_code",
+            "type": "string",
+            "group_label": "Geography",
+            "map_layer": {
+              "name": "zip_codes",
+              "format": "name"
+            }
+          }
+        ],
+        "business": [
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "region",
+            "type": "string"
+          },
+          {
+            "name": "region_copy",
+            "type": "string",
+            "label": "Region (copy)",
+            "sql": "${region}",
+            "hidden": true
+          }
+        ]
+      },
+      "measures": {
+        "financial": [
+          {
+            "name": "sales",
+            "type": "sum",
+            "sql": "${TABLE}.sales",
+            "value_format_name": "usd"
+          },
+          {
+            "name": "profit",
+            "type": "sum",
+            "sql": "${TABLE}.profit",
+            "value_format_name": "usd"
+          },
+          {
+            "name": "discount",
+            "type": "sum",
+            "sql": "${TABLE}.discount",
+            "value_format_name": "percent_2"
+          }
+        ],
+        "operational": [
+          {
+            "name": "quantity",
+            "type": "sum",
+            "sql": "${TABLE}.quantity"
+          }
+        ]
+      }
+    }
+  ],
+  "explores": [
+    {
+      "name": "super_store_sales",
+      "label": "Super Store Sales",
+      "view_name": "super_store_sales",
+      "joins": [],
+      "always_filter": {
+        "filters": []
+      },
+      "conditionally_filter": {
+        "filters": []
+      }
+    }
+  ],
+  "dashboards": [
+    {
+      "name": "accessibility_dashboard",
+      "title": "Accessibility Dashboard",
+      "layout": "grid",
+      "preferred_viewer": "dashboards-next",
+      "elements": []
+    }
+  ],
+  "_metadata": {
+    "source": {
+      "type": "tableau",
+      "file": "tab_look_migration_Accessibility_Dashboard_Design_bq.twb"
+    },
+    "handlers": {
+      "ConnectionHandler": {
+        "version": "1.0",
+        "fields_processed": 1,
+        "average_confidence": 1.0
+      },
+      "DimensionHandler": {
+        "version": "1.0",
+        "fields_processed": 9,
+        "average_confidence": 1.0
+      }
+    }
+  }
+}

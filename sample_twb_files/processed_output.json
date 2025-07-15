@@ -1,0 +1,546 @@
+{
+  "connections": [
+    {
+      "type": "federated",
+      "name": "federated_source",
+      "connections": [
+        {
+          "type": "bigquery",
+          "name": "bigquery.0akjrue1bi18as13i61t007co7eq",
+          "project": "elastic-pocs",
+          "dataset": "Super_Store_Sales",
+          "service_account": "bq-tableau-looker@elastic-pocs.iam.gserviceaccount.com",
+          "authentication": "service-account",
+          "properties": {}
+        }
+      ],
+      "primary_connection": "bigquery.0akjrue1bi18as13i61t007co7eq",
+      "_metadata": {
+        "handler": "ConnectionHandler",
+        "confidence": 1.0
+      }
+    },
+    {
+      "type": "bigquery",
+      "name": "",
+      "project": "elastic-pocs",
+      "dataset": "Super_Store_Sales",
+      "service_account": "bq-tableau-looker@elastic-pocs.iam.gserviceaccount.com",
+      "authentication": "service-account",
+      "properties": {},
+      "_metadata": {
+        "handler": "ConnectionHandler",
+        "confidence": 1.0
+      }
+    }
+  ],
+  "dimensions": [
+    {
+      "name": "parameter_1",
+      "field_type": "integer",
+      "label": "Top Customers",
+      "description": "Calculation: 5 | Parameter type: range | Default: 5 | Range: 5 to 20 (step: 5) | Original name: [Parameter 1]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": "5",
+      "parameter": {
+        "type": "range",
+        "default_value": "5",
+        "range": {
+          "min": "5",
+          "max": "20",
+          "granularity": "5"
+        }
+      },
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "parameter_2",
+      "field_type": "integer",
+      "label": "Profit Bin Size",
+      "description": "Calculation: 200 | Parameter type: range | Default: 200 | Range: 50 to 200 (step: 50) | Original name: [Parameter 2]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": "200",
+      "parameter": {
+        "type": "range",
+        "default_value": "200",
+        "range": {
+          "min": "50",
+          "max": "200",
+          "granularity": "50"
+        }
+      },
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "category",
+      "field_type": "string",
+      "label": null,
+      "description": "Original name: [Category]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "bad circle plot",
+            "line chart",
+            "table view"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "city",
+      "field_type": "string",
+      "label": null,
+      "description": "Semantic role: [City].[Name] | Original name: [City]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "country_region",
+      "field_type": "string",
+      "label": "Country Region",
+      "description": "Semantic role: [Country].[ISO3166_2] | Original name: [Country_Region]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "postal_code",
+      "field_type": "string",
+      "label": null,
+      "description": "Semantic role: [ZipCode].[Name] | Original name: [Postal Code]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "region_copy_1878001047358722060",
+      "field_type": "string",
+      "label": "Region (copy)",
+      "description": "aggregate_role_from: [State/Province] | Calculation: [Region] | Original name: [Region (copy)_1878001047358722060]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": "[Region]",
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "region",
+      "field_type": "string",
+      "label": null,
+      "description": "Original name: [Region]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Pie BAD",
+            "Pie BAD (2)",
+            "Sales time NO colour (4)",
+            "Sales time NO colour (5)",
+            "bad circle plot",
+            "table view"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "state_province",
+      "field_type": "string",
+      "label": "State Province",
+      "description": "Semantic role: [State].[Name] | Original name: [State_Province]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "calculation_1878001047346884615",
+      "field_type": "string",
+      "label": "'Dummy'",
+      "description": "Calculation: 'Dummy' | Original name: [Calculation_1878001047346884615]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": "'Dummy'",
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Button coloor palette",
+            "button colour contrast"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "segment",
+      "field_type": "string",
+      "label": null,
+      "description": "Original name: [Segment]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Pie BAD",
+            "Pie BAD (2)"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "order_date",
+      "field_type": "date",
+      "label": null,
+      "description": "Original name: [Order Date]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Sales BAN high cobtrasat",
+            "Sales BAN high cobtrasat (2)",
+            "Sales time NO colour",
+            "Sales time NO colour (2)",
+            "bad circle plot",
+            "line chart",
+            "table view"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "sub_category",
+      "field_type": "string",
+      "label": null,
+      "description": "Original name: [Sub_Category]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": null,
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "bad circle plot",
+            "table view"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "calculation_1213720102624411649",
+      "field_type": "string",
+      "label": "'Dummy12'",
+      "description": "Calculation: 'Dummy12' | Original name: [Calculation_1213720102624411649]",
+      "hidden": false,
+      "timeframes": null,
+      "sql": null,
+      "group_label": null,
+      "calculation": "'Dummy12'",
+      "parameter": null,
+      "_metadata": {
+        "handler": "DimensionHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "info button",
+            "info button (2)",
+            "info button text]"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    }
+  ],
+  "measures": [
+    {
+      "name": "discount",
+      "aggregation": "sum",
+      "label": null,
+      "description": "Original name: [Discount]",
+      "hidden": false,
+      "_metadata": {
+        "handler": "MeasureHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "profit",
+      "aggregation": "sum",
+      "label": null,
+      "description": "Original name: [Profit]",
+      "hidden": false,
+      "_metadata": {
+        "handler": "MeasureHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Pie BAD",
+            "Pie BAD (2)",
+            "Sales time NO colour (4)",
+            "Sales time NO colour (5)",
+            "bad circle plot",
+            "line chart",
+            "table view"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "quantity",
+      "aggregation": "sum",
+      "label": null,
+      "description": "Original name: [Quantity]",
+      "hidden": false,
+      "_metadata": {
+        "handler": "MeasureHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "sales",
+      "aggregation": "sum",
+      "label": null,
+      "description": "Original name: [Sales]",
+      "hidden": false,
+      "_metadata": {
+        "handler": "MeasureHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Sales BAN high cobtrasat",
+            "Sales BAN high cobtrasat (2)",
+            "Sales time NO colour",
+            "Sales time NO colour (2)",
+            "Sales time NO colour (4)",
+            "Sales time NO colour (5)",
+            "bad circle plot"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "tableau_internal_object_id_add_orders_0f06b03b6d3542169853eda9fb236268",
+      "aggregation": "sum",
+      "label": "add_orders",
+      "description": "Original name: [__tableau_internal_object_id__].[add_orders_0F06B03B6D3542169853EDA9FB236268]",
+      "hidden": false,
+      "_metadata": {
+        "handler": "MeasureHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [],
+          "dashboards": [],
+          "calculations": []
+        }
+      }
+    },
+    {
+      "name": "calculation_1878001047320956933",
+      "aggregation": "sum",
+      "label": "1",
+      "description": "Calculation: 1 | Original name: [Calculation_1878001047320956933]",
+      "hidden": false,
+      "sql": "1",
+      "_metadata": {
+        "handler": "MeasureHandler",
+        "confidence": 1.0,
+        "source": {},
+        "used_in": {
+          "worksheets": [
+            "Colours 1",
+            "Colours 2",
+            "Colours 3",
+            "Colours 4",
+            "DUAL COLOURS 1 ",
+            "DUALS COLOURS 2",
+            "DUALS COLOURS3",
+            "DUALS COLOURS3 (2)",
+            "DUALS COLOURS3 (3)"
+          ],
+          "dashboards": [
+            "Accessibility Dashboard"
+          ],
+          "calculations": []
+        }
+      }
+    }
+  ]
+}
