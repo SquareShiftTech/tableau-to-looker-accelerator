@@ -14,7 +14,7 @@ logging.basicConfig(
 )
 
 SAMPLE_TWB = Path(
-    "/mnt/c/squareshift/tableau-looker-vibe/vibe1/sample_twb_files/Book3.twb"
+    "sample_twb_files/Book3.twb"
 )
 
 
