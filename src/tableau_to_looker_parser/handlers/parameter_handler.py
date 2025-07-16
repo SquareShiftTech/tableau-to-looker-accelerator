@@ -53,7 +53,7 @@ class ParameterHandler(BaseHandler):
         # High confidence for parameters
         return 1.0
 
-    def convert_to_json(self, raw_data: Dict) -> Dict:
+    def convert_to_json(self, data: Dict) -> Dict:
         """Convert raw parameter data to schema-compliant JSON.
 
         Args:
@@ -63,17 +63,17 @@ class ParameterHandler(BaseHandler):
             Dict: Schema-compliant parameter data
         """
         # Clean field name
-        name = self._clean_field_name(raw_data["raw_name"])
+        name = self._clean_field_name(data["raw_name"])
 
         param_type = self._get_parameter_type(
-            raw_data["param_domain_type"], raw_data["datatype"]
+            data["param_domain_type"], data["datatype"]
         )
 
         # Build parameter settings
         settings = {
             "type": param_type,
-            "default_value": raw_data.get("default_value"),
-            "description": self._build_description(raw_data),
+            "default_value": data.get("default_value"),
+            "description": self._build_description(data),
             "required": False,  # Default to optional
         }
 
@@ -86,35 +86,35 @@ class ParameterHandler(BaseHandler):
             }
 
             # Add range if present
-            if raw_data.get("range"):
+            if data.get("range"):
                 date_settings["range"] = RangeParameterSettings(
-                    **raw_data["range"], inclusive_min=True, inclusive_max=True
+                    **data["range"], inclusive_min=True, inclusive_max=True
                 )
 
             # Add allowed values if present
-            if raw_data.get("values"):
+            if data.get("values"):
                 date_settings["allowed_values"] = ListParameterSettings(
-                    values=raw_data["values"], value_type="date"
+                    values=data["values"], value_type="date"
                 )
 
             settings["date"] = DateParameterSettings(**date_settings)
 
         elif param_type == ParameterType.RANGE:
-            if raw_data.get("range"):
+            if data.get("range"):
                 settings["range"] = RangeParameterSettings(
-                    **raw_data["range"], inclusive_min=True, inclusive_max=True
+                    **data["range"], inclusive_min=True, inclusive_max=True
                 )
 
         elif param_type == ParameterType.LIST:
-            if raw_data.get("values"):
+            if data.get("values"):
                 value_type = "string"
-                if raw_data["datatype"] in ["integer", "real"]:
+                if data["datatype"] in ["integer", "real"]:
                     value_type = "number"
-                elif raw_data["datatype"] in ["date", "datetime"]:
+                elif data["datatype"] in ["date", "datetime"]:
                     value_type = "date"
 
                 settings["list"] = ListParameterSettings(
-                    values=raw_data["values"],
+                    values=data["values"],
                     allow_multiple=False,
                     value_type=value_type,
                 )
@@ -122,9 +122,9 @@ class ParameterHandler(BaseHandler):
         # Build complete parameter
         json_data = {
             "name": name,
-            "field_type": self.TYPE_MAP.get(raw_data["datatype"], "string"),
-            "label": raw_data.get("label"),
-            "description": self._build_description(raw_data),
+            "field_type": self.TYPE_MAP.get(data["datatype"], "string"),
+            "label": data.get("label"),
+            "description": self._build_description(data),
             "hidden": False,
             "parameter": ParameterSettings(**settings),
         }

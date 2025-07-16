@@ -82,7 +82,7 @@ class ConnectionHandler(BaseHandler):
 
         return None
 
-    def convert_to_json(self, raw_data: Dict) -> Dict:
+    def convert_to_json(self, data: Dict) -> Dict:
         """Convert raw connection data to schema-compliant JSON.
 
         Args:
@@ -92,34 +92,34 @@ class ConnectionHandler(BaseHandler):
             Dict: Schema-compliant connection data
         """
         # Determine connection type
-        conn_class = raw_data.get("class", "").lower()
+        conn_class = data.get("class", "").lower()
         conn_type = self.TYPE_MAP.get(
             conn_class, DatabaseType.POSTGRESQL
         )  # Default to PostgreSQL
 
         # Extract standard properties
         properties = {}
-        for key, value in raw_data.get("metadata", {}).items():
+        for key, value in data.get("metadata", {}).items():
             if key not in ["name", "server", "dbname", "username", "port", "schema"]:
                 properties[key] = value
 
         # Get authentication type
-        auth_type = self._determine_auth_type(raw_data)
+        auth_type = self._determine_auth_type(data)
 
         if conn_class == "bigquery":
             # Create BigQuery connection
             conn = BigQueryConnectionSchema(
                 type=DatabaseType.BIGQUERY,
-                name=raw_data["name"],
-                project=raw_data.get("metadata", {}).get("project"),
-                dataset=raw_data.get("schema"),
-                service_account=raw_data.get("username"),
+                name=data["name"],
+                project=data.get("metadata", {}).get("project"),
+                dataset=data.get("schema"),
+                service_account=data.get("username"),
                 authentication=auth_type or AuthenticationType.SERVICE_ACCOUNT,
             )
         elif conn_class == "federated":
             # Create federated connection
             sub_connections = []
-            for sub_data in raw_data.get("connections", []):
+            for sub_data in data.get("connections", []):
                 if sub_data.get("class") == "bigquery":
                     sub_conn = BigQueryConnectionSchema(
                         type=DatabaseType.BIGQUERY,
@@ -147,9 +147,9 @@ class ConnectionHandler(BaseHandler):
 
             conn = FederatedConnectionSchema(
                 type=DatabaseType.FEDERATED,
-                name=raw_data["name"],
+                name=data["name"],
                 connections=sub_connections,
-                primary_connection=raw_data.get(
+                primary_connection=data.get(
                     "workgroup"
                 ),  # Use workgroup as primary connection
             )
@@ -157,12 +157,12 @@ class ConnectionHandler(BaseHandler):
             # Create standard connection
             conn = StandardConnectionSchema(
                 type=conn_type,
-                name=raw_data["name"],
-                server=raw_data["server"],
-                database=raw_data["dbname"],
-                port=raw_data.get("port"),
-                username=raw_data.get("username"),
-                db_schema=raw_data.get("schema"),
+                name=data["name"],
+                server=data["server"],
+                database=data["dbname"],
+                port=data.get("port"),
+                username=data.get("username"),
+                db_schema=data.get("schema"),
                 authentication=auth_type,
                 properties=properties,
             )

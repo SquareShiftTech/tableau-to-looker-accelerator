@@ -65,7 +65,7 @@ class MeasureHandler(BaseHandler):
 
         return 0.5
 
-    def convert_to_json(self, raw_data: Dict) -> Dict:
+    def convert_to_json(self, data: Dict) -> Dict:
         """Convert raw measure data to schema-compliant JSON.
 
         Args:
@@ -75,32 +75,32 @@ class MeasureHandler(BaseHandler):
             Dict: Schema-compliant measure data
         """
         # Clean the field name
-        name = self._clean_field_name(raw_data["raw_name"])
+        name = self._clean_field_name(data["raw_name"])
 
         # Build base measure
         json_data = {
             "name": name,
             "aggregation": self.AGGREGATION_MAP.get(
-                raw_data["aggregation"].lower(), AggregationType.SUM
+                data["aggregation"].lower(), AggregationType.SUM
             ),
-            "label": raw_data.get("label"),
-            "description": self._build_description(raw_data),
+            "label": data.get("label"),
+            "description": self._build_description(data),
             "hidden": False,
         }
 
         # Add value format if present
-        if raw_data.get("number_format"):
-            json_data["value_format"] = self._convert_format(raw_data["number_format"])
+        if data.get("number_format"):
+            json_data["value_format"] = self._convert_format(data["number_format"])
 
         # Add drill-down settings if present
-        if raw_data.get("drill_down"):
-            json_data["drill_fields"] = raw_data["drill_down"]["fields"]
-            if raw_data["drill_down"]["default"]:
+        if data.get("drill_down"):
+            json_data["drill_fields"] = data["drill_down"]["fields"]
+            if data["drill_down"]["default"]:
                 json_data["drill_down_default"] = True
 
         # Add calculation if present
-        if raw_data.get("calculation"):
-            json_data["sql"] = raw_data["calculation"]
+        if data.get("calculation"):
+            json_data["sql"] = data["calculation"]
 
         return json_data
 

@@ -66,7 +66,7 @@ class DimensionHandler(BaseHandler):
         # Very low confidence for anything else
         return 0.1
 
-    def convert_to_json(self, raw_data: Dict) -> Dict:
+    def convert_to_json(self, data: Dict) -> Dict:
         """Convert raw dimension data to schema-compliant JSON.
 
         Args:
@@ -76,21 +76,21 @@ class DimensionHandler(BaseHandler):
             Dict: Schema-compliant dimension data
         """
         # Clean field name
-        name = self._clean_field_name(raw_data["raw_name"])
+        name = self._clean_field_name(data["raw_name"])
 
         # Build base dimension
         json_data = {
             "name": name,
-            "field_type": self.TYPE_MAP.get(raw_data["datatype"], DimensionType.STRING),
-            "label": raw_data.get("label"),
-            "description": self._build_description(raw_data),
-            "calculation": raw_data.get("calculation"),
-            "semantic_role": raw_data.get("semantic_role"),
+            "field_type": self.TYPE_MAP.get(data["datatype"], DimensionType.STRING),
+            "label": data.get("label"),
+            "description": self._build_description(data),
+            "calculation": data.get("calculation"),
+            "semantic_role": data.get("semantic_role"),
         }
 
         # Add range data if present
-        if "range" in raw_data:
-            json_data["range"] = raw_data["range"]
+        if "range" in data:
+            json_data["range"] = data["range"]
 
         # Remove None values
         json_data = {k: v for k, v in json_data.items() if v is not None}

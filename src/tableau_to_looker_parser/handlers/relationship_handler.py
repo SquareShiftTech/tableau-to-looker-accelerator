@@ -47,7 +47,7 @@ class RelationshipHandler(BaseHandler):
 
         return 0.0
 
-    def convert_to_json(self, raw_data: Dict) -> Dict:
+    def convert_to_json(self, data: Dict) -> Dict:
         """Convert raw relationship data to schema-compliant JSON.
 
         Args:
@@ -57,27 +57,27 @@ class RelationshipHandler(BaseHandler):
             Dict: Schema-compliant relationship data
         """
         # Check if this is a relationships data structure (from get_all_elements)
-        if "relationships" in raw_data and "tables" in raw_data:
-            return self.process_datasource(raw_data)
+        if "relationships" in data and "tables" in data:
+            return self.process_datasource(data)
 
         # Extract expression data
-        expr = raw_data["expression"]
+        expr = data["expression"]
         expr_data = {
             "operator": expr["operator"],
             "expressions": sorted(expr["expressions"]),
         }
 
         # Process based on relationship type
-        relationship_type = raw_data["relationship_type"]
+        relationship_type = data["relationship_type"]
 
         # For physical joins
         if relationship_type == "physical":
             # Extract unique tables and their aliases
             unique_tables = []
             seen_tables = set()
-            table_aliases = raw_data.get("table_aliases", {})
+            table_aliases = data.get("table_aliases", {})
 
-            for table_info in raw_data["tables"]:
+            for table_info in data["tables"]:
                 table_name = table_info["table"]
                 if table_name not in seen_tables:
                     unique_tables.append(table_name)
@@ -85,7 +85,7 @@ class RelationshipHandler(BaseHandler):
 
             return {
                 "relationship_type": "physical",
-                "join_type": raw_data["join_type"],
+                "join_type": data["join_type"],
                 "expression": expr_data,
                 "tables": sorted(unique_tables),
                 "table_aliases": table_aliases,
@@ -93,8 +93,8 @@ class RelationshipHandler(BaseHandler):
 
         # For logical relationships
         elif relationship_type == "logical":
-            first = raw_data["first_endpoint"]
-            second = raw_data["second_endpoint"]
+            first = data["first_endpoint"]
+            second = data["second_endpoint"]
 
             # Create table aliases for logical relationships
             # Extract table alias from expression fields

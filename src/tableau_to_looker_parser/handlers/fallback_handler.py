@@ -19,7 +19,7 @@ class FallbackHandler(BaseHandler):
         """Initialize the handler with tracking storage."""
         self._unknown_elements = {}  # track frequency of unknown elements
 
-    def can_handle(self, element: Any) -> float:
+    def can_handle(self, data: Any) -> float:
         """Determine if this handler can process the element.
 
         Args:
@@ -28,7 +28,7 @@ class FallbackHandler(BaseHandler):
         Returns:
             float: Always returns 0.1 for valid elements, 0.0 for invalid
         """
-        if not isinstance(element, Element):
+        if not isinstance(data, Element):
             return 0.0
 
         # Always handle any element with low confidence
