@@ -1,0 +1,122 @@
+view: {{ view_name }} {
+  # Generated from Tableau view: {{ view.original_name if view.original_name else view.name }}
+
+  {% if table_name %}
+  sql_table_name: {{ table_name }} ;;
+  {% endif %}
+
+  {% if view.description %}
+  description: "{{ view.description }}"
+  {% endif %}
+
+  # Dimensions
+  {% if has_dimensions %}
+  {% for dimension in dimensions %}
+
+  dimension: {{ dimension.name | clean_name }} {
+    {% if dimension.description %}
+    description: "{{ dimension.description }}"
+    {% endif %}
+    {% if dimension.field_type == 'string' %}
+    type: string
+    {% elif dimension.field_type == 'integer' %}
+    type: number
+    {% elif dimension.field_type == 'real' %}
+    type: number
+    {% elif dimension.field_type == 'date' %}
+    type: date
+    {% elif dimension.field_type == 'datetime' %}
+    type: datetime
+    {% elif dimension.field_type == 'time' %}
+    type: time
+    {% elif dimension.field_type == 'boolean' %}
+    type: yesno
+    {% else %}
+    type: string
+    {% endif %}
+    sql: ${TABLE}.{{ dimension.sql_column or dimension.name }} ;;
+    {% if dimension.hidden %}
+    hidden: yes
+    {% endif %}
+    {% if dimension.label %}
+    label: "{{ dimension.label }}"
+    {% endif %}
+    {% if dimension.group_label %}
+    group_label: "{{ dimension.group_label }}"
+    {% endif %}
+  }
+  {% endfor %}
+
+  # Date dimension groups
+  {% for dimension in dimensions %}
+  {% if dimension.type == 'date' or dimension.type == 'datetime' %}
+
+  dimension_group: {{ dimension.name | clean_name }} {
+    type: time
+    timeframes: [raw, time, date, week, month, quarter, year]
+    sql: ${TABLE}.{{ dimension.sql_column or dimension.name }} ;;
+    {% if dimension.description %}description: "{{ dimension.description }}"{% endif %}
+    {% if dimension.hidden %}hidden: yes{% endif %}
+  }
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  # Measures
+  {% if has_measures %}
+  {% for measure in measures %}
+
+  measure: {{ measure.name | clean_name }} {
+    {% if measure.description %}
+    description: "{{ measure.description }}"
+    {% endif %}
+    {% if measure.aggregation == 'sum' %}
+    type: sum
+    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {% elif measure.aggregation == 'count' %}
+    type: count
+    {% if measure.sql_column %}
+    sql: ${TABLE}.{{ measure.sql_column }} ;;
+    {% endif %}
+    {% elif measure.aggregation == 'count_distinct' %}
+    type: count_distinct
+    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {% elif measure.aggregation == 'average' %}
+    type: average
+    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {% elif measure.aggregation == 'min' %}
+    type: min
+    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {% elif measure.aggregation == 'max' %}
+    type: max
+    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {% else %}
+    type: sum
+    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {% endif %}
+    {% if measure.value_format %}
+    value_format: "{{ measure.value_format }}"
+    {% endif %}
+    {% if measure.hidden %}
+    hidden: yes
+    {% endif %}
+    {% if measure.label %}
+    label: "{{ measure.label }}"
+    {% endif %}
+    {% if measure.group_label %}
+    group_label: "{{ measure.group_label }}"
+    {% endif %}
+    {% if measure.drill_fields %}
+    drill_fields: [{{ measure.drill_fields | join(', ') }}]
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  # Basic measures for counting
+  measure: count {
+    type: count
+    description: "Count of records"
+  }
+
+}

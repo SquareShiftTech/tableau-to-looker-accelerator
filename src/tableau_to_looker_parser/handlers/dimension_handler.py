@@ -82,6 +82,7 @@ class DimensionHandler(BaseHandler):
         json_data = {
             "name": name,
             "field_type": self.TYPE_MAP.get(data["datatype"], DimensionType.STRING),
+            "table_name": data.get("table_name"),  # Include table association
             "label": data.get("label"),
             "description": self._build_description(data),
             "calculation": data.get("calculation"),

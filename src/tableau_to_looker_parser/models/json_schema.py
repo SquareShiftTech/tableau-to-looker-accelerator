@@ -271,6 +271,7 @@ class DimensionSchema(BaseModel):
 
     name: str
     field_type: DimensionType
+    table_name: Optional[str] = None  # Table this dimension belongs to
     label: Optional[str] = None
     description: Optional[str] = None
     hidden: bool = False
@@ -295,6 +296,7 @@ class MeasureSchema(BaseModel):
 
     name: str
     aggregation: AggregationType
+    table_name: Optional[str] = None  # Table this measure belongs to
     label: Optional[str] = None
     description: Optional[str] = None
     hidden: bool = False

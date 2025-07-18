@@ -107,10 +107,23 @@ class ConnectionHandler(BaseHandler):
         auth_type = self._determine_auth_type(data)
 
         if conn_class == "bigquery":
+            # Generate meaningful connection name
+            connection_name = data.get("name", "")
+            if not connection_name:
+                # Use caption if available, otherwise generate from dataset
+                caption = data.get("caption", "")
+                dataset = data.get("schema", "")
+                if caption:
+                    connection_name = f"bigquery_{caption.lower().replace(' ', '_')}"
+                elif dataset:
+                    connection_name = f"bigquery_{dataset.lower()}"
+                else:
+                    connection_name = "bigquery_default"
+
             # Create BigQuery connection
             conn = BigQueryConnectionSchema(
                 type=DatabaseType.BIGQUERY,
-                name=data["name"],
+                name=connection_name,
                 project=data.get("metadata", {}).get("project"),
                 dataset=data.get("schema"),
                 service_account=data.get("username"),

@@ -22,7 +22,8 @@ dependencies = [
     "lxml>=5.0.0,<6.0.0", # for XML processing
     "pydantic>=2.5.0,<3.0.0", # for data validation
     "pytest>=8.4.1",
-    "pre-commit>=4.2.0"
+    "pre-commit>=4.2.0",
+    "jinja2>=3.1.0,<4.0.0" # for template rendering
 ]
 
 [project.optional-dependencies]

@@ -458,10 +458,26 @@ class TableauXMLParser:
             data["tables"] = joins_and_rels["tables"]
             data["relationships"] = joins_and_rels["relationships"]
 
-            # Extract connections
-            data["connections"] = [
-                self.extract_connection(conn) for conn in ds.findall(".//connection")
-            ]
+            # Extract connections - handle both direct connections and named connections
+            connections = []
+
+            # First, check for named connections (federated connections)
+            for named_conn in ds.findall(".//named-connection"):
+                conn_element = named_conn.find("connection")
+                if conn_element is not None:
+                    conn_data = self.extract_connection(conn_element)
+                    # Use the named-connection's name and caption
+                    conn_data["name"] = named_conn.get("name", "")
+                    conn_data["caption"] = named_conn.get("caption", "")
+                    connections.append(conn_data)
+
+            # Then, check for direct connections (not nested in named-connection)
+            for conn in ds.findall(".//connection"):
+                # Skip connections that are already handled as named connections
+                if conn.getparent().tag != "named-connection":
+                    connections.append(self.extract_connection(conn))
+
+            data["connections"] = connections
 
             datasources.append(data)
 
@@ -718,15 +734,35 @@ class TableauXMLParser:
 
         # Get all datasources
         for datasource in root.findall(".//datasource"):
+            # Build table name mapping from metadata records
+            table_mapping = self._build_table_mapping(datasource)
+
+            # Build alias resolution mapping
+            alias_mapping = self._build_alias_mapping(datasource)
+
             # Add measures
             for col in datasource.findall(".//column[@role='measure']"):
-                elements.append({"type": "measure", "data": self.extract_measure(col)})
+                measure_data = self.extract_measure(col)
+                # Add table association from metadata using raw name
+                raw_name = measure_data["raw_name"].strip("[]")
+                table_name = table_mapping.get(raw_name)
+                # Resolve alias to actual table name
+                measure_data["table_name"] = self._resolve_table_alias(
+                    table_name, alias_mapping
+                )
+                elements.append({"type": "measure", "data": measure_data})
 
             # Add dimensions
             for col in datasource.findall(".//column[@role='dimension']"):
-                elements.append(
-                    {"type": "dimension", "data": self.extract_dimension(col)}
+                dimension_data = self.extract_dimension(col)
+                # Add table association from metadata using raw name
+                raw_name = dimension_data["raw_name"].strip("[]")
+                table_name = table_mapping.get(raw_name)
+                # Resolve alias to actual table name
+                dimension_data["table_name"] = self._resolve_table_alias(
+                    table_name, alias_mapping
                 )
+                elements.append({"type": "dimension", "data": dimension_data})
 
             # Add parameters
             for col in datasource.findall(".//column[@param-domain-type]"):
@@ -746,3 +782,137 @@ class TableauXMLParser:
                 elements.append({"type": "relationships", "data": rel_data})
 
         return elements
+
+    def _build_table_mapping(self, datasource: Element) -> Dict[str, str]:
+        """Build mapping from column names to table names using metadata records.
+
+        Args:
+            datasource: Datasource element containing metadata records
+
+        Returns:
+            Dict mapping column names to table names
+        """
+        table_mapping = {}
+
+        # Extract table associations from metadata records
+        for metadata in datasource.findall(".//metadata-record[@class='column']"):
+            local_name_elem = metadata.find("local-name")
+            parent_name_elem = metadata.find("parent-name")
+
+            if local_name_elem is not None and parent_name_elem is not None:
+                # local-name contains the column name like [title] or [id (credits)]
+                column_name = local_name_elem.text
+                # parent-name contains the table name like [movies_data] or [credits]
+                table_name = parent_name_elem.text
+
+                if column_name and table_name:
+                    # Strip brackets from both names
+                    clean_column_name = column_name.strip("[]")
+                    clean_table_name = table_name.strip("[]")
+
+                    # Map column name to table name
+                    table_mapping[clean_column_name] = clean_table_name
+
+        # Also create mapping for all actual column names from datasource
+        for col in datasource.findall(".//column"):
+            col_name = col.get("name", "")
+            if col_name:
+                # Strip brackets from column name
+                clean_col_name = col_name.strip("[]")
+
+                # Try to find matching metadata record
+                for metadata in datasource.findall(
+                    ".//metadata-record[@class='column']"
+                ):
+                    local_name_elem = metadata.find("local-name")
+                    parent_name_elem = metadata.find("parent-name")
+
+                    if local_name_elem is not None and parent_name_elem is not None:
+                        metadata_col_name = local_name_elem.text
+                        if metadata_col_name:
+                            metadata_clean_name = metadata_col_name.strip("[]")
+
+                            # Check if this column matches the metadata record
+                            # Handle cases like [adult (movies_data2)] matching [adult]
+                            if (
+                                clean_col_name == metadata_clean_name
+                                or clean_col_name.startswith(metadata_clean_name + " (")
+                                or metadata_clean_name.startswith(clean_col_name + " (")
+                            ):
+                                table_name = parent_name_elem.text
+                                if table_name:
+                                    clean_table_name = table_name.strip("[]")
+                                    table_mapping[clean_col_name] = clean_table_name
+                                    break
+
+        return table_mapping
+
+    def _build_alias_mapping(self, datasource: Element) -> Dict[str, str]:
+        """Build mapping from table aliases to actual table names.
+
+        Args:
+            datasource: Datasource element containing relationships with table aliases
+
+        Returns:
+            Dict mapping alias names to actual table names
+        """
+        alias_mapping = {}
+
+        # Get all actual table names from the datasource
+        actual_tables = set()
+        for relation in datasource.findall(".//relation[@type='table']"):
+            name = relation.get("name")
+            if name:
+                actual_tables.add(name)
+
+        # Look for table aliases in object-graph
+        for rel in datasource.findall(
+            ".//object-graph//object/properties/relation[@type='table']"
+        ):
+            name = rel.get("name")
+            if name:
+                actual_tables.add(name)
+
+        # Process relationships to find aliases
+        rel_data = self.extract_relationships(datasource)
+        for relationship in rel_data.get("relationships", []):
+            table_aliases = relationship.get("table_aliases", {})
+            for alias, actual_table in table_aliases.items():
+                # Clean the actual table name (remove brackets and schema)
+                clean_actual = (
+                    actual_table.split(".")[-1].strip("[]")
+                    if "." in actual_table
+                    else actual_table.strip("[]")
+                )
+
+                # If this points to an actual table, map the alias
+                if clean_actual in actual_tables or alias in actual_tables:
+                    # Use the actual table name (the one in our tables array)
+                    if alias in actual_tables:
+                        alias_mapping[alias] = alias  # Direct mapping
+                    else:
+                        # Find the corresponding actual table name
+                        for table_name in actual_tables:
+                            if table_name in actual_table or clean_actual == table_name:
+                                alias_mapping[alias] = table_name
+                                break
+
+        return alias_mapping
+
+    def _resolve_table_alias(
+        self, table_name: str, alias_mapping: Dict[str, str]
+    ) -> str:
+        """Resolve a table alias to the actual table name.
+
+        Args:
+            table_name: Table name (possibly an alias)
+            alias_mapping: Mapping from aliases to actual table names
+
+        Returns:
+            Actual table name
+        """
+        if not table_name:
+            return table_name
+
+        # Return the resolved table name or the original if not found
+        return alias_mapping.get(table_name, table_name)

@@ -10,3 +10,4 @@ wheels/
 .venv
 sample_twb_files/processed_pipeline_output.json
 .coverage
+sample_twb_files/generated_lookml*

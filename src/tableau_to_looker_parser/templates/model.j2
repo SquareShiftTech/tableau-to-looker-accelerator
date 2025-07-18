@@ -1,0 +1,31 @@
+# Generated LookML model
+# Project: {{ project_name }}
+
+connection: "{{ connection_name or 'default_connection' }}"
+
+# Include all views
+{% for view in views %}
+include: "{{ view.name | clean_name }}.lkml"
+{% endfor %}
+
+# Explores
+{% for explore in explores %}
+
+explore: {{ explore.name | clean_name }} {
+  {% if explore.description %}
+  description: "{{ explore.description }}"
+  {% endif %}
+
+  {% if explore.joins %}
+  {% for join in explore.joins %}
+  join: {{ join.view_name | clean_name }} {
+    type: {{ join.type }}
+    sql_on: {{ join.sql_on }} ;;
+    {% if join.relationship %}
+    relationship: {{ join.relationship }}
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+}
+{% endfor %}

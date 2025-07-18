@@ -83,6 +83,7 @@ class MeasureHandler(BaseHandler):
             "aggregation": self.AGGREGATION_MAP.get(
                 data["aggregation"].lower(), AggregationType.SUM
             ),
+            "table_name": data.get("table_name"),  # Include table association
             "label": data.get("label"),
             "description": self._build_description(data),
             "hidden": False,

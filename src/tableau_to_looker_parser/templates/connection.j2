@@ -1,0 +1,30 @@
+connection: "{{ connection_name or 'default_connection' }}" {
+  # Database connection configuration
+  {% if database_type == 'bigquery' %}
+  database: "{{ database or 'default_database' }}"
+  {% if username %}service_account: "{{ username }}"{% endif %}
+  {% elif database_type == 'snowflake' %}
+  database: "{{ database or 'default_database' }}"
+  {% if host %}host: "{{ host }}"{% endif %}
+  {% if port %}port: {{ port }}{% endif %}
+  {% if username %}username: "{{ username }}"{% endif %}
+  {% if schema %}schema: "{{ schema }}"{% endif %}
+  {% else %}
+  database: "{{ database or 'default_database' }}"
+  {% if host %}host: "{{ host }}"{% endif %}
+  {% if port %}port: {{ port }}{% endif %}
+  {% if username %}username: "{{ username }}"{% endif %}
+  {% if schema %}schema: "{{ schema }}"{% endif %}
+  {% endif %}
+
+  # Additional connection parameters
+  max_connections: 100
+  pool_timeout: 300
+
+  # SSL and security settings (if applicable)
+  {% if connection.ssl_enabled %}
+  ssl: yes
+  {% endif %}
+
+  # Generated from Tableau connection: {{ database_type }}
+}
