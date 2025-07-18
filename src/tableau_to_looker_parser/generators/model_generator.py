@@ -201,7 +201,7 @@ class ModelGenerator(BaseGenerator):
                 return {
                     "view_name": join_table_alias,
                     "type": relationship.get("join_type", "inner"),
-                    "sql_on": f"${{{primary_table['name']}}}.{primary_field} = ${{{join_table_alias}}}.{join_field}",
+                    "sql_on": f"${{{primary_table['name']}.{primary_field}}} = ${{{join_table_alias}.{join_field}}}",
                     "relationship": "one_to_one",
                 }
 
@@ -233,7 +233,7 @@ class ModelGenerator(BaseGenerator):
 
         # Create proper join condition
         return (
-            f"${{{primary_table_name}}}.{right_field} = ${{{join_table}}}.{left_field}"
+            f"${{{primary_table_name}.{right_field}}} = ${{{join_table}.{left_field}}}"
         )
 
     def _extract_field_name(self, expression: str) -> str:
