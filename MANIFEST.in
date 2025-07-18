@@ -1,7 +1,8 @@
 include README.md
 include SETUP.md
 include LICENSE
-recursive-include src/tableau_looker_lib *.py
+recursive-include src/tableau_looker_parser *.py
+recursive-include src/tableau_looker_parser *.j2
 recursive-include tests *.py
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
