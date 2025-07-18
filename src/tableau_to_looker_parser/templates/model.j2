@@ -5,7 +5,7 @@ connection: "{{ connection_name or 'default_connection' }}"
 
 # Include all views
 {% for view in views %}
-include: "{{ view.name | clean_name }}.lkml"
+include: "{{ view.name | clean_name }}.view.lkml"
 {% endfor %}
 
 # Explores
