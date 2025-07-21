@@ -237,11 +237,25 @@ class ModelGenerator(BaseGenerator):
         )
 
     def _extract_field_name(self, expression: str) -> str:
-        """Extract field name from expression, removing table references."""
-        # Handle formats like "id (credits)" -> "id" or "id" -> "id"
-        if "(" in expression:
-            return expression.split("(")[0].strip()
-        return expression.strip().replace(" ", "_").lower()
+        """Extract field name from expression using same logic as view generator."""
+        import re
+
+        # Remove brackets
+        name = expression.strip("[]")
+
+        # Convert to lowercase
+        name = name.lower()
+
+        # Replace spaces and special chars with underscore
+        name = re.sub(r"[^a-z0-9]+", "_", name)
+
+        # Remove duplicate underscores
+        name = re.sub(r"_+", "_", name)
+
+        # Remove leading/trailing underscores
+        name = name.strip("_")
+
+        return name
 
     def _get_connection_name(self, migration_data: Dict) -> str:
         """Get connection name for the model."""
