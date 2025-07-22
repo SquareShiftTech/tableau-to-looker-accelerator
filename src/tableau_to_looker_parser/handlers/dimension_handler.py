@@ -47,6 +47,10 @@ class DimensionHandler(BaseHandler):
         if param_type:
             return 0.0
 
+        # Check if this has a calculation - if so, defer to CalculatedFieldHandler
+        if data.get("calculation"):
+            return 0.0
+
         # High confidence if it's a dimension with known datatype
         if role == "dimension" and datatype in self.TYPE_MAP:
             return 1.0

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -266,6 +266,40 @@ class PhysicalJoinSchema(BaseModel):
 RelationshipSchema = Union[LogicalRelationshipSchema, PhysicalJoinSchema]
 
 
+class CalculatedFieldCalculation(BaseModel):
+    """Schema for calculated field calculation data."""
+
+    original_formula: str
+    ast: Optional[Dict[str, Any]] = None  # AST representation as dict
+    complexity: str = "unknown"  # "simple", "medium", "complex", "unknown"
+    dependencies: List[str] = Field(default_factory=list)
+    requires_aggregation: bool = False
+    is_deterministic: bool = True
+    parse_confidence: float = 0.0
+    parse_error: Optional[str] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "original_formula": "IF [Sales] > 1000 THEN 'High' ELSE 'Low' END",
+                    "ast": {
+                        "node_type": "conditional",
+                        "condition": {"node_type": "comparison", "operator": ">"},
+                        "then_branch": {"node_type": "literal", "value": "High"},
+                        "else_branch": {"node_type": "literal", "value": "Low"},
+                    },
+                    "complexity": "simple",
+                    "dependencies": ["sales"],
+                    "requires_aggregation": False,
+                    "is_deterministic": True,
+                    "parse_confidence": 0.95,
+                }
+            ]
+        }
+    )
+
+
 class DimensionSchema(BaseModel):
     """Schema for dimension fields"""
 
@@ -279,7 +313,11 @@ class DimensionSchema(BaseModel):
     sql: Optional[str] = None
     sql_column: Optional[str] = None  # Database column name
     group_label: Optional[str] = None
-    calculation: Optional[str] = None  # Calculated field formula
+    calculation: Optional[str] = None  # Calculated field formula (legacy)
+
+    # Enhanced calculated field support
+    calculated_field: Optional[CalculatedFieldCalculation] = None
+    is_calculated: bool = False
 
 
 class AggregationType(str, Enum):
@@ -305,6 +343,63 @@ class MeasureSchema(BaseModel):
     value_format: Optional[str] = None
     group_label: Optional[str] = None
 
+    # Enhanced calculated field support
+    calculated_field: Optional[CalculatedFieldCalculation] = None
+    is_calculated: bool = False
+
+
+class CalculatedFieldSchema(BaseModel):
+    """Schema for calculated fields (both dimensions and measures)."""
+
+    name: str
+    original_name: str
+    role: str  # "dimension" or "measure"
+    field_type: str  # Same as role for compatibility
+    datatype: str  # "string", "integer", "real", "boolean", "date", "datetime"
+
+    # Calculation data
+    calculation: CalculatedFieldCalculation
+
+    # Field metadata
+    table_name: Optional[str] = None
+    aggregation: str = "none"
+    default_aggregate: Optional[str] = None
+    number_format: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    folder: Optional[str] = None
+    hidden: bool = False
+
+    # Quality metrics
+    validation_errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+    # Handler metadata
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "sales_category",
+                    "original_name": "[Sales Category]",
+                    "role": "dimension",
+                    "field_type": "dimension",
+                    "datatype": "string",
+                    "calculation": {
+                        "original_formula": "IF [Sales] > 1000 THEN 'High' ELSE 'Low' END",
+                        "complexity": "simple",
+                        "dependencies": ["sales"],
+                        "parse_confidence": 0.95,
+                    },
+                    "label": "Sales Category",
+                    "validation_errors": [],
+                    "warnings": [],
+                }
+            ]
+        }
+    )
+
 
 class ParameterSchema(BaseModel):
     """Schema for parameter fields"""
@@ -326,6 +421,7 @@ class ViewSchema(BaseModel):
     dimensions: List[DimensionSchema] = Field(default_factory=list)
     measures: List[MeasureSchema] = Field(default_factory=list)
     parameters: List[ParameterSchema] = Field(default_factory=list)
+    calculated_fields: List[CalculatedFieldSchema] = Field(default_factory=list)
     source_table: Optional[str] = None
     relationships: List[RelationshipSchema] = Field(default_factory=list)
 

@@ -11,6 +11,9 @@ from tableau_to_looker_parser.handlers.connection_handler import ConnectionHandl
 from tableau_to_looker_parser.handlers.dimension_handler import DimensionHandler
 from tableau_to_looker_parser.handlers.measure_handler import MeasureHandler
 from tableau_to_looker_parser.handlers.parameter_handler import ParameterHandler
+from tableau_to_looker_parser.handlers.calculated_field_handler import (
+    CalculatedFieldHandler,
+)
 
 
 class MigrationEngine:
@@ -33,6 +36,9 @@ class MigrationEngine:
         self.register_handler(DimensionHandler(), priority=3)
         self.register_handler(MeasureHandler(), priority=4)
         self.register_handler(ParameterHandler(), priority=5)
+        self.register_handler(
+            CalculatedFieldHandler(), priority=6
+        )  # After regular fields
 
     def register_handler(self, handler: BaseHandler, priority: int = 100) -> None:
         """Register a handler with the engine.
@@ -89,6 +95,7 @@ class MigrationEngine:
                 "dimensions": [],
                 "measures": [],
                 "parameters": [],
+                "calculated_fields": [],
             }
 
             # Process with handlers using clean architecture
@@ -117,7 +124,10 @@ class MigrationEngine:
                         json_data = handler.convert_to_json(element_data)
 
                         # Route to appropriate result category
-                        if element["type"] == "measure":
+                        # Check if this is a calculated field first
+                        if handler.__class__.__name__ == "CalculatedFieldHandler":
+                            result["calculated_fields"].append(json_data)
+                        elif element["type"] == "measure":
                             result["measures"].append(json_data)
                         elif element["type"] == "dimension":
                             result["dimensions"].append(json_data)

@@ -59,6 +59,10 @@ class MeasureHandler(BaseHandler):
         if data.get("param_domain_type"):
             return 0.0
 
+        # Check if this has a calculation - if so, defer to CalculatedFieldHandler
+        if data.get("calculation"):
+            return 0.0
+
         # High confidence for measures, especially quantitative
         if data.get("datatype") == "real":
             return 1.0
