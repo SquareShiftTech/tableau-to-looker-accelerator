@@ -1,0 +1,286 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<workbook original-version='18.1' source-build='2025.2.0' source-platform='win' version='18.1'>
+  <datasources>
+    <datasource caption='Student-Course Many-to-Many' inline='true' name='student_course_bridge' version='18.1'>
+      <connection class='federated'>
+        <named-connections>
+          <named-connection caption='BigQuery' name='bigquery.education'>
+            <connection CATALOG='education-analytics' EXECCATALOG='university-db' authentication='oauth' class='bigquery' connection-dialect='google-sql' project='education-proj' schema='academic' server-oauth='' username='registrar@university.edu' />
+          </named-connection>
+        </named-connections>
+        <relation type='collection'>
+          <relation connection='bigquery.education' name='students' table='[education-analytics.academic].[students]' type='table' />
+          <relation connection='bigquery.education' name='student_enrollments' table='[education-analytics.academic].[student_enrollments]' type='table' />
+          <relation connection='bigquery.education' name='courses' table='[education-analytics.academic].[courses]' type='table' />
+          <relation connection='bigquery.education' name='professors' table='[education-analytics.academic].[professors]' type='table' />
+          <relation connection='bigquery.education' name='departments' table='[education-analytics.academic].[departments]' type='table' />
+        </relation>
+        <cols>
+          <!-- Students -->
+          <map key='[student_id]' value='[students].[student_id]' />
+          <map key='[student_first_name]' value='[students].[first_name]' />
+          <map key='[student_last_name]' value='[students].[last_name]' />
+          <map key='[student_email]' value='[students].[email]' />
+          <map key='[enrollment_date]' value='[students].[enrollment_date]' />
+          <map key='[student_status]' value='[students].[student_status]' />
+          <map key='[major]' value='[students].[major]' />
+          <map key='[year_level]' value='[students].[year_level]' />
+
+          <!-- Student Enrollments (Bridge Table) -->
+          <map key='[enrollment_id]' value='[student_enrollments].[enrollment_id]' />
+          <map key='[student_id (enrollments)]' value='[student_enrollments].[student_id]' />
+          <map key='[course_id (enrollments)]' value='[student_enrollments].[course_id]' />
+          <map key='[semester]' value='[student_enrollments].[semester]' />
+          <map key='[year]' value='[student_enrollments].[year]' />
+          <map key='[grade]' value='[student_enrollments].[grade]' />
+          <map key='[credits_earned]' value='[student_enrollments].[credits_earned]' />
+          <map key='[enrollment_status]' value='[student_enrollments].[enrollment_status]' />
+
+          <!-- Courses -->
+          <map key='[course_id (courses)]' value='[courses].[course_id]' />
+          <map key='[course_code]' value='[courses].[course_code]' />
+          <map key='[course_name]' value='[courses].[course_name]' />
+          <map key='[course_description]' value='[courses].[course_description]' />
+          <map key='[credit_hours]' value='[courses].[credit_hours]' />
+          <map key='[professor_id (courses)]' value='[courses].[professor_id]' />
+          <map key='[department_id (courses)]' value='[courses].[department_id]' />
+          <map key='[course_level]' value='[courses].[course_level]' />
+
+          <!-- Professors -->
+          <map key='[professor_id (professors)]' value='[professors].[professor_id]' />
+          <map key='[professor_first_name]' value='[professors].[first_name]' />
+          <map key='[professor_last_name]' value='[professors].[last_name]' />
+          <map key='[professor_email]' value='[professors].[email]' />
+          <map key='[hire_date]' value='[professors].[hire_date]' />
+          <map key='[tenure_status]' value='[professors].[tenure_status]' />
+          <map key='[department_id (professors)]' value='[professors].[department_id]' />
+
+          <!-- Departments -->
+          <map key='[department_id (departments)]' value='[departments].[department_id]' />
+          <map key='[department_name]' value='[departments].[department_name]' />
+          <map key='[department_head]' value='[departments].[department_head]' />
+          <map key='[building]' value='[departments].[building]' />
+          <map key='[budget]' value='[departments].[budget]' />
+        </cols>
+        <metadata-records>
+          <!-- Students metadata -->
+          <metadata-record class='column'>
+            <remote-name>student_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[student_id]</local-name>
+            <parent-name>[students]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Student Enrollments metadata -->
+          <metadata-record class='column'>
+            <remote-name>enrollment_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[enrollment_id]</local-name>
+            <parent-name>[student_enrollments]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>student_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[student_id (enrollments)]</local-name>
+            <parent-name>[student_enrollments]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>course_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[course_id (enrollments)]</local-name>
+            <parent-name>[student_enrollments]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Courses metadata -->
+          <metadata-record class='column'>
+            <remote-name>course_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[course_id (courses)]</local-name>
+            <parent-name>[courses]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>professor_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[professor_id (courses)]</local-name>
+            <parent-name>[courses]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>department_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[department_id (courses)]</local-name>
+            <parent-name>[courses]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Professors metadata -->
+          <metadata-record class='column'>
+            <remote-name>professor_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[professor_id (professors)]</local-name>
+            <parent-name>[professors]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>department_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[department_id (professors)]</local-name>
+            <parent-name>[professors]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Departments metadata -->
+          <metadata-record class='column'>
+            <remote-name>department_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[department_id (departments)]</local-name>
+            <parent-name>[departments]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled='yes' />
+
+      <!-- Column definitions for dimensions and measures -->
+
+      <!-- Student dimensions -->
+      <column caption='Student ID' datatype='integer' name='[student_id]' role='dimension' type='ordinal' />
+      <column caption='Student First Name' datatype='string' name='[student_first_name]' role='dimension' type='nominal' />
+      <column caption='Student Last Name' datatype='string' name='[student_last_name]' role='dimension' type='nominal' />
+      <column caption='Student Email' datatype='string' name='[student_email]' role='dimension' type='nominal' />
+      <column caption='Major' datatype='string' name='[major]' role='dimension' type='nominal' />
+      <column caption='Year Level' datatype='string' name='[year_level]' role='dimension' type='nominal' />
+      <column caption='Student Status' datatype='string' name='[student_status]' role='dimension' type='nominal' />
+      <column caption='Enrollment Date' datatype='date' name='[enrollment_date]' role='dimension' type='ordinal' />
+
+      <!-- Bridge table (Student Enrollments) dimensions -->
+      <column caption='Enrollment ID' datatype='integer' name='[enrollment_id]' role='dimension' type='ordinal' />
+      <column caption='Student ID (Enrollments)' datatype='integer' name='[student_id (enrollments)]' role='dimension' type='ordinal' />
+      <column caption='Course ID (Enrollments)' datatype='integer' name='[course_id (enrollments)]' role='dimension' type='ordinal' />
+      <column caption='Semester' datatype='string' name='[semester]' role='dimension' type='nominal' />
+      <column caption='Year' datatype='integer' name='[year]' role='dimension' type='ordinal' />
+      <column caption='Grade' datatype='string' name='[grade]' role='dimension' type='nominal' />
+      <column caption='Enrollment Status' datatype='string' name='[enrollment_status]' role='dimension' type='nominal' />
+
+      <!-- Course dimensions -->
+      <column caption='Course ID (Courses)' datatype='integer' name='[course_id (courses)]' role='dimension' type='ordinal' />
+      <column caption='Course Code' datatype='string' name='[course_code]' role='dimension' type='nominal' />
+      <column caption='Course Name' datatype='string' name='[course_name]' role='dimension' type='nominal' />
+      <column caption='Course Description' datatype='string' name='[course_description]' role='dimension' type='nominal' />
+      <column caption='Course Level' datatype='string' name='[course_level]' role='dimension' type='nominal' />
+      <column caption='Professor ID (Courses)' datatype='integer' name='[professor_id (courses)]' role='dimension' type='ordinal' />
+      <column caption='Department ID (Courses)' datatype='integer' name='[department_id (courses)]' role='dimension' type='ordinal' />
+
+      <!-- Professor dimensions -->
+      <column caption='Professor ID (Professors)' datatype='integer' name='[professor_id (professors)]' role='dimension' type='ordinal' />
+      <column caption='Professor First Name' datatype='string' name='[professor_first_name]' role='dimension' type='nominal' />
+      <column caption='Professor Last Name' datatype='string' name='[professor_last_name]' role='dimension' type='nominal' />
+      <column caption='Professor Email' datatype='string' name='[professor_email]' role='dimension' type='nominal' />
+      <column caption='Title' datatype='string' name='[title]' role='dimension' type='nominal' />
+      <column caption='Hire Date' datatype='date' name='[hire_date]' role='dimension' type='ordinal' />
+
+      <!-- Department dimensions -->
+      <column caption='Department ID (Departments)' datatype='integer' name='[department_id (departments)]' role='dimension' type='ordinal' />
+      <column caption='Department Name' datatype='string' name='[department_name]' role='dimension' type='nominal' />
+      <column caption='Department Head' datatype='string' name='[department_head]' role='dimension' type='nominal' />
+      <column caption='Location' datatype='string' name='[location]' role='dimension' type='nominal' />
+
+      <!-- Measures -->
+      <column caption='Credit Hours' datatype='real' name='[credit_hours]' role='measure' type='quantitative' />
+      <column caption='Credits Earned' datatype='real' name='[credits_earned]' role='measure' type='quantitative' />
+      <column caption='Budget' datatype='real' name='[budget]' role='measure' type='quantitative' />
+
+      <layout dim-ordering='alphabetic' measure-ordering='alphabetic' show-structure='true' />
+      <object-graph>
+        <objects>
+          <object caption='students' id='students_001'>
+            <properties context=''>
+              <relation connection='bigquery.education' name='students' table='[education-analytics.academic].[students]' type='table' />
+            </properties>
+          </object>
+          <object caption='student_enrollments' id='enrollments_001'>
+            <properties context=''>
+              <relation connection='bigquery.education' name='student_enrollments' table='[education-analytics.academic].[student_enrollments]' type='table' />
+            </properties>
+          </object>
+          <object caption='courses' id='courses_001'>
+            <properties context=''>
+              <relation connection='bigquery.education' name='courses' table='[education-analytics.academic].[courses]' type='table' />
+            </properties>
+          </object>
+          <object caption='professors' id='professors_001'>
+            <properties context=''>
+              <relation connection='bigquery.education' name='professors' table='[education-analytics.academic].[professors]' type='table' />
+            </properties>
+          </object>
+          <object caption='departments' id='departments_001'>
+            <properties context=''>
+              <relation connection='bigquery.education' name='departments' table='[education-analytics.academic].[departments]' type='table' />
+            </properties>
+          </object>
+        </objects>
+        <relationships>
+          <!-- Many-to-Many: Students ↔ Student_Enrollments ↔ Courses -->
+          <!-- Students to Student_Enrollments -->
+          <relationship>
+            <expression op='='>
+              <expression op='[student_id]' />
+              <expression op='[student_id (enrollments)]' />
+            </expression>
+            <first-end-point object-id='students_001' />
+            <second-end-point object-id='enrollments_001' />
+          </relationship>
+
+          <!-- Student_Enrollments to Courses -->
+          <relationship>
+            <expression op='='>
+              <expression op='[course_id (enrollments)]' />
+              <expression op='[course_id (courses)]' />
+            </expression>
+            <first-end-point object-id='enrollments_001' />
+            <second-end-point object-id='courses_001' />
+          </relationship>
+
+          <!-- Courses to Professors -->
+          <relationship>
+            <expression op='='>
+              <expression op='[professor_id (courses)]' />
+              <expression op='[professor_id (professors)]' />
+            </expression>
+            <first-end-point object-id='courses_001' />
+            <second-end-point object-id='professors_001' />
+          </relationship>
+
+          <!-- Courses to Departments -->
+          <relationship>
+            <expression op='='>
+              <expression op='[department_id (courses)]' />
+              <expression op='[department_id (departments)]' />
+            </expression>
+            <first-end-point object-id='courses_001' />
+            <second-end-point object-id='departments_001' />
+          </relationship>
+
+          <!-- Professors to Departments -->
+          <relationship>
+            <expression op='='>
+              <expression op='[department_id (professors)]' />
+              <expression op='[department_id (departments)]' />
+            </expression>
+            <first-end-point object-id='professors_001' />
+            <second-end-point object-id='departments_001' />
+          </relationship>
+        </relationships>
+      </object-graph>
+    </datasource>
+  </datasources>
+  <worksheets>
+    <worksheet name='Academic Analysis'>
+    </worksheet>
+  </worksheets>
+</workbook>

@@ -1,0 +1,301 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<workbook original-version='18.1' source-build='2025.2.0' source-platform='win' version='18.1'>
+  <datasources>
+    <datasource caption='E-commerce Chain Joins' inline='true' name='ecommerce_chain' version='18.1'>
+      <connection class='federated'>
+        <named-connections>
+          <named-connection caption='BigQuery' name='bigquery.ecommerce'>
+            <connection CATALOG='ecommerce-analytics' EXECCATALOG='ecommerce-db' authentication='oauth' class='bigquery' connection-dialect='google-sql' project='ecommerce-proj' schema='public' server-oauth='' username='analytics@ecommerce.com' />
+          </named-connection>
+        </named-connections>
+        <relation type='collection'>
+          <relation connection='bigquery.ecommerce' name='orders' table='[ecommerce-analytics.public].[orders]' type='table' />
+          <relation connection='bigquery.ecommerce' name='order_items' table='[ecommerce-analytics.public].[order_items]' type='table' />
+          <relation connection='bigquery.ecommerce' name='products' table='[ecommerce-analytics.public].[products]' type='table' />
+          <relation connection='bigquery.ecommerce' name='categories' table='[ecommerce-analytics.public].[categories]' type='table' />
+          <relation connection='bigquery.ecommerce' name='suppliers' table='[ecommerce-analytics.public].[suppliers]' type='table' />
+          <relation connection='bigquery.ecommerce' name='customers' table='[ecommerce-analytics.public].[customers]' type='table' />
+        </relation>
+        <cols>
+          <!-- Orders -->
+          <map key='[order_id]' value='[orders].[order_id]' />
+          <map key='[customer_id]' value='[orders].[customer_id]' />
+          <map key='[order_date]' value='[orders].[order_date]' />
+          <map key='[order_status]' value='[orders].[order_status]' />
+          <map key='[total_amount]' value='[orders].[total_amount]' />
+
+          <!-- Order Items -->
+          <map key='[item_id (order_items)]' value='[order_items].[item_id]' />
+          <map key='[order_id (order_items)]' value='[order_items].[order_id]' />
+          <map key='[product_id (order_items)]' value='[order_items].[product_id]' />
+          <map key='[quantity]' value='[order_items].[quantity]' />
+          <map key='[unit_price]' value='[order_items].[unit_price]' />
+          <map key='[line_total]' value='[order_items].[line_total]' />
+
+          <!-- Products -->
+          <map key='[product_id (products)]' value='[products].[product_id]' />
+          <map key='[product_name]' value='[products].[product_name]' />
+          <map key='[product_description]' value='[products].[product_description]' />
+          <map key='[category_id (products)]' value='[products].[category_id]' />
+          <map key='[supplier_id (products)]' value='[products].[supplier_id]' />
+          <map key='[price]' value='[products].[price]' />
+          <map key='[stock_quantity]' value='[products].[stock_quantity]' />
+
+          <!-- Categories -->
+          <map key='[category_id (categories)]' value='[categories].[category_id]' />
+          <map key='[category_name]' value='[categories].[category_name]' />
+          <map key='[parent_category_id]' value='[categories].[parent_category_id]' />
+
+          <!-- Suppliers -->
+          <map key='[supplier_id (suppliers)]' value='[suppliers].[supplier_id]' />
+          <map key='[supplier_name]' value='[suppliers].[supplier_name]' />
+          <map key='[supplier_country]' value='[suppliers].[supplier_country]' />
+
+          <!-- Customers -->
+          <map key='[customer_id (customers)]' value='[customers].[customer_id]' />
+          <map key='[customer_name]' value='[customers].[customer_name]' />
+          <map key='[email]' value='[customers].[email]' />
+          <map key='[registration_date]' value='[customers].[registration_date]' />
+        </cols>
+        <metadata-records>
+          <!-- Orders metadata -->
+          <metadata-record class='column'>
+            <remote-name>order_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[order_id]</local-name>
+            <parent-name>[orders]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Order Items metadata -->
+          <metadata-record class='column'>
+            <remote-name>item_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[item_id (order_items)]</local-name>
+            <parent-name>[order_items]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>order_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[order_id (order_items)]</local-name>
+            <parent-name>[order_items]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>product_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[product_id (order_items)]</local-name>
+            <parent-name>[order_items]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Products metadata -->
+          <metadata-record class='column'>
+            <remote-name>product_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[product_id (products)]</local-name>
+            <parent-name>[products]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>category_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[category_id (products)]</local-name>
+            <parent-name>[products]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>supplier_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[supplier_id (products)]</local-name>
+            <parent-name>[products]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Categories metadata -->
+          <metadata-record class='column'>
+            <remote-name>category_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[category_id (categories)]</local-name>
+            <parent-name>[categories]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Suppliers metadata -->
+          <metadata-record class='column'>
+            <remote-name>supplier_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[supplier_id (suppliers)]</local-name>
+            <parent-name>[suppliers]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+
+          <!-- Customers metadata -->
+          <metadata-record class='column'>
+            <remote-name>customer_id</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[customer_id (customers)]</local-name>
+            <parent-name>[customers]</parent-name>
+            <local-type>integer</local-type>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled='yes' />
+
+      <!-- Column definitions for dimensions and measures -->
+
+      <!-- Orders dimensions -->
+      <column caption='Order ID' datatype='integer' name='[order_id]' role='dimension' type='ordinal' />
+      <column caption='Customer ID' datatype='integer' name='[customer_id]' role='dimension' type='ordinal' />
+      <column caption='Order Date' datatype='date' name='[order_date]' role='dimension' type='ordinal' />
+      <column caption='Order Status' datatype='string' name='[order_status]' role='dimension' type='nominal' />
+      <column caption='Ship Date' datatype='date' name='[ship_date]' role='dimension' type='ordinal' />
+      <column caption='Ship Mode' datatype='string' name='[ship_mode]' role='dimension' type='nominal' />
+      <column caption='Priority' datatype='string' name='[priority]' role='dimension' type='nominal' />
+
+      <!-- Order Items dimensions -->
+      <column caption='Item ID (Order Items)' datatype='integer' name='[item_id (order_items)]' role='dimension' type='ordinal' />
+      <column caption='Order ID (Order Items)' datatype='integer' name='[order_id (order_items)]' role='dimension' type='ordinal' />
+      <column caption='Product ID (Order Items)' datatype='integer' name='[product_id (order_items)]' role='dimension' type='ordinal' />
+      <column caption='Quantity' datatype='integer' name='[quantity]' role='dimension' type='ordinal' />
+      <column caption='Discount Percent' datatype='real' name='[discount_percent]' role='dimension' type='ordinal' />
+
+      <!-- Products dimensions -->
+      <column caption='Product ID (Products)' datatype='integer' name='[product_id (products)]' role='dimension' type='ordinal' />
+      <column caption='Product Name' datatype='string' name='[product_name]' role='dimension' type='nominal' />
+      <column caption='Category ID (Products)' datatype='integer' name='[category_id (products)]' role='dimension' type='ordinal' />
+      <column caption='Supplier ID (Products)' datatype='integer' name='[supplier_id (products)]' role='dimension' type='ordinal' />
+      <column caption='Product Description' datatype='string' name='[product_description]' role='dimension' type='nominal' />
+      <column caption='Brand' datatype='string' name='[brand]' role='dimension' type='nominal' />
+      <column caption='Size' datatype='string' name='[size]' role='dimension' type='nominal' />
+      <column caption='Color' datatype='string' name='[color]' role='dimension' type='nominal' />
+      <column caption='Weight' datatype='real' name='[weight]' role='dimension' type='ordinal' />
+
+      <!-- Categories dimensions -->
+      <column caption='Category ID (Categories)' datatype='integer' name='[category_id (categories)]' role='dimension' type='ordinal' />
+      <column caption='Category Name' datatype='string' name='[category_name]' role='dimension' type='nominal' />
+      <column caption='Category Description' datatype='string' name='[category_description]' role='dimension' type='nominal' />
+      <column caption='Parent Category ID' datatype='integer' name='[parent_category_id]' role='dimension' type='ordinal' />
+
+      <!-- Suppliers dimensions -->
+      <column caption='Supplier ID (Suppliers)' datatype='integer' name='[supplier_id (suppliers)]' role='dimension' type='ordinal' />
+      <column caption='Supplier Name' datatype='string' name='[supplier_name]' role='dimension' type='nominal' />
+      <column caption='Contact Person' datatype='string' name='[contact_person]' role='dimension' type='nominal' />
+      <column caption='Supplier Email' datatype='string' name='[supplier_email]' role='dimension' type='nominal' />
+      <column caption='Supplier Phone' datatype='string' name='[supplier_phone]' role='dimension' type='nominal' />
+      <column caption='Address' datatype='string' name='[address]' role='dimension' type='nominal' />
+      <column caption='City' datatype='string' name='[city]' role='dimension' type='nominal' />
+      <column caption='Country' datatype='string' name='[country]' role='dimension' type='nominal' />
+
+      <!-- Customers dimensions -->
+      <column caption='Customer ID (Customers)' datatype='integer' name='[customer_id (customers)]' role='dimension' type='ordinal' />
+      <column caption='Customer First Name' datatype='string' name='[customer_first_name]' role='dimension' type='nominal' />
+      <column caption='Customer Last Name' datatype='string' name='[customer_last_name]' role='dimension' type='nominal' />
+      <column caption='Customer Email' datatype='string' name='[customer_email]' role='dimension' type='nominal' />
+      <column caption='Customer Phone' datatype='string' name='[customer_phone]' role='dimension' type='nominal' />
+      <column caption='Customer Address' datatype='string' name='[customer_address]' role='dimension' type='nominal' />
+      <column caption='Customer City' datatype='string' name='[customer_city]' role='dimension' type='nominal' />
+      <column caption='Customer Country' datatype='string' name='[customer_country]' role='dimension' type='nominal' />
+      <column caption='Registration Date' datatype='date' name='[registration_date]' role='dimension' type='ordinal' />
+
+      <!-- Measures -->
+      <column caption='Total Amount' datatype='real' name='[total_amount]' role='measure' type='quantitative' />
+      <column caption='Unit Price' datatype='real' name='[unit_price]' role='measure' type='quantitative' />
+      <column caption='Discount Amount' datatype='real' name='[discount_amount]' role='measure' type='quantitative' />
+      <column caption='Cost' datatype='real' name='[cost]' role='measure' type='quantitative' />
+
+      <layout dim-ordering='alphabetic' measure-ordering='alphabetic' show-structure='true' />
+      <object-graph>
+        <objects>
+          <object caption='orders' id='orders_001'>
+            <properties context=''>
+              <relation connection='bigquery.ecommerce' name='orders' table='[ecommerce-analytics.public].[orders]' type='table' />
+            </properties>
+          </object>
+          <object caption='order_items' id='order_items_001'>
+            <properties context=''>
+              <relation connection='bigquery.ecommerce' name='order_items' table='[ecommerce-analytics.public].[order_items]' type='table' />
+            </properties>
+          </object>
+          <object caption='products' id='products_001'>
+            <properties context=''>
+              <relation connection='bigquery.ecommerce' name='products' table='[ecommerce-analytics.public].[products]' type='table' />
+            </properties>
+          </object>
+          <object caption='categories' id='categories_001'>
+            <properties context=''>
+              <relation connection='bigquery.ecommerce' name='categories' table='[ecommerce-analytics.public].[categories]' type='table' />
+            </properties>
+          </object>
+          <object caption='suppliers' id='suppliers_001'>
+            <properties context=''>
+              <relation connection='bigquery.ecommerce' name='suppliers' table='[ecommerce-analytics.public].[suppliers]' type='table' />
+            </properties>
+          </object>
+          <object caption='customers' id='customers_001'>
+            <properties context=''>
+              <relation connection='bigquery.ecommerce' name='customers' table='[ecommerce-analytics.public].[customers]' type='table' />
+            </properties>
+          </object>
+        </objects>
+        <relationships>
+          <!-- Chain: Orders -> Order_Items -> Products -> Categories -->
+          <!-- Orders to Order_Items -->
+          <relationship>
+            <expression op='='>
+              <expression op='[order_id]' />
+              <expression op='[order_id (order_items)]' />
+            </expression>
+            <first-end-point object-id='orders_001' />
+            <second-end-point object-id='order_items_001' />
+          </relationship>
+
+          <!-- Order_Items to Products -->
+          <relationship>
+            <expression op='='>
+              <expression op='[product_id (order_items)]' />
+              <expression op='[product_id (products)]' />
+            </expression>
+            <first-end-point object-id='order_items_001' />
+            <second-end-point object-id='products_001' />
+          </relationship>
+
+          <!-- Products to Categories -->
+          <relationship>
+            <expression op='='>
+              <expression op='[category_id (products)]' />
+              <expression op='[category_id (categories)]' />
+            </expression>
+            <first-end-point object-id='products_001' />
+            <second-end-point object-id='categories_001' />
+          </relationship>
+
+          <!-- Products to Suppliers (parallel chain) -->
+          <relationship>
+            <expression op='='>
+              <expression op='[supplier_id (products)]' />
+              <expression op='[supplier_id (suppliers)]' />
+            </expression>
+            <first-end-point object-id='products_001' />
+            <second-end-point object-id='suppliers_001' />
+          </relationship>
+
+          <!-- Orders to Customers (direct relationship) -->
+          <relationship>
+            <expression op='='>
+              <expression op='[customer_id]' />
+              <expression op='[customer_id (customers)]' />
+            </expression>
+            <first-end-point object-id='orders_001' />
+            <second-end-point object-id='customers_001' />
+          </relationship>
+        </relationships>
+      </object-graph>
+    </datasource>
+  </datasources>
+  <worksheets>
+    <worksheet name='Order Analysis'>
+    </worksheet>
+  </worksheets>
+</workbook>

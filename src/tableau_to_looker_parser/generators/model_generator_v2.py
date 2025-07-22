@@ -14,7 +14,7 @@ from .base_generator import BaseGenerator
 logger = logging.getLogger(__name__)
 
 
-class ModelGenerator(BaseGenerator):
+class ModelGeneratorV2(BaseGenerator):
     """Generic Model LookML generator with enhanced relationship handling."""
 
     def generate(self, migration_data: Dict, output_dir: str) -> str:
