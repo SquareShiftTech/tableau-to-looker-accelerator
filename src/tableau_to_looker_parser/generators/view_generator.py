@@ -201,6 +201,9 @@ class ViewGenerator(BaseGenerator):
             # Convert AST to LookML SQL expression
             lookml_sql = self.ast_converter.convert_to_lookml(ast_node, "TABLE")
 
+            # Determine LookML type for measures with aggregation
+            lookml_type = self._determine_lookml_type(calc_field, calculation)
+
             # Build LookML field definition
             converted_field = {
                 "name": self._clean_name(calc_field.get("name", "")),
@@ -211,6 +214,7 @@ class ViewGenerator(BaseGenerator):
                 "sql": lookml_sql,
                 "original_formula": calculation.get("original_formula", ""),
                 "description": f"Calculated field: {calculation.get('original_formula', '')}",
+                "lookml_type": lookml_type,  # Add LookML type for template
             }
 
             logger.debug(
@@ -223,6 +227,49 @@ class ViewGenerator(BaseGenerator):
                 f"Failed to convert calculated field {calc_field.get('name')}: {str(e)}"
             )
             return None
+
+    def _determine_lookml_type(self, calc_field: Dict, calculation: Dict) -> str:
+        """
+        Determine the appropriate LookML type for a calculated field.
+
+        For measures, this detects if the formula already contains aggregation
+        and returns 'number' instead of 'sum' to avoid double aggregation.
+
+        Args:
+            calc_field: Calculated field data
+            calculation: Calculation metadata
+
+        Returns:
+            str: LookML type ('sum', 'number', 'string', 'yesno')
+        """
+        field_role = calc_field.get("role", "dimension")
+
+        if field_role == "dimension":
+            # For dimensions, use appropriate type based on datatype
+            datatype = calc_field.get("datatype", "string")
+            if datatype == "boolean":
+                return "yesno"
+            elif datatype in ["integer", "real"]:
+                return "number"
+            else:
+                return "string"
+        else:
+            # For measures, check if formula already contains aggregation
+            original_formula = calculation.get("original_formula", "")
+            requires_aggregation = calculation.get("requires_aggregation", False)
+
+            # Check if formula contains aggregation functions
+            agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
+            has_aggregation = any(
+                func in original_formula.upper() for func in agg_functions
+            )
+
+            if has_aggregation or requires_aggregation:
+                # Already aggregated - use number type to avoid double aggregation
+                return "number"
+            else:
+                # Not aggregated - use sum type
+                return "sum"
 
     def _format_table_name(self, table_name: str) -> str:
         """Format table name from [schema].[table] to `schema.table`."""

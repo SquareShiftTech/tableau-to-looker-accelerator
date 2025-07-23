@@ -93,12 +93,15 @@ class CalculatedFieldHandler(BaseHandler):
         logger.debug(f"Calculated field confidence for '{name}': {confidence}")
         return confidence
 
-    def convert_to_json(self, data: Dict) -> Dict:
+    def convert_to_json(
+        self, data: Dict, field_table_mapping: Optional[Dict[str, str]] = None
+    ) -> Dict:
         """
         Convert raw calculated field data to schema-compliant JSON.
 
         Args:
             data: Raw data dict from XMLParser containing calculated field info
+            field_table_mapping: Optional mapping from field names to table names
 
         Returns:
             Dict: Schema-compliant calculated field data with AST
@@ -151,7 +154,7 @@ class CalculatedFieldHandler(BaseHandler):
         table_name = data.get("table_name")
         if not table_name and calculated_field.dependencies:
             table_name = self._infer_table_from_dependencies(
-                calculated_field.dependencies, data
+                calculated_field.dependencies, data, field_table_mapping
             )
 
         # Create the JSON representation
@@ -465,7 +468,10 @@ class CalculatedFieldHandler(BaseHandler):
         }
 
     def _infer_table_from_dependencies(
-        self, dependencies: List[str], data: Dict
+        self,
+        dependencies: List[str],
+        data: Dict,
+        field_table_mapping: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """
         Infer table name for calculated field based on its field dependencies.
@@ -476,6 +482,7 @@ class CalculatedFieldHandler(BaseHandler):
         Args:
             dependencies: List of field names this calculated field depends on
             data: Original field data (may contain context)
+            field_table_mapping: Mapping from field names to table names from migration context
 
         Returns:
             Inferred table name or None
@@ -483,32 +490,42 @@ class CalculatedFieldHandler(BaseHandler):
         if not dependencies:
             return None
 
-        # For now, we'll use a simple heuristic: if all dependencies are from the same table,
-        # then the calculated field belongs to that table. This is a reasonable assumption
-        # for most calculated fields.
-
-        # TODO: In a more sophisticated implementation, we could:
-        # 1. Access the migration engine's field registry to look up dependency tables
-        # 2. Use a majority voting system if dependencies span multiple tables
-        # 3. Consider the context of where the calculated field is defined
-
-        # For this fix, we'll infer from common field names and context
         logger.debug(
             f"Inferring table for calculated field with dependencies: {dependencies}"
         )
 
-        # Check if any context hints are available in the data
-        original_name = data.get("name", "")
-        if "movies_data" in original_name.lower():
-            return "movies_data"
-        elif "credits" in original_name.lower():
-            return "credits"
+        # Use dynamic field-to-table mapping if available
+        if field_table_mapping:
+            tables_found = set()
+            for dep in dependencies:
+                # Try exact match first
+                table_name = field_table_mapping.get(dep)
+                if not table_name:
+                    # Try case-insensitive match
+                    for field_name, tbl_name in field_table_mapping.items():
+                        if field_name.lower() == dep.lower():
+                            table_name = tbl_name
+                            break
+                if table_name:
+                    tables_found.add(table_name)
 
-        # Default inference based on first dependency
-        # This is a simple heuristic that works for single-table calculated fields
+            # If all dependencies point to the same table, use that table
+            if len(tables_found) == 1:
+                inferred_table = tables_found.pop()
+                logger.debug(f"Inferred table '{inferred_table}' from field mapping")
+                return inferred_table
+            elif len(tables_found) > 1:
+                # Multiple tables - use the most common one or first alphabetically for consistency
+                inferred_table = sorted(tables_found)[0]
+                logger.warning(
+                    f"Calculated field dependencies span multiple tables: {tables_found}. Using '{inferred_table}'"
+                )
+                return inferred_table
+
+        # Fallback to hardcoded patterns for backward compatibility
         first_dep = dependencies[0]
 
-        # Common field patterns to table mapping
+        # Common field patterns to table mapping (fallback only)
         movie_fields = {
             "adult",
             "budget",
@@ -528,8 +545,10 @@ class CalculatedFieldHandler(BaseHandler):
         credit_fields = {"cast_members", "crew", "id_credits"}
 
         if first_dep in movie_fields:
+            logger.debug(f"Using fallback mapping: '{first_dep}' -> 'movies_data'")
             return "movies_data"
         elif first_dep in credit_fields:
+            logger.debug(f"Using fallback mapping: '{first_dep}' -> 'credits'")
             return "credits"
 
         # If we can't infer, log a warning and return None

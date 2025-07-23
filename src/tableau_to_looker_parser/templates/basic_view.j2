@@ -88,7 +88,9 @@ view: {{ view_name }} {
   {% else %}
   measure: {{ calc_field.name }} {
     description: "{{ calc_field.description }}"
-    {% if calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
+    {% if calc_field.lookml_type %}
+    type: {{ calc_field.lookml_type }}
+    {% elif calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
     type: sum
     {% else %}
     type: sum
