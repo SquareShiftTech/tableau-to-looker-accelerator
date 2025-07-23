@@ -213,7 +213,7 @@ class ViewGenerator(BaseGenerator):
                 "datatype": calc_field.get("datatype", "string"),
                 "sql": lookml_sql,
                 "original_formula": calculation.get("original_formula", ""),
-                "description": f"Calculated field: {calculation.get('original_formula', '')}",
+                "description": f"Calculated field: {self._normalize_formula_for_description(calculation.get('original_formula', ''))}",
                 "lookml_type": lookml_type,  # Add LookML type for template
             }
 
@@ -270,6 +270,19 @@ class ViewGenerator(BaseGenerator):
             else:
                 # Not aggregated - use sum type
                 return "sum"
+
+    def _normalize_formula_for_description(self, formula: str) -> str:
+        """Normalize multi-line formulas for use in descriptions."""
+        if not formula:
+            return formula
+
+        import re
+
+        # Replace line breaks with spaces and normalize whitespace
+        single_line = re.sub(r"\s*\n\s*", " ", formula.strip())
+        # Normalize multiple spaces to single space
+        single_line = re.sub(r"\s+", " ", single_line)
+        return single_line
 
     def _format_table_name(self, table_name: str) -> str:
         """Format table name from [schema].[table] to `schema.table`."""
