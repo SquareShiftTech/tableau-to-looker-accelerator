@@ -104,8 +104,18 @@ class CalculatedFieldHandler(BaseHandler):
             Dict: Schema-compliant calculated field data with AST
         """
         # Extract basic field information
-        field_name = data.get("name", "").strip("[]")
-        original_name = data.get("name", "")
+        # Prefer user-friendly caption/label over auto-generated Tableau ID
+        user_caption = data.get("caption") or data.get("label")
+        if user_caption:
+            # Use caption for clean field name (convert to snake_case for LookML compatibility)
+            field_name = user_caption.lower().replace(" ", "_").replace("-", "_")
+            display_name = user_caption
+        else:
+            # Fallback to Tableau's generated name
+            field_name = data.get("name", "").strip("[]")
+            display_name = field_name
+
+        original_name = data.get("name", "")  # Always preserve Tableau's internal ID
         role = data.get("role", "dimension")
         calculation = data.get("calculation", "")
 
@@ -125,6 +135,7 @@ class CalculatedFieldHandler(BaseHandler):
             return self._create_fallback_calculated_field(
                 data=data,
                 field_name=field_name,
+                display_name=display_name,
                 role=role,
                 calculation=calculation,
                 error=parse_result.error_message,
@@ -165,7 +176,8 @@ class CalculatedFieldHandler(BaseHandler):
             "aggregation": data.get("aggregation", "none"),
             "default_aggregate": data.get("default_aggregate"),
             "number_format": data.get("number_format"),
-            "label": data.get("label") or data.get("caption"),
+            "label": display_name,
+            "display_name": display_name,  # Explicit display name for UI
             "description": data.get("description"),
             "folder": data.get("folder"),
             "hidden": data.get("hidden", False),
@@ -187,14 +199,21 @@ class CalculatedFieldHandler(BaseHandler):
         return result
 
     def _create_fallback_calculated_field(
-        self, data: Dict, field_name: str, role: str, calculation: str, error: str
+        self,
+        data: Dict,
+        field_name: str,
+        display_name: str,
+        role: str,
+        calculation: str,
+        error: str,
     ) -> Dict:
         """
         Create a fallback representation when formula parsing fails.
 
         Args:
             data: Original field data
-            field_name: Clean field name
+            field_name: Clean field name (snake_case)
+            display_name: User-friendly display name
             role: Field role (dimension/measure)
             calculation: Original formula
             error: Parse error message
@@ -229,7 +248,8 @@ class CalculatedFieldHandler(BaseHandler):
             # Additional metadata
             "table_name": data.get("table_name"),
             "aggregation": data.get("aggregation", "none"),
-            "label": data.get("label") or data.get("caption"),
+            "label": display_name,
+            "display_name": display_name,  # Explicit display name for UI
             "description": data.get("description"),
             "hidden": data.get("hidden", False),
             # Quality metrics
