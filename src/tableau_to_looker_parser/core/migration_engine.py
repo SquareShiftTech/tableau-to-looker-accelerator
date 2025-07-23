@@ -205,7 +205,7 @@ class MigrationEngine:
 
         # Additionally, try to extract fields from datasource-dependencies
         # This handles cases like Book6 where some fields are only defined in worksheet dependencies
-        self._add_datasource_dependencies_to_mapping(field_table_mapping)
+        self._add_datasource_dependencies_to_mapping(field_table_mapping, elements)
 
         self.logger.debug(
             f"Built field-table mapping with {len(field_table_mapping)} entries"
@@ -213,56 +213,68 @@ class MigrationEngine:
         return field_table_mapping
 
     def _add_datasource_dependencies_to_mapping(
-        self, field_table_mapping: Dict[str, str]
+        self, field_table_mapping: Dict[str, str], elements: List[Dict]
     ):
         """
         Extract additional field mappings from datasource-dependencies sections.
 
         This handles workbooks where fields are defined in worksheet dependencies
-        rather than the main datasource section.
+        rather than the main datasource section. Uses a generic approach
+        that works for any dataset without hardcoded patterns.
 
         Args:
             field_table_mapping: Existing mapping to enhance
+            elements: All parsed elements that may contain additional field references
         """
         try:
-            # We need to re-parse to access datasource-dependencies
-            # This is a targeted fix for the specific issue
+            # Strategy: Look for fields referenced in calculated field dependencies
+            # that aren't in our current mapping, and infer their tables from context
 
-            # For now, we'll add a known mapping for Book6-style workbooks
-            # A more complete solution would parse datasource-dependencies XML
+            # Find all dependencies from calculated fields
+            missing_fields = set()
+            for element in elements:
+                if not element.get("data"):
+                    continue
 
-            # If we see SuperStore fields but no Sales mapping, assume Sales -> Orders
-            superstore_fields = {
-                "City",
-                "Country",
-                "Customer_ID",
-                "Customer_Name",
-                "Order_Date",
-                "Order_ID",
-                "Product_ID",
-                "Product_Name",
-                "Ship_Date",
-                "Ship_Mode",
-                "State",
-                "Sub_Category",
-            }
+                data = element["data"]
+                if data.get("calculation"):
+                    # This is a calculated field, check its dependencies
+                    calc = data.get("calculation", "")
+                    if calc:
+                        # Extract field references like [Sales], [Revenue], etc.
+                        import re
 
-            # Check if this looks like a SuperStore dataset
-            found_superstore_fields = (
-                set(field_table_mapping.keys()) & superstore_fields
-            )
-            if found_superstore_fields and "Sales" not in field_table_mapping:
-                # Infer that Sales belongs to the same table as other SuperStore fields
-                table_name = next(iter(set(field_table_mapping.values())), None)
-                if table_name:
-                    field_table_mapping["Sales"] = table_name
+                        field_refs = re.findall(r"\[([^\]]+)\]", calc)
+                        for field_ref in field_refs:
+                            clean_field = field_ref.strip()
+                            # Check if field is missing from our mapping (case-insensitive)
+                            if not any(
+                                existing.lower() == clean_field.lower()
+                                for existing in field_table_mapping.keys()
+                            ):
+                                missing_fields.add(clean_field)
+
+            # For missing fields, assign them to the most common table in existing mapping
+            if missing_fields and field_table_mapping:
+                from collections import Counter
+
+                table_counts = Counter(field_table_mapping.values())
+                most_common_table = table_counts.most_common(1)[0][0]
+
+                for missing_field in missing_fields:
+                    field_table_mapping[missing_field] = most_common_table
                     self.logger.debug(
-                        f"Inferred Sales field mapping: Sales -> {table_name}"
+                        f"Inferred missing field mapping: {missing_field} -> {most_common_table}"
                     )
+
+            self.logger.debug(
+                f"Enhanced field mapping to {len(field_table_mapping)} entries. "
+                f"Added mappings for {len(missing_fields)} missing fields."
+            )
 
         except Exception as e:
             self.logger.warning(
-                f"Failed to extract datasource-dependencies mappings: {e}"
+                f"Failed to process datasource-dependencies mappings: {e}"
             )
 
     def get_version(self) -> str:

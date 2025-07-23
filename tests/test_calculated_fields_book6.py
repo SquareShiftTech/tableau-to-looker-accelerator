@@ -297,6 +297,44 @@ class TestBook6CalculatedFields:
                 "No calculated fields found in Book6"
             )
 
+            # Generate LookML files (like Book5 test)
+            from tableau_to_looker_parser.generators.view_generator import ViewGenerator
+            from tableau_to_looker_parser.generators.model_generator_v2 import (
+                ModelGeneratorV2,
+            )
+
+            lookml_output_dir = Path("sample_twb_files/generated_lookml_book6_calc")
+            lookml_output_dir.mkdir(exist_ok=True)
+
+            # Generate view and model files
+            view_gen = ViewGenerator()
+            model_gen = ModelGeneratorV2()
+
+            view_files = view_gen.generate_views(result, str(lookml_output_dir))
+            model_file = model_gen.generate(result, str(lookml_output_dir))
+
+            print("\nGenerated LookML files:")
+            print(f"  - View files: {[Path(f).name for f in view_files]}")
+            print(f"  - Model file: {Path(model_file).name}")
+
+            # Verify calculated fields appear in view files
+            calc_fields_found = 0
+            for view_file in view_files:
+                with open(view_file, "r") as f:
+                    content = f.read()
+                    if "# Calculated Fields" in content:
+                        # Count calculated field entries
+                        calc_fields_found += (
+                            content.count("measure:")
+                            + content.count("dimension:")
+                            - content.count("measure: count")
+                        )
+
+            print(f"  - Calculated fields in LookML: {calc_fields_found}")
+            assert calc_fields_found > 0, (
+                "No calculated fields found in generated LookML"
+            )
+
 
 @pytest.mark.integration
 class TestCalculatedFieldsIntegration:

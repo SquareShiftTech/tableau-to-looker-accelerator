@@ -522,34 +522,8 @@ class CalculatedFieldHandler(BaseHandler):
                 )
                 return inferred_table
 
-        # Fallback to hardcoded patterns for backward compatibility
-        first_dep = dependencies[0]
-
-        # Common field patterns to table mapping (fallback only)
-        movie_fields = {
-            "adult",
-            "budget",
-            "revenue",
-            "popularity",
-            "runtime",
-            "title",
-            "original_title",
-            "overview",
-            "genres",
-            "release_date",
-            "original_language",
-            "production_companies",
-            "production_countries",
-            "tagline",
-        }
-        credit_fields = {"cast_members", "crew", "id_credits"}
-
-        if first_dep in movie_fields:
-            logger.debug(f"Using fallback mapping: '{first_dep}' -> 'movies_data'")
-            return "movies_data"
-        elif first_dep in credit_fields:
-            logger.debug(f"Using fallback mapping: '{first_dep}' -> 'credits'")
-            return "credits"
+        # No hardcoded patterns - rely purely on dynamic inference
+        # If field mapping didn't provide a table, we can't reliably infer one
 
         # If we can't infer, log a warning and return None
         logger.warning(
