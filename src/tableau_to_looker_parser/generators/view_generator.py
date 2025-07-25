@@ -135,12 +135,21 @@ class ViewGenerator(BaseGenerator):
 
         # Filter calculated fields for this specific table and convert AST to LookML
         table_calculated_fields = []
+        table_calculated_dimensions = []  # For two-step pattern dimensions
         for calc_field in all_calculated_fields:
             if calc_field.get("table_name") == actual_table_name:
                 # Convert AST to LookML SQL using our converter
                 converted_field = self._convert_calculated_field(calc_field, view_name)
                 if converted_field:
-                    table_calculated_fields.append(converted_field)
+                    # Check if this is a two-step pattern
+                    if converted_field.get("two_step_pattern"):
+                        # Add dimension to calculated dimensions list
+                        table_calculated_dimensions.append(converted_field["dimension"])
+                        # Add measure to calculated fields list
+                        table_calculated_fields.append(converted_field["measure"])
+                    else:
+                        # Standard single field
+                        table_calculated_fields.append(converted_field)
 
         # Build view data
         view_data = {
@@ -149,6 +158,7 @@ class ViewGenerator(BaseGenerator):
             "dimensions": table_dimensions,
             "measures": table_measures,
             "calculated_fields": table_calculated_fields,
+            "calculated_dimensions": table_calculated_dimensions,  # Add two-step pattern dimensions
         }
 
         # Generate the view file
@@ -177,12 +187,16 @@ class ViewGenerator(BaseGenerator):
         """
         Convert a calculated field with AST to LookML format.
 
+        For calculated field measures, implements two-step pattern:
+        1. Generate hidden dimension for row-level calculation
+        2. Generate measure that aggregates the dimension
+
         Args:
             calc_field: Calculated field data with AST
             table_context: Table context for field references
 
         Returns:
-            Dict with converted LookML field data
+            Dict with converted LookML field data (may contain both dimension and measure)
         """
         try:
             # Extract AST from calculation
@@ -201,6 +215,16 @@ class ViewGenerator(BaseGenerator):
             # Convert AST to LookML SQL expression
             lookml_sql = self.ast_converter.convert_to_lookml(ast_node, "TABLE")
 
+            # Check if this is a measure that needs two-step pattern
+            role = calc_field.get("role", "dimension")
+            if role == "measure" and self._needs_two_step_pattern(
+                calc_field, calculation
+            ):
+                return self._create_two_step_pattern(
+                    calc_field, lookml_sql, calculation
+                )
+
+            # Standard single field conversion for dimensions and simple measures
             # Determine LookML type for measures with aggregation
             lookml_type = self._determine_lookml_type(calc_field, calculation)
 
@@ -271,6 +295,107 @@ class ViewGenerator(BaseGenerator):
                 # Not aggregated - use sum type
                 return "sum"
 
+    def _needs_two_step_pattern(self, calc_field: Dict, calculation: Dict) -> bool:
+        """
+        Determine if a calculated field measure needs the two-step pattern.
+
+        Two-step pattern is needed when:
+        1. Field role is 'measure'
+        2. Formula contains field references
+        3. Formula does not already contain aggregation functions
+
+        Args:
+            calc_field: Calculated field data
+            calculation: Calculation metadata
+
+        Returns:
+            bool: True if two-step pattern is needed
+        """
+        # Only applies to measures
+        if calc_field.get("role") != "measure":
+            return False
+
+        original_formula = calculation.get("original_formula", "")
+        dependencies = calculation.get("dependencies", [])
+
+        # If no field references, no need for two-step pattern
+        if not dependencies:
+            return False
+
+        # If formula already contains aggregation, no need for two-step pattern
+        agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
+        has_aggregation = any(
+            func in original_formula.upper() for func in agg_functions
+        )
+
+        if has_aggregation:
+            return False
+
+        # Measure with field references but no aggregation = needs two-step pattern
+        logger.debug(
+            f"Calculated field measure '{calc_field.get('name')}' needs two-step pattern"
+        )
+        return True
+
+    def _create_two_step_pattern(
+        self, calc_field: Dict, lookml_sql: str, calculation: Dict
+    ) -> Dict:
+        """
+        Create two-step pattern: hidden dimension + aggregated measure.
+
+        Args:
+            calc_field: Original calculated field data
+            lookml_sql: Converted LookML SQL expression
+            calculation: Calculation metadata
+
+        Returns:
+            Dict with two-step pattern fields (dimension and measure)
+        """
+        base_name = self._clean_name(calc_field.get("name", ""))
+        original_formula = calculation.get("original_formula", "")
+
+        # Create hidden dimension for row-level calculation
+        dimension_field = {
+            "name": f"{base_name}_calc",
+            "original_name": calc_field.get("original_name", ""),
+            "field_type": "dimension",
+            "role": "dimension",
+            "datatype": calc_field.get(
+                "datatype", "real"
+            ),  # Usually numeric for measures
+            "sql": lookml_sql,
+            "original_formula": original_formula,
+            "description": f"Row-level calculation for {base_name}: {self._normalize_formula_for_description(original_formula)}",
+            "lookml_type": "number",
+            "hidden": True,  # Hide the calculation dimension
+            "is_two_step_dimension": True,  # Flag for template
+        }
+
+        # Create measure that aggregates the dimension
+        measure_field = {
+            "name": base_name,
+            "original_name": calc_field.get("original_name", ""),
+            "field_type": "measure",
+            "role": "measure",
+            "datatype": calc_field.get("datatype", "real"),
+            "sql": f"${{{base_name}_calc}}",  # Reference the hidden dimension
+            "original_formula": original_formula,
+            "description": f"Calculated field: {self._normalize_formula_for_description(original_formula)}",
+            "lookml_type": "sum",  # Aggregate the dimension values
+            "is_two_step_measure": True,  # Flag for template
+            "references_dimension": f"{base_name}_calc",  # Reference to dimension
+        }
+
+        logger.debug(
+            f"Created two-step pattern for '{base_name}': dimension '{base_name}_calc' + measure '{base_name}'"
+        )
+
+        return {
+            "two_step_pattern": True,
+            "dimension": dimension_field,
+            "measure": measure_field,
+        }
+
     def _normalize_formula_for_description(self, formula: str) -> str:
         """Normalize multi-line formulas for use in descriptions."""
         if not formula:
@@ -305,9 +430,16 @@ class ViewGenerator(BaseGenerator):
                 "dimensions": view_data["dimensions"],
                 "measures": view_data["measures"],
                 "calculated_fields": view_data["calculated_fields"],
+                "calculated_dimensions": view_data.get(
+                    "calculated_dimensions", []
+                ),  # Add calculated dimensions
                 "has_dimensions": len(view_data["dimensions"]) > 0,
                 "has_measures": len(view_data["measures"]) > 0,
                 "has_calculated_fields": len(view_data["calculated_fields"]) > 0,
+                "has_calculated_dimensions": len(
+                    view_data.get("calculated_dimensions", [])
+                )
+                > 0,
             }
 
             # Render template

@@ -62,6 +62,22 @@ view: {{ view_name }} {
   {% endfor %}
   {% endif %}
 
+  # Two-step Pattern Dimensions (hidden calculation dimensions)
+  {% if has_calculated_dimensions %}
+  {% for calc_dim in calculated_dimensions %}
+
+  dimension: {{ calc_dim.name }} {
+    description: "{{ calc_dim.description | escape_quotes }}"
+    type: {{ calc_dim.lookml_type }}
+    sql: {{ calc_dim.sql }} ;;
+    hidden: yes
+    {% if calc_dim.original_formula %}
+    # Original Tableau formula: {{ calc_dim.original_formula | single_line_comment }}
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
   # Calculated Fields (from Tableau formulas)
   {% if has_calculated_fields %}
   {% for calc_field in calculated_fields %}
@@ -88,14 +104,19 @@ view: {{ view_name }} {
   {% else %}
   measure: {{ calc_field.name }} {
     description: "{{ calc_field.description | escape_quotes }}"
-    {% if calc_field.lookml_type %}
+    {% if calc_field.is_two_step_measure %}
+    type: sum
+    sql: ${{ calc_field.references_dimension }} ;;
+    {% elif calc_field.lookml_type %}
     type: {{ calc_field.lookml_type }}
+    sql: {{ calc_field.sql }} ;;
     {% elif calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
     type: sum
+    sql: {{ calc_field.sql }} ;;
     {% else %}
     type: sum
-    {% endif %}
     sql: {{ calc_field.sql }} ;;
+    {% endif %}
     {% if calc_field.original_formula %}
     # Original Tableau formula: {{ calc_field.original_formula | single_line_comment }}
     {% endif %}
