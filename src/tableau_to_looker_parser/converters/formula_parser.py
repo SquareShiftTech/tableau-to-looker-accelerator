@@ -622,7 +622,8 @@ class FormulaParser:
         func_name = self.previous().value.upper()
 
         # Check if function is supported
-        if not self.function_registry.is_supported(func_name):
+        func_info = self.function_registry.get_function(func_name)
+        if not func_info:
             self.warnings.append(
                 ParserError(
                     message=f"Unsupported function: {func_name}",
@@ -630,6 +631,9 @@ class FormulaParser:
                     severity="warning",
                 )
             )
+
+        # Check if this is a window function
+        is_window_function = func_info and func_info.category == "window"
 
         self.consume(
             TokenType.LEFT_PAREN, f"Expected '(' after function name {func_name}"
@@ -643,9 +647,23 @@ class FormulaParser:
 
         self.consume(TokenType.RIGHT_PAREN, "Expected ')' after function arguments")
 
-        return ASTNode(
-            node_type=NodeType.FUNCTION, function_name=func_name, arguments=arguments
-        )
+        # For window functions, create a WINDOW_FUNCTION node type
+        if is_window_function:
+            return ASTNode(
+                node_type=NodeType.WINDOW_FUNCTION,
+                window_function_type=func_name,
+                arguments=arguments,
+                # Default window properties - can be extended later for OVER clauses
+                partition_by=[],
+                order_by=[],
+                window_frame=None,
+            )
+        else:
+            return ASTNode(
+                node_type=NodeType.FUNCTION,
+                function_name=func_name,
+                arguments=arguments,
+            )
 
     # Helper methods
     def match(self, *types: TokenType) -> bool:

@@ -441,6 +441,118 @@ def create_default_function_registry() -> FunctionRegistry:
         SupportedFunction(name="IFNULL", category="logical", min_args=2, max_args=2),
     ]
 
+    # Window functions
+    window_functions = [
+        SupportedFunction(
+            name="RUNNING_SUM",
+            category="window",
+            min_args=1,
+            max_args=1,
+            return_type="real",
+            requires_context=True,
+            description="Running sum of values",
+        ),
+        SupportedFunction(
+            name="RUNNING_AVG",
+            category="window",
+            min_args=1,
+            max_args=1,
+            return_type="real",
+            requires_context=True,
+            description="Running average of values",
+        ),
+        SupportedFunction(
+            name="RUNNING_COUNT",
+            category="window",
+            min_args=1,
+            max_args=1,
+            return_type="integer",
+            requires_context=True,
+            description="Running count of values",
+        ),
+        SupportedFunction(
+            name="WINDOW_SUM",
+            category="window",
+            min_args=3,
+            max_args=3,
+            return_type="real",
+            requires_context=True,
+            description="Window sum with range parameters",
+        ),
+        SupportedFunction(
+            name="WINDOW_AVG",
+            category="window",
+            min_args=3,
+            max_args=3,
+            return_type="real",
+            requires_context=True,
+            description="Window average with range parameters",
+        ),
+        SupportedFunction(
+            name="WINDOW_COUNT",
+            category="window",
+            min_args=3,
+            max_args=3,
+            return_type="integer",
+            requires_context=True,
+            description="Window count with range parameters",
+        ),
+        SupportedFunction(
+            name="RANK",
+            category="window",
+            min_args=1,
+            max_args=2,
+            return_type="integer",
+            requires_context=True,
+            description="Rank values with gaps",
+        ),
+        SupportedFunction(
+            name="DENSE_RANK",
+            category="window",
+            min_args=1,
+            max_args=2,
+            return_type="integer",
+            requires_context=True,
+            description="Rank values without gaps",
+        ),
+        SupportedFunction(
+            name="ROW_NUMBER",
+            category="window",
+            min_args=0,
+            max_args=0,
+            return_type="integer",
+            requires_context=True,
+            description="Sequential row number",
+        ),
+        SupportedFunction(
+            name="PERCENTILE",
+            category="window",
+            min_args=2,
+            max_args=2,
+            return_type="real",
+            requires_context=True,
+            description="Percentile calculation",
+        ),
+        SupportedFunction(
+            name="LAG",
+            category="window",
+            min_args=1,
+            max_args=3,
+            return_type=None,
+            requires_context=True,
+            description="Previous row value with offset",
+        ),
+        SupportedFunction(
+            name="LEAD",
+            category="window",
+            min_args=1,
+            max_args=3,
+            return_type=None,
+            requires_context=True,
+            description="Next row value with offset",
+        ),
+    ]
+
     # Add all functions
     for func_list in [
         aggregate_functions,
@@ -448,6 +560,7 @@ def create_default_function_registry() -> FunctionRegistry:
         math_functions,
         date_functions,
         logical_functions,
+        window_functions,
     ]:
         for func in func_list:
             registry.add_function(func)

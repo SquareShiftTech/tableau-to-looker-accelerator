@@ -81,6 +81,8 @@ class ASTToLookMLConverter:
             return self._convert_case(node, table_context)
         elif node.node_type == NodeType.LOD_EXPRESSION:
             return self._convert_lod_expression(node, table_context)
+        elif node.node_type == NodeType.WINDOW_FUNCTION:
+            return self._convert_window_function(node, table_context)
         elif node.node_type == NodeType.UNARY:
             return self._convert_unary(node, table_context)
         else:
@@ -535,6 +537,212 @@ class ASTToLookMLConverter:
 
         logger.debug(f"Converted LOD expression to: {sql_expr}")
         return sql_expr
+
+    def _convert_window_function(self, node: ASTNode, table_context: str) -> str:
+        """
+        Convert window functions to LookML SQL with OVER clauses.
+
+        Window functions require OVER clauses to define partitioning and ordering:
+        - RUNNING_SUM: Cumulative sum with default ordering
+        - RANK: Ranking with optional ordering direction
+        - WINDOW_SUM: Window sum with frame specification
+
+        Args:
+            node: Window function AST node with window_function_type and arguments
+            table_context: Table context for field references
+
+        Returns:
+            LookML SQL window function expression
+
+        Examples:
+            RUNNING_SUM([Sales]) → SUM(${TABLE}.sales) OVER (ORDER BY ${TABLE}.sales)
+            RANK([Sales], 'desc') → RANK() OVER (ORDER BY ${TABLE}.sales DESC)
+            WINDOW_SUM([Sales], -2, 0) → SUM(${TABLE}.sales) OVER (ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)
+        """
+        if not node.window_function_type:
+            logger.warning("Window function node missing window_function_type")
+            return "/* Invalid window function */"
+
+        window_func = node.window_function_type.upper()
+
+        # Convert arguments
+        converted_args = []
+        for arg in node.arguments:
+            arg_expr = self._convert_node(arg, table_context)
+            converted_args.append(arg_expr)
+
+        # Build window function based on type
+        if window_func == "RUNNING_SUM":
+            # RUNNING_SUM([field]) → SUM(field) OVER (ORDER BY field)
+            if len(converted_args) == 1:
+                field_expr = converted_args[0]
+                sql_expr = f"SUM({field_expr}) OVER (ORDER BY {field_expr})"
+            else:
+                logger.warning(
+                    f"RUNNING_SUM expects 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* RUNNING_SUM: wrong argument count */"
+
+        elif window_func == "RUNNING_AVG":
+            # RUNNING_AVG([field]) → AVG(field) OVER (ORDER BY field)
+            if len(converted_args) == 1:
+                field_expr = converted_args[0]
+                sql_expr = f"AVG({field_expr}) OVER (ORDER BY {field_expr})"
+            else:
+                logger.warning(
+                    f"RUNNING_AVG expects 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* RUNNING_AVG: wrong argument count */"
+
+        elif window_func == "RUNNING_COUNT":
+            # RUNNING_COUNT([field]) → COUNT(field) OVER (ORDER BY field)
+            if len(converted_args) == 1:
+                field_expr = converted_args[0]
+                sql_expr = f"COUNT({field_expr}) OVER (ORDER BY {field_expr})"
+            else:
+                logger.warning(
+                    f"RUNNING_COUNT expects 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* RUNNING_COUNT: wrong argument count */"
+
+        elif window_func == "RANK":
+            # RANK([field]) → RANK() OVER (ORDER BY field)
+            # RANK([field], 'desc') → RANK() OVER (ORDER BY field DESC)
+            if len(converted_args) >= 1:
+                field_expr = converted_args[0]
+                order_direction = "ASC"
+
+                if len(converted_args) == 2:
+                    # Second argument is direction (desc/asc)
+                    direction_arg = converted_args[1].strip("'\"").upper()
+                    if direction_arg in ["DESC", "DESCENDING"]:
+                        order_direction = "DESC"
+
+                sql_expr = f"RANK() OVER (ORDER BY {field_expr} {order_direction})"
+            else:
+                logger.warning(
+                    f"RANK expects at least 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* RANK: missing arguments */"
+
+        elif window_func == "DENSE_RANK":
+            # DENSE_RANK([field]) → DENSE_RANK() OVER (ORDER BY field)
+            if len(converted_args) >= 1:
+                field_expr = converted_args[0]
+                order_direction = "ASC"
+
+                if len(converted_args) == 2:
+                    direction_arg = converted_args[1].strip("'\"").upper()
+                    if direction_arg in ["DESC", "DESCENDING"]:
+                        order_direction = "DESC"
+
+                sql_expr = (
+                    f"DENSE_RANK() OVER (ORDER BY {field_expr} {order_direction})"
+                )
+            else:
+                logger.warning(
+                    f"DENSE_RANK expects at least 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* DENSE_RANK: missing arguments */"
+
+        elif window_func == "ROW_NUMBER":
+            # ROW_NUMBER() → ROW_NUMBER() OVER (ORDER BY (SELECT NULL))
+            sql_expr = "ROW_NUMBER() OVER (ORDER BY (SELECT NULL))"
+
+        elif window_func == "WINDOW_SUM":
+            # WINDOW_SUM([field], start, end) → SUM(field) OVER (ROWS BETWEEN ... AND ...)
+            if len(converted_args) == 3:
+                field_expr = converted_args[0]
+                start_offset = converted_args[1]
+                end_offset = converted_args[2]
+
+                # Convert offsets to ROWS clause
+                start_clause = self._convert_window_offset(start_offset, "PRECEDING")
+                end_clause = self._convert_window_offset(end_offset, "FOLLOWING")
+
+                sql_expr = f"SUM({field_expr}) OVER (ROWS BETWEEN {start_clause} AND {end_clause})"
+            else:
+                logger.warning(
+                    f"WINDOW_SUM expects 3 arguments, got {len(converted_args)}"
+                )
+                sql_expr = "/* WINDOW_SUM: wrong argument count */"
+
+        elif window_func == "WINDOW_AVG":
+            # WINDOW_AVG([field], start, end) → AVG(field) OVER (ROWS BETWEEN ... AND ...)
+            if len(converted_args) == 3:
+                field_expr = converted_args[0]
+                start_offset = converted_args[1]
+                end_offset = converted_args[2]
+
+                start_clause = self._convert_window_offset(start_offset, "PRECEDING")
+                end_clause = self._convert_window_offset(end_offset, "FOLLOWING")
+
+                sql_expr = f"AVG({field_expr}) OVER (ROWS BETWEEN {start_clause} AND {end_clause})"
+            else:
+                logger.warning(
+                    f"WINDOW_AVG expects 3 arguments, got {len(converted_args)}"
+                )
+                sql_expr = "/* WINDOW_AVG: wrong argument count */"
+
+        elif window_func == "LAG":
+            # LAG([field], offset, default) → LAG(field, offset, default) OVER (ORDER BY field)
+            if len(converted_args) >= 1:
+                field_expr = converted_args[0]
+                offset = converted_args[1] if len(converted_args) > 1 else "1"
+                default_val = converted_args[2] if len(converted_args) > 2 else "NULL"
+
+                sql_expr = f"LAG({field_expr}, {offset}, {default_val}) OVER (ORDER BY {field_expr})"
+            else:
+                logger.warning(
+                    f"LAG expects at least 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* LAG: missing arguments */"
+
+        elif window_func == "LEAD":
+            # LEAD([field], offset, default) → LEAD(field, offset, default) OVER (ORDER BY field)
+            if len(converted_args) >= 1:
+                field_expr = converted_args[0]
+                offset = converted_args[1] if len(converted_args) > 1 else "1"
+                default_val = converted_args[2] if len(converted_args) > 2 else "NULL"
+
+                sql_expr = f"LEAD({field_expr}, {offset}, {default_val}) OVER (ORDER BY {field_expr})"
+            else:
+                logger.warning(
+                    f"LEAD expects at least 1 argument, got {len(converted_args)}"
+                )
+                sql_expr = "/* LEAD: missing arguments */"
+
+        else:
+            # Unknown window function - use generic OVER clause
+            logger.warning(f"Unknown window function: {window_func}")
+            args_str = ", ".join(converted_args) if converted_args else ""
+            sql_expr = f"{window_func}({args_str}) OVER ()"
+
+        logger.debug(f"Converted window function {window_func} to: {sql_expr}")
+        return sql_expr
+
+    def _convert_window_offset(self, offset_str: str, direction: str) -> str:
+        """
+        Convert window function offset to SQL ROWS clause.
+
+        Args:
+            offset_str: Offset value as string (e.g., "-2", "0", "1")
+            direction: "PRECEDING" or "FOLLOWING"
+
+        Returns:
+            SQL ROWS clause fragment
+        """
+        try:
+            offset = int(offset_str)
+            if offset == 0:
+                return "CURRENT ROW"
+            elif offset < 0:
+                return f"{abs(offset)} PRECEDING"
+            else:
+                return f"{offset} FOLLOWING"
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid window offset: {offset_str}")
+            return "CURRENT ROW"
 
     def _convert_fallback_node(self, node: ASTNode, table_context: str) -> str:
         """
