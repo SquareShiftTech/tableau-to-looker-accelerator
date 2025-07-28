@@ -215,10 +215,9 @@ class ViewGenerator(BaseGenerator):
             # Convert AST to LookML SQL expression
             lookml_sql = self.ast_converter.convert_to_lookml(ast_node, "TABLE")
 
-            # Check if this is a fallback AST node that needs special handling
+            # Check if this is a fallback AST node created due to parsing failure
             is_fallback = (
-                ast_node.node_type.value == "literal"
-                and ast_node.properties
+                ast_node.properties
                 and ast_node.properties.get("migration_status") == "MANUAL_REQUIRED"
             )
 
