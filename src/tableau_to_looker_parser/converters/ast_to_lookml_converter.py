@@ -112,6 +112,15 @@ class ASTToLookMLConverter:
             "MIN": "MIN",
             "MAX": "MAX",
             "MEDIAN": "MEDIAN",
+            # Additional aggregation functions from Excel mapping
+            "COUNTD": "COUNT(DISTINCT {0})",  # COUNT DISTINCT
+            "STDEV": "STDDEV_SAMP",  # Standard deviation (sample)
+            "STDEVP": "STDDEV_POP",  # Standard deviation (population)
+            "CORR": "CORR",  # Correlation
+            "COVAR": "COVAR_SAMP",  # Covariance (sample)
+            "COVARP": "COVAR_POP",  # Covariance (population)
+            "VAR": "VAR_SAMP",  # Variance (sample)
+            "VARP": "VAR_POP",  # Variance (population)
             # String functions - mostly direct
             "UPPER": "UPPER",
             "LOWER": "LOWER",
@@ -129,6 +138,10 @@ class ASTToLookMLConverter:
             "SPLIT": "SPLIT_PART({0}, {1}, {2})",  # SPLIT(string, delimiter, index) → SPLIT_PART
             "LTRIM": "LTRIM",  # Direct mapping
             "RTRIM": "RTRIM",  # Direct mapping
+            # Additional string functions from Excel mapping
+            "ASCII": "ASCII",  # ASCII code of character
+            "CHAR": "CHR",  # Character from ASCII code (Tableau CHAR → SQL CHR)
+            "PROPER": "INITCAP",  # Proper case (Tableau PROPER → SQL INITCAP)
             # Math functions - direct mapping
             "ABS": "ABS",
             "ROUND": "ROUND",
@@ -142,6 +155,20 @@ class ASTToLookMLConverter:
             "DAY": "EXTRACT(DAY FROM {})",
             "NOW": "CURRENT_TIMESTAMP",
             "TODAY": "CURRENT_DATE",
+            # Additional date functions from Excel mapping - need special handling
+            "DATEADD": "DATEADD_SPECIAL",  # Special handling for INTERVAL syntax
+            "DATEDIFF": "DATEDIFF_SPECIAL",  # Special handling for unit parameter
+            "DATETRUNC": "DATETRUNC_SPECIAL",  # Special handling for unit parameter
+            "PARSE_DATE": "PARSE_DATE('%Y-%m-%d', {0})",  # PARSE_DATE format
+            # Type conversion functions from Excel mapping
+            "FLOAT": "CAST({0} AS FLOAT64)",  # Convert to float
+            "INT": "CAST({0} AS INT64)",  # Convert to integer
+            "STR": "CAST({0} AS STRING)",  # Convert to string
+            "DATE": "DATE({0})",  # Convert to date
+            "DATETIME": "DATETIME({0})",  # Convert to datetime
+            # Logical functions from Excel mapping
+            "IFNULL": "IFNULL",  # NULL handling function
+            "ISNULL": "{0} IS NULL",  # NULL check: ISNULL([field]) -> field IS NULL
         }
 
     # CONVERSION METHODS - Each handles a specific AST node type
@@ -355,8 +382,43 @@ class ASTToLookMLConverter:
         if function_name in self.function_registry:
             lookml_function = self.function_registry[function_name]
 
+            # Handle special date functions that need custom formatting
+            if lookml_function == "DATEADD_SPECIAL":
+                if len(converted_args) == 3:
+                    date_expr = converted_args[0]
+                    interval_expr = converted_args[1]
+                    unit_expr = converted_args[2].strip(
+                        "'\""
+                    )  # Remove quotes from unit
+                    return (
+                        f"DATE_ADD({date_expr}, INTERVAL {interval_expr} {unit_expr})"
+                    )
+                else:
+                    return (
+                        f"/* DATEADD: expects 3 arguments, got {len(converted_args)} */"
+                    )
+            elif lookml_function == "DATEDIFF_SPECIAL":
+                if len(converted_args) == 3:
+                    start_expr = converted_args[0]
+                    end_expr = converted_args[1]
+                    unit_expr = converted_args[2].strip(
+                        "'\""
+                    )  # Remove quotes from unit
+                    return f"DATE_DIFF({end_expr}, {start_expr}, {unit_expr})"
+                else:
+                    return f"/* DATEDIFF: expects 3 arguments, got {len(converted_args)} */"
+            elif lookml_function == "DATETRUNC_SPECIAL":
+                if len(converted_args) == 2:
+                    date_expr = converted_args[0]
+                    unit_expr = converted_args[1].strip(
+                        "'\""
+                    )  # Remove quotes from unit
+                    return f"DATE_TRUNC({date_expr}, {unit_expr})"
+                else:
+                    return f"/* DATETRUNC: expects 2 arguments, got {len(converted_args)} */"
+
             # Handle special function formats
-            if "{}" in lookml_function:
+            elif "{}" in lookml_function:
                 # Special format like EXTRACT(YEAR FROM {})
                 if len(converted_args) == 1:
                     return lookml_function.format(converted_args[0])
@@ -375,7 +437,14 @@ class ASTToLookMLConverter:
             else:
                 # Standard function format: FUNCTION(arg1, arg2, ...)
                 args_str = ", ".join(converted_args)
-                return f"{lookml_function}({args_str})"
+                # Handle zero-argument functions that shouldn't have parentheses
+                if len(converted_args) == 0 and lookml_function in [
+                    "CURRENT_TIMESTAMP",
+                    "CURRENT_DATE",
+                ]:
+                    return lookml_function  # No parentheses for these
+                else:
+                    return f"{lookml_function}({args_str})"
         else:
             # Function not in registry - use as-is with warning
             logger.warning(f"Unknown function: {function_name}")

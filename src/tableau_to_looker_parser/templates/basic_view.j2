@@ -71,7 +71,9 @@ view: {{ view_name }} {
     type: {{ calc_dim.lookml_type }}
     sql: {{ calc_dim.sql }} ;;
     hidden: yes
-    {% if calc_dim.original_formula %}
+    {% if calc_dim.migration_error %}
+    # {{ calc_dim.migration_comment | single_line_comment }}
+    {% elif calc_dim.original_formula %}
     # Original Tableau formula: {{ calc_dim.original_formula | single_line_comment }}
     {% endif %}
   }
@@ -97,7 +99,9 @@ view: {{ view_name }} {
     type: string
     {% endif %}
     sql: {{ calc_field.sql }} ;;
-    {% if calc_field.original_formula %}
+    {% if calc_field.migration_error %}
+    # {{ calc_field.migration_comment | single_line_comment }}
+    {% elif calc_field.original_formula %}
     # Original Tableau formula: {{ calc_field.original_formula | single_line_comment }}
     {% endif %}
   }
@@ -106,7 +110,7 @@ view: {{ view_name }} {
     description: "{{ calc_field.description | escape_quotes }}"
     {% if calc_field.is_two_step_measure %}
     type: sum
-    sql: ${{ calc_field.references_dimension }} ;;
+    sql: ${{ '{' + calc_field.references_dimension + '}' }} ;;
     {% elif calc_field.lookml_type %}
     type: {{ calc_field.lookml_type }}
     sql: {{ calc_field.sql }} ;;
@@ -117,7 +121,9 @@ view: {{ view_name }} {
     type: sum
     sql: {{ calc_field.sql }} ;;
     {% endif %}
-    {% if calc_field.original_formula %}
+    {% if calc_field.migration_error %}
+    # {{ calc_field.migration_comment | single_line_comment }}
+    {% elif calc_field.original_formula %}
     # Original Tableau formula: {{ calc_field.original_formula | single_line_comment }}
     {% endif %}
   }
