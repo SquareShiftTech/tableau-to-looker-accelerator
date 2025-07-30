@@ -575,13 +575,19 @@ class ModelGenerator(BaseGenerator):
                 and join_table in table_aliases
                 and join_table not in existing_joins
             ):
+                # Clean table and field names to match view naming convention
+                clean_primary_table = self._clean_name(primary_table["name"])
+                clean_join_table = self._clean_name(join_table)
+                clean_primary_field = self._clean_name(primary_field)
+                clean_join_field = self._clean_name(join_field)
+
                 logger.info(
-                    f"Creating physical join: {primary_table['name']} -> {join_table} on {primary_field} = {join_field}"
+                    f"Creating physical join: {clean_primary_table} -> {clean_join_table} on {clean_primary_field} = {clean_join_field}"
                 )
                 return {
-                    "view_name": join_table,
+                    "view_name": clean_join_table,
                     "type": relationship.get("join_type", "inner"),
-                    "sql_on": f"${{{primary_table['name']}.{primary_field}}} = ${{{join_table}.{join_field}}}",
+                    "sql_on": f"${{{clean_primary_table}.{clean_primary_field}}} = ${{{clean_join_table}.{clean_join_field}}}",
                     "relationship": "many_to_one",
                 }
 

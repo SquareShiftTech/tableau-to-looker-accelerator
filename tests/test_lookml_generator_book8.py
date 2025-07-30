@@ -40,7 +40,7 @@ def test_lookml_generator_book8():
             assert "join:" in model_content  # book8 has physical relationships
             # Specifically check for the Orders -> Returns join
             assert "join: returns" in model_content
-            assert "sql_on: ${Orders.Order_ID} = ${Returns.Order_ID}" in model_content
+            assert "sql_on: ${orders.order_id} = ${returns.order_id}" in model_content
 
         # Validate that each view has proper structure
         dimensions_found = False
