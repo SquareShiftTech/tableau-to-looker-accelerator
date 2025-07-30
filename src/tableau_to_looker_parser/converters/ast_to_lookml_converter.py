@@ -130,12 +130,12 @@ class ASTToLookMLConverter:
             "RIGHT": "RIGHT",
             "MID": "SUBSTR",  # Tableau MID → SQL SUBSTR
             # Advanced string functions
-            "CONTAINS": "POSITION({1} IN {0}) > 0",  # CONTAINS(string, substring) → POSITION(substring IN string) > 0
-            "STARTSWITH": "LEFT({0}, LENGTH({1})) = {1}",  # STARTSWITH(string, prefix) → LEFT(string, LENGTH(prefix)) = prefix
-            "ENDSWITH": "RIGHT({0}, LENGTH({1})) = {1}",  # ENDSWITH(string, suffix) → RIGHT(string, LENGTH(suffix)) = suffix
+            "CONTAINS": "STRPOS({0}, {1}) > 0",  # CONTAINS(string, substring) → STRPOS(string, substring) > 0 for BigQuery
+            "STARTSWITH": "STARTS_WITH({0}, {1})",  # STARTSWITH(string, prefix) → STARTS_WITH(string, prefix) for BigQuery
+            "ENDSWITH": "ENDS_WITH({0}, {1})",  # ENDSWITH(string, suffix) → ENDS_WITH(string, suffix) for BigQuery
             "REPLACE": "REPLACE",  # Direct mapping
-            "FIND": "POSITION({1} IN {0})",  # FIND(string, substring) → POSITION(substring IN string)
-            "SPLIT": "SPLIT_PART({0}, {1}, {2})",  # SPLIT(string, delimiter, index) → SPLIT_PART
+            "FIND": "STRPOS({0}, {1})",  # FIND(string, substring) → STRPOS(string, substring) for BigQuery
+            "SPLIT": "SPLIT({0}, {1})[OFFSET(CASE WHEN {2} < 0 THEN {2} ELSE {2} - 1 END)]",  # SPLIT(string, delimiter, index) → SPLIT(string, delimiter)[OFFSET(...)] for BigQuery
             "LTRIM": "LTRIM",  # Direct mapping
             "RTRIM": "RTRIM",  # Direct mapping
             # Additional string functions from Excel mapping

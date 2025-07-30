@@ -109,16 +109,16 @@ view: {{ view_name }} {
   measure: {{ calc_field.name }} {
     description: "{{ calc_field.description | escape_quotes }}"
     {% if calc_field.is_two_step_measure %}
-    type: sum
+    type: number
     sql: ${{ '{' + calc_field.references_dimension + '}' }} ;;
     {% elif calc_field.lookml_type %}
-    type: {{ calc_field.lookml_type }}
+    type: number
     sql: {{ calc_field.sql }} ;;
     {% elif calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
-    type: sum
+    type: number
     sql: {{ calc_field.sql }} ;;
     {% else %}
-    type: sum
+    type: number
     sql: {{ calc_field.sql }} ;;
     {% endif %}
     {% if calc_field.migration_error %}
@@ -139,29 +139,12 @@ view: {{ view_name }} {
     {% if measure.description %}
     description: "{{ measure.description | escape_quotes }}"
     {% endif %}
-    {% if measure.aggregation == 'sum' %}
-    type: sum
+    type: number
     sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
-    {% elif measure.aggregation == 'count' %}
-    type: count
-    {% if measure.sql_column %}
-    sql: ${TABLE}.{{ measure.sql_column | sql_column }} ;;
-    {% endif %}
-    {% elif measure.aggregation == 'count_distinct' %}
-    type: count_distinct
-    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
-    {% elif measure.aggregation == 'average' %}
-    type: average
-    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
-    {% elif measure.aggregation == 'min' %}
-    type: min
-    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
-    {% elif measure.aggregation == 'max' %}
-    type: max
-    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
+    {% if measure.aggregation == 'count' and not measure.sql_column %}
+    {# Count measures without SQL column don't need sql parameter #}
     {% else %}
-    type: sum
-    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
+    {# All other measures use the column SQL #}
     {% endif %}
     {% if measure.value_format %}
     value_format: "{{ measure.value_format }}"
@@ -182,10 +165,5 @@ view: {{ view_name }} {
   {% endfor %}
   {% endif %}
 
-  # Basic measures for counting
-  measure: count {
-    type: count
-    description: "Count of records"
-  }
 
 }

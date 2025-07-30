@@ -239,6 +239,10 @@ class TableauXMLParserV2:
                 "sql_column": remote_alias_elem.text
                 if remote_alias_elem is not None
                 else remote_name_elem.text,
+                # Label from remote-alias (for LookML label field)
+                "label": remote_alias_elem.text
+                if remote_alias_elem is not None
+                else remote_name_elem.text,
                 # Type classification (KEY IMPROVEMENT)
                 "field_type": "measure" if is_measure else "dimension",
                 "role": "measure" if is_measure else "dimension",
@@ -564,7 +568,8 @@ class TableauXMLParserV2:
                     "semantic_role": field_def.get("semantic_role"),
                     "folder": field_def.get("folder"),
                     "description": field_def.get("description"),
-                    "label": field_def.get("caption")
+                    "label": field_def.get("label")  # Preserve remote-alias label
+                    or field_def.get("caption")
                     or field_def["local_name"],  # User-friendly label
                 }
 
@@ -582,7 +587,7 @@ class TableauXMLParserV2:
                     "caption": field_def.get("caption"),
                     "aggregation": field_def.get("aggregation"),
                     "number_format": field_def.get("number_format"),
-                    "label": field_def.get("caption"),
+                    "label": field_def.get("label") or field_def.get("caption"),
                 }
 
                 elements.append({"type": "calculated_field", "data": element_data})
@@ -600,7 +605,7 @@ class TableauXMLParserV2:
                     "default_value": field_def.get("default_value"),
                     "caption": field_def.get("caption"),
                     "description": field_def.get("description"),
-                    "label": field_def.get("caption"),
+                    "label": field_def.get("label") or field_def.get("caption"),
                 }
 
                 elements.append({"type": "parameter", "data": element_data})

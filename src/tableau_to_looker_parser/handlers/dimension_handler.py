@@ -142,6 +142,10 @@ class DimensionHandler(BaseHandler):
         """
         parts = []
 
+        # Use caption from Tableau XML as primary description
+        if raw_data.get("caption"):
+            return raw_data["caption"]
+
         # Add semantic role if present
         if raw_data.get("semantic_role"):
             parts.append(f"Semantic role: {raw_data['semantic_role']}")

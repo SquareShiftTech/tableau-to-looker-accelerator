@@ -116,14 +116,14 @@ class TestFormulaConversion:
             ("RIGHT([Code], 2)", "RIGHT(${TABLE}.code, 2)"),
             ("MID([Text], 2, 5)", "SUBSTR(${TABLE}.text, 2, 5)"),
             # Advanced string functions
-            ("CONTAINS([Name], 'John')", "POSITION('John' IN ${TABLE}.name) > 0"),
-            ("STARTSWITH([Code], 'A')", "LEFT(${TABLE}.code, LENGTH('A')) = 'A'"),
+            ("CONTAINS([Name], 'John')", "STRPOS(${TABLE}.name, 'John') > 0"),
+            ("STARTSWITH([Code], 'A')", "STARTS_WITH(${TABLE}.code, 'A')"),
             (
                 "ENDSWITH([File], '.pdf')",
-                "RIGHT(${TABLE}.file, LENGTH('.pdf')) = '.pdf'",
+                "ENDS_WITH(${TABLE}.file, '.pdf')",
             ),
             ("REPLACE([Text], 'old', 'new')", "REPLACE(${TABLE}.text, 'old', 'new')"),
-            ("FIND([Text], 'word')", "POSITION('word' IN ${TABLE}.text)"),
+            ("FIND([Text], 'word')", "STRPOS(${TABLE}.text, 'word')"),
             ("LTRIM([Text])", "LTRIM(${TABLE}.text)"),
             ("RTRIM([Text])", "RTRIM(${TABLE}.text)"),
             # New functions from Excel mapping

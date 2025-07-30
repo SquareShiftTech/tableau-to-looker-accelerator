@@ -185,6 +185,10 @@ class MeasureHandler(BaseHandler):
         Returns:
             str: Description or None
         """
+        # Use caption from Tableau XML as primary description
+        if data.get("caption"):
+            return data["caption"]
+
         parts = []
 
         # Add calculation if present
