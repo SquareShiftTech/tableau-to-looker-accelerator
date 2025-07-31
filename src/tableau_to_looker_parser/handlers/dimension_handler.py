@@ -47,6 +47,10 @@ class DimensionHandler(BaseHandler):
         if param_type:
             return 0.0
 
+        # Check if this has a calculation - if so, defer to CalculatedFieldHandler
+        if data.get("calculation"):
+            return 0.0
+
         # High confidence if it's a dimension with known datatype
         if role == "dimension" and datatype in self.TYPE_MAP:
             return 1.0
@@ -75,8 +79,8 @@ class DimensionHandler(BaseHandler):
         Returns:
             Dict: Schema-compliant dimension data
         """
-        # Clean field name
-        name = self._clean_field_name(data["raw_name"])
+        # Use the clean field name from v2 parser, fallback to cleaning raw_name for v1
+        name = data.get("name") or self._clean_field_name(data["raw_name"])
 
         # Build base dimension
         json_data = {
@@ -137,6 +141,10 @@ class DimensionHandler(BaseHandler):
             str: Description or None
         """
         parts = []
+
+        # Use caption from Tableau XML as primary description
+        if raw_data.get("caption"):
+            return raw_data["caption"]
 
         # Add semantic role if present
         if raw_data.get("semantic_role"):

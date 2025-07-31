@@ -1,0 +1,403 @@
+<?xml version='1.0' encoding='utf-8' ?>
+
+<!-- build 20252.25.0722.1150                               -->
+<workbook original-version='18.1' source-build='2025.2.0 (20252.25.0722.1150)' version='18.1' xml:base='http://localhost:9100' xmlns:user='http://www.tableausoftware.com/xml/user'>
+  <document-format-change-manifest>
+    <AnimationOnByDefault />
+    <MarkAnimation />
+    <ObjectModelEncapsulateLegacy />
+    <ObjectModelTableType />
+    <SchemaViewerObjectModel />
+    <SheetIdentifierTracking />
+    <WindowsPersistSimpleIdentifiers />
+  </document-format-change-manifest>
+  <repository-location derived-from='http://localhost:9100/t/harini-1dde7a738a/workbooks/Complex?rev=1.3' id='Complex' path='/t/harini-1dde7a738a/workbooks' revision='1.4' site='harini-1dde7a738a' />
+  <preferences />
+  <datasources>
+    <datasource caption='Orders (Super_Store_Sales)' inline='true' name='federated.0fe9wjy1xigj5n14r9nmj0zjs4cr' version='18.1'>
+      <connection class='federated'>
+        <named-connections>
+          <named-connection caption='BigQuery' name='bigquery.1joy05h0c0ri6f1c34ihx0etsfp2'>
+            <connection CATALOG='elastic-pocs' EXECCATALOG='elastic-pocs' authentication='yes' class='bigquery' connection-dialect='google-sql' project='elastic-pocs' schema='Super_Store_Sales' server='' server-oauth='server-custom' username='nishok@squareshift.co' />
+          </named-connection>
+        </named-connections>
+        <relation join='inner' type='join'>
+          <clause type='join'>
+            <expression op='='>
+              <expression op='[Orders].[Order_ID]' />
+              <expression op='[Returns].[Order_ID]' />
+            </expression>
+          </clause>
+          <relation connection='bigquery.1joy05h0c0ri6f1c34ihx0etsfp2' name='Orders' table='[elastic-pocs.Super_Store_Sales].[Orders]' type='table' />
+          <relation connection='bigquery.1joy05h0c0ri6f1c34ihx0etsfp2' name='Returns' table='[elastic-pocs.Super_Store_Sales].[Returns]' type='table' />
+        </relation>
+        <cols>
+          <map key='[Category]' value='[Orders].[Category]' />
+          <map key='[City]' value='[Orders].[City]' />
+          <map key='[Country]' value='[Orders].[Country]' />
+          <map key='[Customer_ID]' value='[Orders].[Customer_ID]' />
+          <map key='[Customer_Name]' value='[Orders].[Customer_Name]' />
+          <map key='[Discount]' value='[Orders].[Discount]' />
+          <map key='[Order_Date]' value='[Orders].[Order_Date]' />
+          <map key='[Order_ID (Returns)]' value='[Returns].[Order_ID]' />
+          <map key='[Order_ID]' value='[Orders].[Order_ID]' />
+          <map key='[Postal_Code]' value='[Orders].[Postal_Code]' />
+          <map key='[Product_ID]' value='[Orders].[Product_ID]' />
+          <map key='[Product_Name]' value='[Orders].[Product_Name]' />
+          <map key='[Profit]' value='[Orders].[Profit]' />
+          <map key='[Quantity]' value='[Orders].[Quantity]' />
+          <map key='[Region]' value='[Orders].[Region]' />
+          <map key='[Returned]' value='[Returns].[Returned]' />
+          <map key='[Sales]' value='[Orders].[Sales]' />
+          <map key='[Segment]' value='[Orders].[Segment]' />
+          <map key='[Ship_Date]' value='[Orders].[Ship_Date]' />
+          <map key='[Ship_Mode]' value='[Orders].[Ship_Mode]' />
+          <map key='[State]' value='[Orders].[State]' />
+          <map key='[Sub_Category]' value='[Orders].[Sub_Category]' />
+        </cols>
+        <metadata-records>
+          <metadata-record class='column'>
+            <remote-name>Order_ID</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Order_ID]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Order_ID</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Order_Date</remote-name>
+            <remote-type>7</remote-type>
+            <local-name>[Order_Date]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Order_Date</remote-alias>
+            <local-type>date</local-type>
+            <aggregation>Year</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Ship_Date</remote-name>
+            <remote-type>7</remote-type>
+            <local-name>[Ship_Date]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Ship_Date</remote-alias>
+            <local-type>date</local-type>
+            <aggregation>Year</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Ship_Mode</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Ship_Mode]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Ship_Mode</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Customer_ID</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Customer_ID]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Customer_ID</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Customer_Name</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Customer_Name]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Customer_Name</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Segment</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Segment]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Segment</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Country</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Country]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Country</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>City</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[City]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>City</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>State</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[State]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>State</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Postal_Code</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[Postal_Code]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Postal_Code</remote-alias>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Region</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Region]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Region</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Product_ID</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Product_ID]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Product_ID</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Category</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Category]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Category</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Sub_Category</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Sub_Category]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Sub_Category</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Product_Name</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Product_Name]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Product_Name</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Sales</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[Sales]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Sales</remote-alias>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Quantity</remote-name>
+            <remote-type>20</remote-type>
+            <local-name>[Quantity]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Quantity</remote-alias>
+            <local-type>integer</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Discount</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[Discount]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Discount</remote-alias>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Profit</remote-name>
+            <remote-type>5</remote-type>
+            <local-name>[Profit]</local-name>
+            <parent-name>[Orders]</parent-name>
+            <remote-alias>Profit</remote-alias>
+            <local-type>real</local-type>
+            <aggregation>Sum</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Returned</remote-name>
+            <remote-type>11</remote-type>
+            <local-name>[Returned]</local-name>
+            <parent-name>[Returns]</parent-name>
+            <remote-alias>Returned</remote-alias>
+            <local-type>boolean</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+          <metadata-record class='column'>
+            <remote-name>Order_ID</remote-name>
+            <remote-type>130</remote-type>
+            <local-name>[Order_ID (Returns)]</local-name>
+            <parent-name>[Returns]</parent-name>
+            <remote-alias>Order_ID</remote-alias>
+            <local-type>string</local-type>
+            <aggregation>Count</aggregation>
+            <contains-null>true</contains-null>
+            <object-id>[Orders_4F0A288850EA4E33946131456C9CE9C6]</object-id>
+          </metadata-record>
+        </metadata-records>
+      </connection>
+      <aliases enabled='yes' />
+      <column caption='Priority' datatype='string' name='[Calculation_14707102852317266]' role='dimension' type='nominal'>
+        <calculation class='tableau' formula='IF [Sales] &gt; 5000 THEN&#10;    IF [Profit] &lt; 0 THEN &quot;High Sale, But Loss&quot;&#10;    ELSEIF [Discount] &gt; 0.3 THEN &quot;High Sale, High Discount&quot;&#10;    ELSE &quot;High Sale, Healthy Profit&quot;&#10;    END&#10;ELSE&#10;    IF [Quantity] &gt; 10 THEN &quot;Bulk Order - Low Sale&quot;&#10;    ELSE &quot;Normal Order&quot;&#10;    END&#10;END' />
+      </column>
+      <column caption='Aggressive Discount' datatype='string' name='[Calculation_14707102853980243]' role='dimension' type='nominal'>
+        <calculation class='tableau' formula='IF [Discount] &gt; 0.4 THEN&#10;    IF [Profit] &lt; 0 THEN &quot;Heavy Discount, Loss&quot;&#10;    ELSE &quot;Heavy Discount, Still Profitable&quot;&#10;    END&#10;ELSEIF [Discount] &gt; 0.2 THEN&#10;    IF [Profit] &lt; 0 THEN &quot;Medium Discount, Loss&quot;&#10;    ELSE &quot;Medium Discount, Profit&quot;&#10;    END&#10;ELSE&#10;    &quot;Low Discount&quot;&#10;END' />
+      </column>
+      <column caption='Order Behavior Tag' datatype='string' name='[Calculation_14707102854774868]' role='dimension' type='nominal'>
+        <calculation class='tableau' formula='IF [Sales] &gt; 1000 THEN&#10;    IF [Quantity] &gt; 5 THEN&#10;        IF [Profit] &gt; 100 THEN &quot;Large Order - Profitable&quot;&#10;        ELSE &quot;Large Order - Low Profit&quot;&#10;        END&#10;    ELSE&#10;        IF [Profit] &gt; 0 THEN &quot;Small Qty, High Value&quot;&#10;        ELSE &quot;Small Qty, Unprofitable&quot;&#10;        END&#10;    END&#10;ELSE&#10;    IF [Discount] &gt; 0.3 THEN &quot;Discount Driven Small Order&quot;&#10;    ELSE &quot;Minor Order&quot;&#10;    END&#10;END' />
+      </column>
+      <column datatype='string' name='[City]' role='dimension' semantic-role='[City].[Name]' type='nominal' />
+      <column datatype='string' name='[Country]' role='dimension' semantic-role='[Country].[ISO3166_2]' type='nominal' />
+      <column caption='Customer ID' datatype='string' name='[Customer_ID]' role='dimension' type='nominal' />
+      <column caption='Customer Name' datatype='string' name='[Customer_Name]' role='dimension' type='nominal' />
+      <column caption='Order Date' datatype='date' name='[Order_Date]' role='dimension' type='ordinal' />
+      <column caption='Order ID (Returns)' datatype='string' name='[Order_ID (Returns)]' role='dimension' type='nominal' />
+      <column caption='Order ID' datatype='string' name='[Order_ID]' role='dimension' type='nominal' />
+      <column caption='Postal Code' datatype='integer' name='[Postal_Code]' role='dimension' type='ordinal' />
+      <column caption='Product ID' datatype='string' name='[Product_ID]' role='dimension' type='nominal' />
+      <column caption='Product Name' datatype='string' name='[Product_Name]' role='dimension' type='nominal' />
+      <column caption='Ship Date' datatype='date' name='[Ship_Date]' role='dimension' type='ordinal' />
+      <column caption='Ship Mode' datatype='string' name='[Ship_Mode]' role='dimension' type='nominal' />
+      <column datatype='string' name='[State]' role='dimension' semantic-role='[State].[Name]' type='nominal' />
+      <column caption='Sub Category' datatype='string' name='[Sub_Category]' role='dimension' type='nominal' />
+      <column caption='Orders' datatype='table' name='[__tableau_internal_object_id__].[Orders_4F0A288850EA4E33946131456C9CE9C6]' role='measure' type='quantitative' />
+      <drill-paths>
+        <drill-path name='Country, State, City' />
+      </drill-paths>
+      <layout dim-ordering='alphabetic' measure-ordering='alphabetic' show-structure='true' />
+      <semantic-values>
+        <semantic-value key='[Country].[Name]' value='&quot;United States&quot;' />
+      </semantic-values>
+      <object-graph>
+        <objects>
+          <object caption='Orders' id='Orders_4F0A288850EA4E33946131456C9CE9C6'>
+            <properties context=''>
+              <relation join='inner' type='join'>
+                <clause type='join'>
+                  <expression op='='>
+                    <expression op='[Orders].[Order_ID]' />
+                    <expression op='[Returns].[Order_ID]' />
+                  </expression>
+                </clause>
+                <relation connection='bigquery.1joy05h0c0ri6f1c34ihx0etsfp2' name='Orders' table='[elastic-pocs.Super_Store_Sales].[Orders]' type='table' />
+                <relation connection='bigquery.1joy05h0c0ri6f1c34ihx0etsfp2' name='Returns' table='[elastic-pocs.Super_Store_Sales].[Returns]' type='table' />
+              </relation>
+            </properties>
+          </object>
+        </objects>
+      </object-graph>
+    </datasource>
+  </datasources>
+  <worksheets>
+    <worksheet name='Sheet 1'>
+      <repository-location derived-from='http://localhost:9100/t/harini-1dde7a738a/workbooks/Complex/Sheet1?rev=' id='Sheet1' path='/t/harini-1dde7a738a/workbooks/Complex' revision='' site='harini-1dde7a738a' />
+      <table>
+        <view>
+          <datasources />
+          <aggregation value='true' />
+        </view>
+        <style />
+        <panes>
+          <pane selection-relaxation-option='selection-relaxation-allow'>
+            <view>
+              <breakdown value='auto' />
+            </view>
+            <mark class='Automatic' />
+          </pane>
+        </panes>
+        <rows />
+        <cols />
+      </table>
+      <simple-id uuid='{5BFF2F4E-9427-4388-9EBE-5BDF203299A0}' />
+    </worksheet>
+  </worksheets>
+  <windows>
+    <window class='worksheet' maximized='true' name='Sheet 1'>
+      <cards>
+        <edge name='left'>
+          <strip size='160'>
+            <card type='pages' />
+            <card type='filters' />
+            <card type='marks' />
+          </strip>
+        </edge>
+        <edge name='top'>
+          <strip size='31'>
+            <card type='columns' />
+          </strip>
+          <strip size='31'>
+            <card type='rows' />
+          </strip>
+          <strip size='31'>
+            <card type='title' />
+          </strip>
+        </edge>
+      </cards>
+      <simple-id uuid='{42A8DB6C-E549-41BF-8458-A310E071248E}' />
+    </window>
+  </windows>
+</workbook>

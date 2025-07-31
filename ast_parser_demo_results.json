@@ -1,0 +1,154 @@
+{
+  "demo_summary": {
+    "total_cases": 5,
+    "successful_conversions": 5,
+    "failed_conversions": 0,
+    "average_confidence": 0.9503999999999999
+  },
+  "detailed_results": [
+    {
+      "success": true,
+      "input_formula": "[Sales] + [Profit]",
+      "ast_structure": {
+        "node_type": "arithmetic",
+        "operator": "+",
+        "left": {
+          "node_type": "field"
+        },
+        "right": {
+          "node_type": "field"
+        }
+      },
+      "lookml_result": {
+        "name": "total_revenue",
+        "type": "dimension",
+        "data_type": "number",
+        "sql": "${TABLE}.sales + ${TABLE}.profit",
+        "label": "Total_revenue",
+        "measure_type": null,
+        "confidence": 0.99
+      },
+      "generated_lookml": "dimension: total_revenue {\n  type: number\n  sql: ${TABLE}.sales + ${TABLE}.profit ;;\n  label: \"Total_revenue\"\n}",
+      "confidence": 0.99,
+      "processing_time": "Sub-second",
+      "validation_errors": null
+    },
+    {
+      "success": true,
+      "input_formula": "SUM([Revenue])",
+      "ast_structure": {
+        "node_type": "function",
+        "function_name": "SUM",
+        "arguments": [
+          {
+            "node_type": "field"
+          }
+        ]
+      },
+      "lookml_result": {
+        "name": "total_revenue",
+        "type": "measure",
+        "data_type": "number",
+        "sql": "${TABLE}.revenue",
+        "label": "Total_revenue",
+        "measure_type": "sum",
+        "confidence": 0.99
+      },
+      "generated_lookml": "measure: total_revenue {\n  type: sum\n  sql: ${TABLE}.revenue ;;\n  label: \"Total_revenue\"\n}",
+      "confidence": 0.99,
+      "processing_time": "Sub-second",
+      "validation_errors": null
+    },
+    {
+      "success": true,
+      "input_formula": "IF [Sales] > 1000 THEN \"High\" ELSE \"Low\" END",
+      "ast_structure": {
+        "node_type": "conditional",
+        "condition": {
+          "node_type": "comparison"
+        },
+        "then_branch": {
+          "node_type": "literal"
+        },
+        "else_branch": {
+          "node_type": "literal"
+        }
+      },
+      "lookml_result": {
+        "name": "sales_category",
+        "type": "dimension",
+        "data_type": "string",
+        "sql": "CASE WHEN ${TABLE}.sales > 1000 THEN 'High' ELSE 'Low' END",
+        "label": "Sales_category",
+        "measure_type": null,
+        "confidence": 0.891
+      },
+      "generated_lookml": "dimension: sales_category {\n  type: string\n  sql: CASE WHEN ${TABLE}.sales > 1000 THEN 'High' ELSE 'Low' END ;;\n  label: \"Sales_category\"\n}",
+      "confidence": 0.891,
+      "processing_time": "Sub-second",
+      "validation_errors": null
+    },
+    {
+      "success": true,
+      "input_formula": "UPPER([Customer Name])",
+      "ast_structure": {
+        "node_type": "function",
+        "function_name": "UPPER",
+        "arguments": [
+          {
+            "node_type": "field"
+          }
+        ]
+      },
+      "lookml_result": {
+        "name": "customer_name_upper",
+        "type": "dimension",
+        "data_type": "string",
+        "sql": "UPPER(${TABLE}.customer_name)",
+        "label": "Customer_name_upper",
+        "measure_type": null,
+        "confidence": 0.99
+      },
+      "generated_lookml": "dimension: customer_name_upper {\n  type: string\n  sql: UPPER(${TABLE}.customer_name) ;;\n  label: \"Customer_name_upper\"\n}",
+      "confidence": 0.99,
+      "processing_time": "Sub-second",
+      "validation_errors": null
+    },
+    {
+      "success": true,
+      "input_formula": "IF SUM([Sales]) > 10000 THEN \"Target Met\" ELSE \"Below Target\" END",
+      "ast_structure": {
+        "node_type": "conditional",
+        "condition": {
+          "node_type": "comparison"
+        },
+        "then_branch": {
+          "node_type": "literal"
+        },
+        "else_branch": {
+          "node_type": "literal"
+        }
+      },
+      "lookml_result": {
+        "name": "performance_status",
+        "type": "measure",
+        "data_type": "number",
+        "sql": "CASE WHEN ${TABLE}.sales > 10000 THEN 'Target Met' ELSE 'Below Target' END",
+        "label": "Performance_status",
+        "measure_type": "sum",
+        "confidence": 0.891
+      },
+      "generated_lookml": "measure: performance_status {\n  type: sum\n  sql: CASE WHEN ${TABLE}.sales > 10000 THEN 'Target Met' ELSE 'Below Target' END ;;\n  label: \"Performance_status\"\n}",
+      "confidence": 0.891,
+      "processing_time": "Sub-second",
+      "validation_errors": null
+    }
+  ],
+  "technology_benefits": [
+    "Type-safe parsing with Pydantic validation",
+    "Deterministic and reproducible results",
+    "Clear error messages and debugging",
+    "Scalable architecture for production use",
+    "Extensible for new Tableau functions"
+  ]
+}

@@ -15,7 +15,7 @@ view: {{ view_name }} {
 
   dimension: {{ dimension.name | clean_name }} {
     {% if dimension.description %}
-    description: "{{ dimension.description }}"
+    description: "{{ dimension.description | escape_quotes }}"
     {% endif %}
     {% if dimension.field_type == 'string' %}
     type: string
@@ -34,15 +34,15 @@ view: {{ view_name }} {
     {% else %}
     type: string
     {% endif %}
-    sql: ${TABLE}.{{ dimension.sql_column or dimension.name }} ;;
+    sql: ${TABLE}.{{ (dimension.sql_column or dimension.name) | sql_column }} ;;
     {% if dimension.hidden %}
     hidden: yes
     {% endif %}
     {% if dimension.label %}
-    label: "{{ dimension.label }}"
+    label: "{{ dimension.label | escape_quotes }}"
     {% endif %}
     {% if dimension.group_label %}
-    group_label: "{{ dimension.group_label }}"
+    group_label: "{{ dimension.group_label | escape_quotes }}"
     {% endif %}
   }
   {% endfor %}
@@ -54,9 +54,78 @@ view: {{ view_name }} {
   dimension_group: {{ dimension.name | clean_name }} {
     type: time
     timeframes: [raw, time, date, week, month, quarter, year]
-    sql: ${TABLE}.{{ dimension.sql_column or dimension.name }} ;;
-    {% if dimension.description %}description: "{{ dimension.description }}"{% endif %}
+    sql: ${TABLE}.{{ (dimension.sql_column or dimension.name) | sql_column }} ;;
+    {% if dimension.description %}description: "{{ dimension.description | escape_quotes }}"{% endif %}
     {% if dimension.hidden %}hidden: yes{% endif %}
+  }
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  # Two-step Pattern Dimensions (hidden calculation dimensions)
+  {% if has_calculated_dimensions %}
+  {% for calc_dim in calculated_dimensions %}
+
+  dimension: {{ calc_dim.name }} {
+    description: "{{ calc_dim.description | escape_quotes }}"
+    type: {{ calc_dim.lookml_type }}
+    sql: {{ calc_dim.sql }} ;;
+    hidden: yes
+    {% if calc_dim.migration_error %}
+    # {{ calc_dim.migration_comment | single_line_comment }}
+    {% elif calc_dim.original_formula %}
+    # Original Tableau formula: {{ calc_dim.original_formula | single_line_comment }}
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  # Calculated Fields (from Tableau formulas)
+  {% if has_calculated_fields %}
+  {% for calc_field in calculated_fields %}
+
+  {% if calc_field.role == 'dimension' or calc_field.field_type == 'dimension' %}
+  dimension: {{ calc_field.name }} {
+    description: "{{ calc_field.description | escape_quotes }}"
+    {% if calc_field.datatype == 'string' %}
+    type: string
+    {% elif calc_field.datatype == 'integer' %}
+    type: number
+    {% elif calc_field.datatype == 'real' %}
+    type: number
+    {% elif calc_field.datatype == 'boolean' %}
+    type: yesno
+    {% else %}
+    type: string
+    {% endif %}
+    sql: {{ calc_field.sql }} ;;
+    {% if calc_field.migration_error %}
+    # {{ calc_field.migration_comment | single_line_comment }}
+    {% elif calc_field.original_formula %}
+    # Original Tableau formula: {{ calc_field.original_formula | single_line_comment }}
+    {% endif %}
+  }
+  {% else %}
+  measure: {{ calc_field.name }} {
+    description: "{{ calc_field.description | escape_quotes }}"
+    {% if calc_field.is_two_step_measure %}
+    type: number
+    sql: ${{ '{' + calc_field.references_dimension + '}' }} ;;
+    {% elif calc_field.lookml_type %}
+    type: number
+    sql: {{ calc_field.sql }} ;;
+    {% elif calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
+    type: number
+    sql: {{ calc_field.sql }} ;;
+    {% else %}
+    type: number
+    sql: {{ calc_field.sql }} ;;
+    {% endif %}
+    {% if calc_field.migration_error %}
+    # {{ calc_field.migration_comment | single_line_comment }}
+    {% elif calc_field.original_formula %}
+    # Original Tableau formula: {{ calc_field.original_formula | single_line_comment }}
+    {% endif %}
   }
   {% endif %}
   {% endfor %}
@@ -68,31 +137,14 @@ view: {{ view_name }} {
 
   measure: {{ measure.name | clean_name }} {
     {% if measure.description %}
-    description: "{{ measure.description }}"
+    description: "{{ measure.description | escape_quotes }}"
     {% endif %}
-    {% if measure.aggregation == 'sum' %}
-    type: sum
-    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
-    {% elif measure.aggregation == 'count' %}
-    type: count
-    {% if measure.sql_column %}
-    sql: ${TABLE}.{{ measure.sql_column }} ;;
-    {% endif %}
-    {% elif measure.aggregation == 'count_distinct' %}
-    type: count_distinct
-    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
-    {% elif measure.aggregation == 'average' %}
-    type: average
-    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
-    {% elif measure.aggregation == 'min' %}
-    type: min
-    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
-    {% elif measure.aggregation == 'max' %}
-    type: max
-    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    type: number
+    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
+    {% if measure.aggregation == 'count' and not measure.sql_column %}
+    {# Count measures without SQL column don't need sql parameter #}
     {% else %}
-    type: sum
-    sql: ${TABLE}.{{ measure.sql_column or measure.name }} ;;
+    {# All other measures use the column SQL #}
     {% endif %}
     {% if measure.value_format %}
     value_format: "{{ measure.value_format }}"
@@ -101,10 +153,10 @@ view: {{ view_name }} {
     hidden: yes
     {% endif %}
     {% if measure.label %}
-    label: "{{ measure.label }}"
+    label: "{{ measure.label | escape_quotes }}"
     {% endif %}
     {% if measure.group_label %}
-    group_label: "{{ measure.group_label }}"
+    group_label: "{{ measure.group_label | escape_quotes }}"
     {% endif %}
     {% if measure.drill_fields %}
     drill_fields: [{{ measure.drill_fields | join(', ') }}]
@@ -113,10 +165,5 @@ view: {{ view_name }} {
   {% endfor %}
   {% endif %}
 
-  # Basic measures for counting
-  measure: count {
-    type: count
-    description: "Count of records"
-  }
 
 }

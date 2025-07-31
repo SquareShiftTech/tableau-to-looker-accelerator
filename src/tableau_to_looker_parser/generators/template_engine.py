@@ -40,6 +40,9 @@ class TemplateEngine:
         # Add custom filters
         self.env.filters["snake_case"] = self._snake_case_filter
         self.env.filters["clean_name"] = self._clean_name_filter
+        self.env.filters["escape_quotes"] = self._escape_quotes_filter
+        self.env.filters["single_line_comment"] = self._single_line_comment_filter
+        self.env.filters["sql_column"] = self._sql_column_filter
 
         logger.info(f"Template engine initialized with directory: {self.template_dir}")
 
@@ -63,6 +66,64 @@ class TemplateEngine:
         # Remove brackets and clean up
         clean_value = value.replace("[", "").replace("]", "")
         return self._snake_case_filter(clean_value)
+
+    def _escape_quotes_filter(self, value: str) -> str:
+        """Escape double quotes in LookML strings."""
+        if not value:
+            return value
+        # Escape double quotes by replacing " with \"
+        return value.replace('"', '\\"')
+
+    def _single_line_comment_filter(self, value: str) -> str:
+        """Convert multi-line text to single-line comment format."""
+        if not value:
+            return value
+        # Replace newlines with spaces and normalize whitespace
+        import re
+
+        # Replace line breaks with spaces
+        single_line = re.sub(r"\s*\n\s*", " ", value.strip())
+        # Normalize multiple spaces to single space
+        single_line = re.sub(r"\s+", " ", single_line)
+        return single_line
+
+    def _sql_column_filter(self, value: str) -> str:
+        """Quote SQL column names that contain spaces or special characters."""
+        if not value:
+            return value
+
+        import re
+
+        # Check if column name needs quoting (contains spaces, special chars, or is a reserved word)
+        needs_quoting = (
+            " " in value  # Contains spaces
+            or "-" in value  # Contains hyphens
+            or "." in value  # Contains dots
+            or re.search(r"[^a-zA-Z0-9_]", value)  # Contains special characters
+            or value.upper()
+            in {
+                "ORDER",
+                "GROUP",
+                "HAVING",
+                "WHERE",
+                "SELECT",
+                "FROM",
+                "JOIN",
+                "UNION",
+                "CASE",
+                "WHEN",
+                "THEN",
+                "ELSE",
+                "END",
+            }  # SQL reserved words
+        )
+
+        if needs_quoting:
+            # Remove existing backticks if present and add new ones
+            clean_value = value.strip("`")
+            return f"`{clean_value}`"
+
+        return value
 
     def render_template(self, template_name: str, context: Dict[str, Any]) -> str:
         """

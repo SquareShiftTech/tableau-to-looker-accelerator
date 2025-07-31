@@ -752,6 +752,50 @@ class TableauXMLParser:
                 )
                 elements.append({"type": "measure", "data": measure_data})
 
+            # Also add measures from metadata records with aggregation (for files like Book7)
+            # This handles cases where measures exist in metadata but not as column elements
+            existing_measure_names = {
+                col.get("name", "").strip("[]")
+                for col in datasource.findall(".//column[@role='measure']")
+            }
+
+            for metadata in datasource.findall(".//metadata-record[@class='column']"):
+                aggregation_elem = metadata.find("aggregation")
+                local_name_elem = metadata.find("local-name")
+                remote_name_elem = metadata.find("remote-name")
+                local_type_elem = metadata.find("local-type")
+
+                if (
+                    aggregation_elem is not None
+                    and aggregation_elem.text == "Sum"
+                    and local_name_elem is not None
+                    and remote_name_elem is not None
+                ):
+                    local_name = local_name_elem.text
+                    remote_name = remote_name_elem.text
+                    local_type = (
+                        local_type_elem.text if local_type_elem is not None else "real"
+                    )
+
+                    if local_name and remote_name:
+                        clean_local_name = local_name.strip("[]")
+                        # Skip if this measure already exists as a column element
+                        if clean_local_name not in existing_measure_names:
+                            # Create measure data from metadata
+                            measure_data = {
+                                "name": local_name,
+                                "raw_name": local_name,
+                                "role": "measure",
+                                "datatype": local_type,
+                                "aggregation": "sum",
+                                "number_format": None,
+                                "label": remote_name,  # Use remote name as label
+                                "table_name": self._resolve_table_alias(
+                                    table_mapping.get(clean_local_name), alias_mapping
+                                ),
+                            }
+                            elements.append({"type": "measure", "data": measure_data})
+
             # Add dimensions
             for col in datasource.findall(".//column[@role='dimension']"):
                 dimension_data = self.extract_dimension(col)
