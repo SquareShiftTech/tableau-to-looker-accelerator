@@ -78,7 +78,7 @@ def run_test_suite():
         # Math functions
         "ABS([Profit])",
         "ROUND([Sales], 2)",
-        "POWER([Base], 2)",
+        "POW([Base], 2)",
         # Date functions
         "YEAR([Order Date])",
         "DATEADD([Date], 30, 'day')",

@@ -142,13 +142,25 @@ class ASTToLookMLConverter:
             "ASCII": "ASCII",  # ASCII code of character
             "CHAR": "CHR",  # Character from ASCII code (Tableau CHAR → SQL CHR)
             "PROPER": "INITCAP",  # Proper case (Tableau PROPER → SQL INITCAP)
+            "SPACE": "REPEAT('\\u2009', {0})",  # SPACE(n) → REPEAT(' ', n)
             # Math functions - direct mapping
             "ABS": "ABS",
             "ROUND": "ROUND",
             "CEILING": "CEIL",  # Tableau CEILING → SQL CEIL
             "FLOOR": "FLOOR",
             "SQRT": "SQRT",
-            "POWER": "POWER",
+            "POWER": "POW",
+            "DIV": "DIV",
+            "SQUARE": "POW({0}, 2)",  # SQUARE(x) → POWER(x, 2)
+            "PI": "ACOS(-1)",  # PI() → ACOS(-1) for BigQuery
+            "SIGN": "SIGN",
+            "SIN": "SIN",
+            "COS": "COS",
+            "TAN": "TAN",
+            "ACOS": "ACOS",
+            "ATAN": "ATAN",
+            "LOG": "LOG",
+            "LN": "LN",
             # Date functions - more complex, handled specially
             "YEAR": "EXTRACT(YEAR FROM {})",
             "MONTH": "EXTRACT(MONTH FROM {})",
@@ -169,6 +181,7 @@ class ASTToLookMLConverter:
             # Logical functions from Excel mapping
             "IFNULL": "IFNULL",  # NULL handling function
             "ISNULL": "{0} IS NULL",  # NULL check: ISNULL([field]) -> field IS NULL
+            "ZN": "IFNULL({0}, 0)",  # Zero if null: ZN([field]) -> IFNULL(field, 0)
         }
 
     # CONVERSION METHODS - Each handles a specific AST node type
@@ -268,8 +281,8 @@ class ASTToLookMLConverter:
         # Handle special operators
         operator = node.operator
         if operator == "^":
-            # Tableau uses ^ for power, SQL uses POWER function
-            return f"POWER({left_expr}, {right_expr})"
+            # Tableau uses ^ for power, SQL uses POW function
+            return f"POW({left_expr}, {right_expr})"
         elif operator == "%":
             # Modulo operator
             return f"MOD({left_expr}, {right_expr})"
@@ -442,7 +455,10 @@ class ASTToLookMLConverter:
                     "CURRENT_TIMESTAMP",
                     "CURRENT_DATE",
                 ]:
-                    return lookml_function  # No parentheses for these
+                    return f"{lookml_function}()"
+                # Handle functions where lookml_function is an expression with parentheses already
+                elif "(" in lookml_function and ")" in lookml_function:
+                    return lookml_function
                 else:
                     return f"{lookml_function}({args_str})"
         else:

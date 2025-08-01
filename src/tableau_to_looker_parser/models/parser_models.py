@@ -380,6 +380,13 @@ def create_default_function_registry() -> FunctionRegistry:
             return_type="string",
         ),
         SupportedFunction(
+            name="SPACE",
+            category="string",
+            min_args=1,
+            max_args=1,
+            return_type="string",
+        ),
+        SupportedFunction(
             name="LEN", category="string", min_args=1, max_args=1, return_type="integer"
         ),
         SupportedFunction(
@@ -476,6 +483,50 @@ def create_default_function_registry() -> FunctionRegistry:
         SupportedFunction(
             name="FLOOR", category="math", min_args=1, max_args=1, return_type="real"
         ),
+        SupportedFunction(
+            name="SQRT", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="POWER", category="math", min_args=2, max_args=2, return_type="real"
+        ),
+        SupportedFunction(
+            name="DIV", category="math", min_args=2, max_args=2, return_type="real"
+        ),
+        SupportedFunction(
+            name="SQUARE", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="PI",
+            category="math",
+            min_args=0,
+            max_args=0,
+            return_type="real",
+            description="Pi constant",
+        ),
+        SupportedFunction(
+            name="SIGN", category="math", min_args=1, max_args=1, return_type="integer"
+        ),
+        SupportedFunction(
+            name="SIN", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="COS", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="TAN", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="ACOS", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="ATAN", category="math", min_args=1, max_args=1, return_type="real"
+        ),
+        SupportedFunction(
+            name="LOG", category="math", min_args=1, max_args=2, return_type="real"
+        ),
+        SupportedFunction(
+            name="LN", category="math", min_args=1, max_args=1, return_type="real"
+        ),
     ]
 
     # Date functions
@@ -504,6 +555,7 @@ def create_default_function_registry() -> FunctionRegistry:
             return_type="boolean",
         ),
         SupportedFunction(name="IFNULL", category="logical", min_args=2, max_args=2),
+        SupportedFunction(name="ZN", category="logical", min_args=1, max_args=1),
     ]
 
     # Window functions

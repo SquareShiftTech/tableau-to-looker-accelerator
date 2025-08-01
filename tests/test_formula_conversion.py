@@ -152,7 +152,7 @@ class TestFormulaConversion:
             ("CEILING([Price])", "CEIL(${TABLE}.price)"),
             ("FLOOR([Amount])", "FLOOR(${TABLE}.amount)"),
             ("SQRT([Value])", "SQRT(${TABLE}.value)"),
-            ("POWER([Base], 2)", "POWER(${TABLE}.base, 2)"),
+            ("POWER([Base], 2)", "POW(${TABLE}.base, 2)"),
         ]
 
         for tableau_formula, expected_lookml in test_cases:
@@ -173,8 +173,8 @@ class TestFormulaConversion:
             ("YEAR([Order Date])", "EXTRACT(YEAR FROM ${TABLE}.order_date)"),
             ("MONTH([Order Date])", "EXTRACT(MONTH FROM ${TABLE}.order_date)"),
             ("DAY([Order Date])", "EXTRACT(DAY FROM ${TABLE}.order_date)"),
-            ("NOW()", "CURRENT_TIMESTAMP"),
-            ("TODAY()", "CURRENT_DATE"),
+            ("NOW()", "CURRENT_TIMESTAMP()"),
+            ("TODAY()", "CURRENT_DATE()"),
             # New date functions from Excel mapping
             ("DATEADD([Date], 30, 'day')", "DATE_ADD(${TABLE}.date, INTERVAL 30 day)"),
             (
@@ -245,7 +245,7 @@ class TestFormulaConversion:
             ("[Revenue] - [Cost]", "(${TABLE}.revenue - ${TABLE}.cost)"),
             ("[Price] * [Quantity]", "(${TABLE}.price * ${TABLE}.quantity)"),
             ("[Total] / [Count]", "(${TABLE}.total / ${TABLE}.count)"),
-            ("[Base] ^ 2", "POWER(${TABLE}.base, 2)"),
+            ("[Base] ^ 2", "POW(${TABLE}.base, 2)"),
             ("[Value] % 10", "MOD(${TABLE}.value, 10)"),
         ]
 

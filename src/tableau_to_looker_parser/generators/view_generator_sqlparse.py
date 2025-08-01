@@ -396,7 +396,7 @@ class ViewGeneratorSQLParse(BaseGenerator):
             if token_value == "<>":
                 return "!="
             elif token_value == "^":
-                return "POWER"  # This would need special handling for syntax
+                return "POW"  # This would need special handling for syntax
             return token_value
 
         else:

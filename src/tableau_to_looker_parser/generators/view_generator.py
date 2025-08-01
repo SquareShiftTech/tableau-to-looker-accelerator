@@ -137,7 +137,11 @@ class ViewGenerator(BaseGenerator):
         table_calculated_fields = []
         table_calculated_dimensions = []  # For two-step pattern dimensions
         for calc_field in all_calculated_fields:
-            if calc_field.get("table_name") == actual_table_name:
+            # Include calculated fields with matching table_name or with placeholder "__UNASSIGNED_TABLE__"
+            if (
+                calc_field.get("table_name") == actual_table_name
+                or calc_field.get("table_name") == "__UNASSIGNED_TABLE__"
+            ):
                 # Convert AST to LookML SQL using our converter
                 converted_field = self._convert_calculated_field(calc_field, view_name)
                 if converted_field:

@@ -152,11 +152,14 @@ class CalculatedFieldHandler(BaseHandler):
 
         # Infer table_name if not provided by analyzing dependencies
         table_name = data.get("table_name")
-        if not table_name and calculated_field.dependencies:
-            table_name = self._infer_table_from_dependencies(
-                calculated_field.dependencies, data, field_table_mapping
-            )
-
+        if not table_name:
+            if calculated_field.dependencies:
+                table_name = self._infer_table_from_dependencies(
+                    calculated_field.dependencies, data, field_table_mapping
+                )
+            else:
+                # Assign a special placeholder table_name to ensure generation
+                table_name = "__UNASSIGNED_TABLE__"
         # Create the JSON representation
         result = {
             "name": field_name,
