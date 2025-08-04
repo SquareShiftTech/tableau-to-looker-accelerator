@@ -134,8 +134,8 @@ class ASTToLookMLConverter:
             "STARTSWITH": "STARTS_WITH({0}, {1})",  # STARTSWITH(string, prefix) → STARTS_WITH(string, prefix) for BigQuery
             "ENDSWITH": "ENDS_WITH({0}, {1})",  # ENDSWITH(string, suffix) → ENDS_WITH(string, suffix) for BigQuery
             "REPLACE": "REPLACE",  # Direct mapping
-            "FIND": "STRPOS({0}, {1})",  # FIND(string, substring) → STRPOS(string, substring) for BigQuery
-            "SPLIT": "SPLIT({0}, {1})[OFFSET(CASE WHEN {2} < 0 THEN {2} ELSE {2} - 1 END)]",  # SPLIT(string, delimiter, index) → SPLIT(string, delimiter)[OFFSET(...)] for BigQuery
+            "FIND": "FIND_SPECIAL",  # FIND(string, substring) → STRPOS(string, substring) for BigQuery
+            "SPLIT": "SPLIT({0}, {1})[OFFSET(CASE WHEN {2} < 0 THEN ARRAY_LENGTH(SPLIT({0}, {1})) + {2} ELSE {2} - 1 END)]",  # SPLIT(string, delimiter, index) → SPLIT(string, delimiter)[OFFSET(...)] for BigQuery
             "LTRIM": "LTRIM",  # Direct mapping
             "RTRIM": "RTRIM",  # Direct mapping
             # Additional string functions from Excel mapping
@@ -165,12 +165,15 @@ class ASTToLookMLConverter:
             "YEAR": "EXTRACT(YEAR FROM {})",
             "MONTH": "EXTRACT(MONTH FROM {})",
             "DAY": "EXTRACT(DAY FROM {})",
+            "WEEK": "EXTRACT(WEEK FROM {})",
+            "QUARTER": "EXTRACT(QUARTER FROM {})",
             "NOW": "CURRENT_TIMESTAMP",
             "TODAY": "CURRENT_DATE",
             # Additional date functions from Excel mapping - need special handling
             "DATEADD": "DATEADD_SPECIAL",  # Special handling for INTERVAL syntax
             "DATEDIFF": "DATEDIFF_SPECIAL",  # Special handling for unit parameter
             "DATETRUNC": "DATETRUNC_SPECIAL",  # Special handling for unit parameter
+            "DATEPART": "DATEPART_SPECIAL",
             "PARSE_DATE": "PARSE_DATE('%Y-%m-%d', {0})",  # PARSE_DATE format
             # Type conversion functions from Excel mapping
             "FLOAT": "CAST({0} AS FLOAT64)",  # Convert to float
@@ -391,7 +394,18 @@ class ASTToLookMLConverter:
             arg_expr = self._convert_node(arg, table_context)
             converted_args.append(arg_expr)
 
-        # Look up function in registry
+        # Special handling for LOG function to support both 1 and 2 arguments
+        if function_name == "LOG":
+            if len(converted_args) == 1:
+                # LOG(value) - use base 10 as default
+                return f"LOG({converted_args[0]},10)"  # LOG base 10
+            elif len(converted_args) == 2:
+                # LOG(value, base) - use specified base
+                return f"LOG({converted_args[0]}, {converted_args[1]})"
+            else:
+                return f"/* LOG: expects 1 or 2 arguments, got {len(converted_args)} */"
+
+        # Look up function in registry for other functions
         if function_name in self.function_registry:
             lookml_function = self.function_registry[function_name]
 
@@ -399,37 +413,64 @@ class ASTToLookMLConverter:
             if lookml_function == "DATEADD_SPECIAL":
                 if len(converted_args) == 3:
                     date_expr = converted_args[0]
+                    date_expr = date_expr.strip("'\"").upper()
                     interval_expr = converted_args[1]
                     unit_expr = converted_args[2].strip(
                         "'\""
                     )  # Remove quotes from unit
-                    return (
-                        f"DATE_ADD({date_expr}, INTERVAL {interval_expr} {unit_expr})"
-                    )
+                    if (
+                        date_expr == "HOUR"
+                        or date_expr == "MINUTE"
+                        or date_expr == "SECOND"
+                    ):
+                        return f"DATETIME_ADD({unit_expr}, INTERVAL {interval_expr} {date_expr})"
+                    else:
+                        return f"DATE_ADD({unit_expr}, INTERVAL {interval_expr} {date_expr})"
                 else:
                     return (
                         f"/* DATEADD: expects 3 arguments, got {len(converted_args)} */"
                     )
             elif lookml_function == "DATEDIFF_SPECIAL":
                 if len(converted_args) == 3:
-                    start_expr = converted_args[0]
-                    end_expr = converted_args[1]
-                    unit_expr = converted_args[2].strip(
-                        "'\""
-                    )  # Remove quotes from unit
-                    return f"DATE_DIFF({end_expr}, {start_expr}, {unit_expr})"
+                    date_expr = converted_args[0]
+                    date_expr = date_expr.strip("'\"").upper()
+                    start_expr = converted_args[1].strip("'\"")
+                    end_expr = converted_args[2].strip("'\"")  # Remove quotes from unit
+                    if (
+                        date_expr == "HOUR"
+                        or date_expr == "MINUTE"
+                        or date_expr == "SECOND"
+                    ):
+                        return f"DATETIME_DIFF({end_expr}, {start_expr}, {date_expr})"
+                    else:
+                        return f"DATE_DIFF({end_expr}, {start_expr}, {date_expr})"
                 else:
                     return f"/* DATEDIFF: expects 3 arguments, got {len(converted_args)} */"
             elif lookml_function == "DATETRUNC_SPECIAL":
                 if len(converted_args) == 2:
                     date_expr = converted_args[0]
+                    date_expr = date_expr.strip("'\"")
                     unit_expr = converted_args[1].strip(
                         "'\""
                     )  # Remove quotes from unit
-                    return f"DATE_TRUNC({date_expr}, {unit_expr})"
+                    return f"DATE_TRUNC({unit_expr}, {date_expr})"
                 else:
                     return f"/* DATETRUNC: expects 2 arguments, got {len(converted_args)} */"
-
+            elif lookml_function == "DATEPART_SPECIAL":
+                if len(converted_args) == 2:
+                    date_expr = converted_args[0]
+                    date_expr = date_expr.strip("'\"").upper()
+                    unit_expr = converted_args[1].strip("'\"")
+                    return f"EXTRACT({date_expr} FROM {unit_expr})"
+                else:
+                    return f"/* DATEPART: expects 2 arguments, got {len(converted_args)} */"
+            elif lookml_function == "FIND_SPECIAL":
+                if len(converted_args) == 3:
+                    return f"STRPOS(SUBSTR({converted_args[0]}, {converted_args[2]}), {converted_args[1]}) + {converted_args[2]} - 1"
+                elif len(converted_args) == 2:
+                    return f"STRPOS({converted_args[0]}, {converted_args[1]})"
+                else:
+                    return f"/* FIND: expects 2 or 3 arguments, got {len(converted_args)} */"
             # Handle special function formats
             elif "{}" in lookml_function:
                 # Special format like EXTRACT(YEAR FROM {})

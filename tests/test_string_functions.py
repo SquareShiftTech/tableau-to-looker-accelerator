@@ -104,7 +104,7 @@ class TestStringFunctions:
         ast_root = result.calculated_field.ast_root
 
         lookml_sql = self.converter.convert_to_lookml(ast_root)
-        expected = "SPLIT(${TABLE}.customer_name, ' ')[OFFSET(CASE WHEN 1 < 0 THEN 1 ELSE 1 - 1 END)]"
+        expected = "SPLIT(${TABLE}.customer_name, ' ')[OFFSET(CASE WHEN 1 < 0 THEN ARRAY_LENGTH(SPLIT(${TABLE}.customer_name, ' ')) + 1 ELSE 1 - 1 END)]"
 
         assert lookml_sql == expected
 
