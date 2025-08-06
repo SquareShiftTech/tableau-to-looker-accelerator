@@ -269,22 +269,14 @@ class WorksheetHandler(BaseHandler):
         return viz_config
 
     def _map_chart_type(self, tableau_chart_type: str) -> ChartType:
-        """Map Tableau chart type to ChartType enum."""
-        mapping = {
-            "bar": ChartType.BAR,
-            "line": ChartType.LINE,
-            "area": ChartType.AREA,
-            "pie": ChartType.PIE,
-            "circle": ChartType.SCATTER,
-            "scatter": ChartType.SCATTER,
-            "map": ChartType.MAP,
-            "text": ChartType.TEXT,
-            "gantt": ChartType.GANTT,
-            "square": ChartType.HEATMAP,
-            "heatmap": ChartType.HEATMAP,
-        }
-
-        return mapping.get(tableau_chart_type.lower(), ChartType.UNKNOWN)
+        """Simple mapping for basic chart types: donut, pie, bar, table."""
+        # Simple mapping for basic charts only
+        if tableau_chart_type.lower() == "pie":
+            return ChartType.PIE
+        elif tableau_chart_type.lower() == "square":
+            return ChartType.TEXT_TABLE  # Square = Table
+        else:
+            return ChartType.BAR  # Everything else = Bar
 
     def _suggest_lookml_type(self, field: Dict) -> Optional[str]:
         """Suggest appropriate LookML field type."""

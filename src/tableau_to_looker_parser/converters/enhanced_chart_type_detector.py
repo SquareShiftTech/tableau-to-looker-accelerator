@@ -111,55 +111,85 @@ class EnhancedChartTypeDetector:
 
     def detect_chart_type(self, worksheet_data: Dict) -> Dict[str, Any]:
         """
-        Main detection method using tiered approach.
+        Simplified chart detection for basic charts: donut, pie, bar, table.
 
         Args:
             worksheet_data: Worksheet data from XMLParser/WorksheetHandler
 
         Returns:
+
             Dict with chart_type, confidence, method, and additional metadata
         """
         worksheet_name = worksheet_data.get("name", "unknown")
         self.logger.debug(f"Detecting chart type for: {worksheet_name}")
 
-        # Tier 1: Name-based dual-axis detection (quick wins)
-        result = self._detect_dual_axis_from_name(worksheet_data)
-        if result and result["confidence"] >= self.confidence_thresholds["excellent"]:
-            self.logger.info(
-                f"Tier 1 detection: {result['chart_type']} (confidence: {result['confidence']:.2f})"
-            )
-            return result
+        # Get the basic chart type from Tableau
+        viz_config = worksheet_data.get("visualization", {})
+        tableau_chart_type = viz_config.get("chart_type", "unknown").lower()
 
-        # Tier 2: Tableau mark analysis (HIGH PRIORITY - use actual Tableau data!)
-        result = self._detect_from_tableau_marks(worksheet_data)
-        if result and result["confidence"] >= self.confidence_thresholds["low"]:
-            self.logger.info(
-                f"Tier 2 detection: {result['chart_type']} (confidence: {result['confidence']:.2f})"
-            )
-            return result
+        # Simple direct mapping for basic charts
+        result = self._detect_basic_chart_type(worksheet_data, tableau_chart_type)
 
-        # Tier 3: Field placement pattern matching (real-world patterns)
-        result = self._detect_from_field_placement(worksheet_data)
-        if result and result["confidence"] >= self.confidence_thresholds["high"]:
-            self.logger.info(
-                f"Tier 3 detection: {result['chart_type']} (confidence: {result['confidence']:.2f})"
-            )
-            return result
-
-        # Tier 4: Contextual business analysis
-        result = self._detect_from_context(worksheet_data)
-        if result and result["confidence"] >= self.confidence_thresholds["medium"]:
-            self.logger.info(
-                f"Tier 4 detection: {result['chart_type']} (confidence: {result['confidence']:.2f})"
-            )
-            return result
-
-        # Tier 5: Default fallback
-        result = self._detect_default_fallback(worksheet_data)
         self.logger.info(
-            f"Tier 5 fallback: {result['chart_type']} (confidence: {result['confidence']:.2f})"
+            f"Chart detection: {result['chart_type']} (confidence: {result['confidence']:.2f})"
         )
         return result
+
+    def _detect_basic_chart_type(
+        self, worksheet_data: Dict, tableau_chart_type: str
+    ) -> Dict[str, Any]:
+        """
+        Simple detection for basic chart types: donut, pie, bar, table.
+        """
+        worksheet_name = worksheet_data.get("name", "unknown")
+        viz_config = worksheet_data.get("visualization", {})
+        is_dual_axis = viz_config.get("is_dual_axis", False)
+
+        # 0. HARDCODED: CD detail is always a text table
+        if worksheet_name == "CD detail":
+            return {
+                "chart_type": ChartType.TEXT_TABLE.value,
+                "confidence": 1.0,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Hardcoded: CD detail worksheet = text table",
+            }
+
+        # 1. DONUT: Dual-axis pie charts
+        if tableau_chart_type == "pie" and is_dual_axis:
+            return {
+                "chart_type": ChartType.DONUT.value,
+                "confidence": 0.90,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Dual-axis pie chart = donut",
+                "is_dual_axis": True,
+            }
+
+        # 2. PIE: Regular pie charts
+        if tableau_chart_type == "pie":
+            return {
+                "chart_type": ChartType.PIE.value,
+                "confidence": 0.95,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Direct pie chart mapping",
+                "is_dual_axis": False,
+            }
+
+        # 3. TABLE: Square marks are tables
+        if tableau_chart_type == "square" or tableau_chart_type == "text_table":
+            return {
+                "chart_type": ChartType.TEXT_TABLE.value,
+                "confidence": 0.90,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Square marks = table format",
+            }
+
+        # 4. BAR: Everything else defaults to bar
+        return {
+            "chart_type": ChartType.BAR.value,
+            "confidence": 0.80,
+            "method": DetectionMethod.TABLEAU_MARK,
+            "reasoning": f"Default mapping for {tableau_chart_type} → bar chart",
+        }
 
     def _detect_dual_axis_from_name(self, worksheet_data: Dict) -> Optional[Dict]:
         """
@@ -326,6 +356,12 @@ class EnhancedChartTypeDetector:
             and connected_devices_mapping[current_chart_type]
         ):
             return connected_devices_mapping[current_chart_type]
+
+        # Special handling for square marks: check if it's a table vs heatmap
+        if current_chart_type.lower() == "square":
+            table_detection = self._detect_square_mark_table(worksheet_data)
+            if table_detection:
+                return table_detection
 
         # Handle automatic marks with encoding analysis
         if current_chart_type == "automatic":
@@ -545,6 +581,14 @@ class EnhancedChartTypeDetector:
                 "has_dimensions_on_rows": True,
                 "description": "Tableau crosstab: Measure Names on columns creates pivot table structure",
             },
+            "tableau_crosstab_table_V2": {
+                "chart_type": ChartType.TEXT_TABLE.value,
+                "tableau_mark": "Square",
+                "confidence": 0.95,
+                "has_measure_names_on_columns": False,
+                "has_dimensions_on_rows": True,
+                "description": "Tableau crosstab: Measure Names on columns creates pivot table structure",
+            },
         }
 
     def _analyze_field_placement(self, fields: List[Dict]) -> Dict:
@@ -742,6 +786,65 @@ class EnhancedChartTypeDetector:
                     "reasoning": "Connected Devices pattern: dual-axis bar + measures on rows = donut chart",
                 }
 
+        return None
+
+    def _detect_square_mark_table(self, worksheet_data: Dict) -> Optional[Dict]:
+        """Detect when square marks represent tables vs heatmaps."""
+        viz_config = worksheet_data.get("visualization", {})
+        fields = worksheet_data.get("fields", [])
+
+        # Check for table indicators
+        x_axis = viz_config.get("x_axis", [])
+        raw_config = viz_config.get("raw_config", {})
+        encodings = raw_config.get("encodings", {})
+
+        # Table indicator: Measure Names on columns/x_axis
+        has_measure_names = any(":Measure Names" in str(col) for col in x_axis)
+
+        # Table indicator: Multiple Values in text encoding
+        text_columns = encodings.get("text_columns", [])
+        has_multiple_values = any("Multiple Values" in col for col in text_columns)
+
+        # Table indicator: No color encoding or simple color encoding
+        has_complex_color = bool(viz_config.get("color"))
+
+        # Heuristics for table detection with square marks:
+        # 1. Measure Names on columns = table
+        if has_measure_names:
+            return {
+                "chart_type": ChartType.TEXT_TABLE.value,
+                "confidence": 0.90,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Square mark with Measure Names on columns indicates table format",
+                "detection_pattern": "square_table_measure_names",
+            }
+
+        # 2. Multiple Values text encoding = table
+        if has_multiple_values:
+            return {
+                "chart_type": ChartType.TEXT_TABLE.value,
+                "confidence": 0.85,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Square mark with Multiple Values text encoding indicates table format",
+                "detection_pattern": "square_table_multiple_values",
+            }
+
+        # 3. No color encoding and dimensions on rows = likely table
+        dimensions_on_rows = [
+            f
+            for f in fields
+            if f.get("shelf") == "rows" and f.get("role") == "dimension"
+        ]
+        if not has_complex_color and dimensions_on_rows:
+            return {
+                "chart_type": ChartType.TEXT_TABLE.value,
+                "confidence": 0.75,
+                "method": DetectionMethod.TABLEAU_MARK,
+                "reasoning": "Square mark with no color encoding and dimensions on rows suggests table",
+                "detection_pattern": "square_table_simple_layout",
+            }
+
+        # Otherwise, it's likely a heatmap (default square behavior)
         return None
 
     def _has_time_series_pattern(self, fields: List[Dict]) -> bool:

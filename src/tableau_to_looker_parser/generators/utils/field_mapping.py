@@ -28,6 +28,7 @@ class FieldMapper:
     def build_fields_from_worksheet(self, worksheet, explore_name: str) -> List[str]:
         """
         Build fields array from worksheet fields for LookML dashboard.
+        Only includes fields from row and column shelves (for tables/pivots) plus measures.
 
         Args:
             worksheet: Worksheet schema object
@@ -48,14 +49,30 @@ class FieldMapper:
                 logger.debug(f"Skipping internal field: {field_name}")
                 continue
 
-            # Convert to explore.field format
+            # Chart-specific field inclusion logic
+            shelf = self._get_field_shelf(field)
+            field_type = self._get_field_type(field)
             field_name = self._get_field_name(field)
-            if field_name:
-                # Add proper measure aggregation types for dashboard fields
-                aggregated_field_name = self._add_measure_aggregation_type(
-                    field_name, field
+
+            # Check if we should include this field based on chart type
+            should_include = self._should_include_field_for_chart(
+                worksheet, field, shelf, field_type
+            )
+
+            if should_include:
+                if field_name:
+                    # Add proper measure aggregation types for dashboard fields
+                    aggregated_field_name = self._add_measure_aggregation_type(
+                        field_name, field
+                    )
+                    fields.append(f"{explore_name.lower()}.{aggregated_field_name}")
+                    logger.debug(
+                        f"Added field: {field_name} (shelf: {shelf}, type: {field_type})"
+                    )
+            else:
+                logger.debug(
+                    f"Skipping field: {field_name} (shelf: {shelf}, type: {field_type})"
                 )
-                fields.append(f"{explore_name.lower()}.{aggregated_field_name}")
 
         return fields
 
@@ -74,6 +91,69 @@ class FieldMapper:
         elif hasattr(field, "get"):
             return field.get("name", "")
         return ""
+
+    def _get_field_shelf(self, field) -> str:
+        """Extract field shelf from field object."""
+        if hasattr(field, "shelf"):
+            return field.shelf
+        elif hasattr(field, "get"):
+            return field.get("shelf", "")
+        return ""
+
+    def _should_include_field_for_chart(
+        self, worksheet, field, shelf: str, field_type: str
+    ) -> bool:
+        """
+        Determine if a field should be included based on chart type.
+
+        For donut charts: Use color and text/detail shelf fields + measures
+        For tables: Use rows and columns shelf fields + measures
+        For bar/pie: Use rows and columns shelf fields + measures
+        """
+        # Get chart type from worksheet
+        chart_type = "bar"  # default
+        if hasattr(worksheet, "visualization"):
+            viz = worksheet.visualization
+            if hasattr(viz, "chart_type"):
+                chart_type = (
+                    viz.chart_type.lower()
+                    if hasattr(viz.chart_type, "lower")
+                    else str(viz.chart_type).lower()
+                )
+
+        # Always include measures
+        if field_type == "measure":
+            return True
+
+        # Donut-specific logic: include color and detail/text shelf fields
+        if chart_type in ["donut", "pie"]:
+            # Include fields on color, detail, or text shelves
+            if shelf in ["color", "detail", "text"]:
+                logger.debug(
+                    f"Including donut field from {shelf} shelf: {self._get_field_name(field)}"
+                )
+                return True
+
+            # Also check if this field is used in visualization.color
+            if hasattr(worksheet, "visualization") and hasattr(
+                worksheet.visualization, "color"
+            ):
+                viz_color = worksheet.visualization.color
+                field_name = self._get_field_name(field)
+                if (
+                    viz_color
+                    and field_name
+                    and field_name.lower() in str(viz_color).lower()
+                ):
+                    logger.debug(
+                        f"Including donut field from visualization.color: {field_name}"
+                    )
+                    return True
+
+            return False
+
+        # For all other charts (tables, bars): use rows and columns
+        return shelf in ["rows", "columns"]
 
     def _add_measure_aggregation_type(self, field_name: str, field) -> str:
         """

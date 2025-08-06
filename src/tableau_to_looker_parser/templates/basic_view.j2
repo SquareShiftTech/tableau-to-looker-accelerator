@@ -9,9 +9,33 @@ view: {{ view_name }} {
   description: "{{ view.description }}"
   {% endif %}
 
+  # Date dimension groups
+  {% if has_dimensions %}
+  {% for dimension in dimensions %}
+  {% if dimension.field_type == 'date' or dimension.field_type == 'datetime' or dimension.field_type == 'time' %}
+
+  dimension_group: {{ dimension.name | clean_name }} {
+    type: time
+    timeframes: [raw, time, date, week, month, quarter, year]
+    sql: ${TABLE}.{{ (dimension.sql_column or dimension.name) | sql_column }} ;;
+    {% if dimension.description %}
+    description: "{{ dimension.description | escape_quotes }}"
+    {% endif %}
+    {% if dimension.hidden %}
+    hidden: yes
+    {% endif %}
+    {% if dimension.label %}
+    label: "{{ dimension.label | escape_quotes }}"
+    {% endif %}
+  }
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
   # Dimensions
   {% if has_dimensions %}
   {% for dimension in dimensions %}
+  {% if not (dimension.field_type == 'date' or dimension.field_type == 'datetime' or dimension.field_type == 'time') %}
 
   dimension: {{ dimension.name | clean_name }} {
     {% if dimension.description %}
@@ -23,15 +47,6 @@ view: {{ view_name }} {
     type: number
     {% elif dimension.field_type == 'real' %}
     type: number
-    {% elif dimension.field_type == 'date' %}
-    type: time
-    timeframes: [raw, time, date, week, month, quarter, year]
-    {% elif dimension.field_type == 'datetime' %}
-    type: time
-    timeframes: [raw, time, date, week, month, quarter, year]
-    {% elif dimension.field_type == 'time' %}
-    type: time
-    timeframes: [raw, time, date, week, month, quarter, year]
     {% elif dimension.field_type == 'boolean' %}
     type: yesno
     {% else %}
@@ -51,19 +66,6 @@ view: {{ view_name }} {
     {% if dimension.group_label %}
     group_label: "{{ dimension.group_label | escape_quotes }}"
     {% endif %}
-  }
-  {% endfor %}
-
-  # Date dimension groups
-  {% for dimension in dimensions %}
-  {% if dimension.type == 'date' or dimension.type == 'datetime' %}
-
-  dimension_group: {{ dimension.name | clean_name }} {
-    type: time
-    timeframes: [raw, time, date, week, month, quarter, year]
-    sql: ${TABLE}.{{ (dimension.sql_column or dimension.name) | sql_column }} ;;
-    {% if dimension.description %}description: "{{ dimension.description | escape_quotes }}"{% endif %}
-    {% if dimension.hidden %}hidden: yes{% endif %}
   }
   {% endif %}
   {% endfor %}

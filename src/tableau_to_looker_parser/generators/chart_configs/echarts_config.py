@@ -90,7 +90,7 @@ class EChartsConfig(BaseChartConfig):
             config["sorts"] = sorts
             print(f"   Added sorts: {len(sorts)} items")
 
-        # Add pivots based on chart type and field patterns (Looker concept)
+        # Add pivots ONLY for table charts (like CD detail)
         pivots = self._generate_looker_pivots(chart_type, fields, explore_name)
         if pivots:
             config["pivots"] = pivots
@@ -611,19 +611,31 @@ class EChartsConfig(BaseChartConfig):
     def _generate_looker_pivots(
         self, chart_type: str, fields: List[str], explore_name: str
     ) -> List[str]:
-        """Generate Looker pivots based on Connected Devices patterns - will evolve with new dashboards."""
+        """Generate Looker pivots ONLY for table charts (text_table)."""
         pivots = []
 
-        # Based on manual reference patterns from Connected Devices dashboard
+        # ONLY generate pivots for table charts
+        if chart_type.lower() not in ["text_table", "table"]:
+            print(f"   No pivots for chart type: {chart_type} (only tables get pivots)")
+            return pivots
 
-        # Pattern 1: Time-based pivots (most common)
+        print(f"   Generating pivots for table chart: {chart_type}")
+
+        # Pattern 1: Time-based pivots (most common for tables)
         # Example: pivots: [day_rpt_dt, hour_rpt_time]
         time_fields = []
         for field in fields:
             field_name = field.split(".")[-1] if "." in field else field
             if any(
                 keyword in field_name.lower()
-                for keyword in ["rpt_dt", "day_rpt_dt", "rpt_time", "hour_rpt_time"]
+                for keyword in [
+                    "rpt_dt",
+                    "day_rpt_dt",
+                    "rpt_time",
+                    "hour_rpt_time",
+                    "day_",
+                    "hour_",
+                ]
             ):
                 time_fields.append(field)
 
@@ -631,18 +643,17 @@ class EChartsConfig(BaseChartConfig):
             pivots.extend(
                 time_fields[:2]
             )  # Limit to 2 time dimensions like manual reference
+            print(f"   Added time-based pivots: {time_fields[:2]}")
 
-        # Pattern 2: Category-based pivots for comparison
+        # Pattern 2: Category-based pivots for comparison (only if no time pivots)
         # Example: pivots: [eqp_grp_desc]
         if not pivots:  # Only if no time pivots found
             for field in fields:
                 field_name = field.split(".")[-1] if "." in field else field
                 if "eqp_grp_desc" in field_name.lower():
                     pivots.append(field)
+                    print(f"   Added category pivot: {field}")
                     break  # Just one category pivot
-
-        # TODO: As we see more dashboards, we can add more patterns here
-        # TODO: Chart type specific logic can be refined based on new examples
 
         return pivots
 
