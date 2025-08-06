@@ -164,20 +164,34 @@ class FieldMapper:
                                 )
                                 return True
 
-                        # For CD st specifically, only include is_preorder (hardcoded for now)
+                        # For CD st and CD pre specifically, include is_preorder + measures (hardcoded for now)
                         worksheet_name = (
                             getattr(worksheet, "name", "")
                             if hasattr(worksheet, "name")
                             else worksheet.get("name", "")
                         )
-                        if (
-                            worksheet_name == "CD st"
-                            and field_name.lower() == "is_preorder"
-                        ):
-                            logger.debug(
-                                f"DONUT: Including hardcoded CD st dimension: {field_name}"
-                            )
-                            return True
+                        if worksheet_name in [
+                            "CD st",
+                            "CD pre",
+                            "tab pre",
+                            "CD market ",
+                            "CD market",
+                        ]:
+                            # Exclude the donut-specific calculated field (used for dual-axis hole effect)
+                            if "calculation_687924861912420364" in field_name.lower():
+                                logger.debug(
+                                    f"DONUT: Excluding donut hole calculation field: {field_name}"
+                                )
+                                return False
+
+                            if (
+                                field_name.lower() == "is_preorder"
+                                or field_type == "measure"
+                            ):
+                                logger.debug(
+                                    f"DONUT: Including hardcoded {worksheet_name} field: {field_name} (type: {field_type})"
+                                )
+                                return True
 
             # If no raw_config encoding match, exclude everything
             logger.debug(f"DONUT: Excluding field not in encodings: {field_name}")
