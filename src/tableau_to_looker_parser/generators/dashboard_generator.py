@@ -181,7 +181,7 @@ class DashboardGenerator(BaseGenerator):
 
         # Get model and explore name
         model_name = migration_data.get("metadata", {}).get(
-            "project_name", "tableau_migration"
+            "project_name", "bigquery_super_store_sales_model"
         )
         # Use main table explore instead of worksheet-specific explores
         main_table = migration_data.get("tables", [{}])[0]
