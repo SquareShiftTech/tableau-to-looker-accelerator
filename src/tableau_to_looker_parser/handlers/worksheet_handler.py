@@ -56,6 +56,13 @@ class WorksheetHandler(BaseHandler):
         if not isinstance(viz, dict) or "chart_type" not in viz:
             return 0.0
 
+        # Filter out worksheets that are likely text elements or placeholders
+        # name = data.get("name", "").lower()
+
+        # Check for text-only or placeholder worksheets
+        if self._is_text_or_placeholder_worksheet(data, fields):
+            return 0.0
+
         # High confidence if it has typical worksheet elements
         confidence = 0.8
 
@@ -76,6 +83,8 @@ class WorksheetHandler(BaseHandler):
 
         # Extract basic properties
         name = data["name"]
+        if name == "CD detail":
+            print(f"🔧 WORKSHEET DEBUG: Processing worksheet '{name}'")
         clean_name = data.get("clean_name", self._clean_name(name))
         datasource_id = data["datasource_id"]
 
@@ -480,6 +489,127 @@ class WorksheetHandler(BaseHandler):
             confidence -= 0.3
 
         return max(0.0, min(1.0, confidence))
+
+    def _is_text_or_placeholder_worksheet(self, data: Dict, fields: List[Dict]) -> bool:
+        """
+        Check if a worksheet is likely a text element or placeholder rather than a data visualization.
+
+        Args:
+            data: Raw worksheet data
+            fields: Processed field list
+
+        Returns:
+            bool: True if worksheet should be filtered out
+        """
+        name = data.get("name", "").lower()
+
+        # Check for common text/placeholder names
+        text_indicators = [
+            "notice",
+            "text",
+            "title",
+            "header",
+            "footer",
+            "label",
+            "placeholder",
+            "blank",
+            "spacer",
+            "divider",
+            "instruction",
+            "filter",
+            "refresh",
+        ]
+
+        name_matches_indicator = any(indicator in name for indicator in text_indicators)
+
+        # Check if worksheet has no meaningful visualization data
+        viz = data.get("visualization", {})
+        has_no_viz_data = (
+            not viz.get("x_axis") and not viz.get("y_axis") and not viz.get("color")
+        )
+
+        # If name suggests it's a text element AND it has no visualization data, filter it
+        if name_matches_indicator and has_no_viz_data:
+            return True
+
+        # Check if all fields are calculated fields with empty formulas
+        if fields and all(self._is_empty_calculated_field(field) for field in fields):
+            return True
+
+        # Additional check for worksheets with text-like names but some fields
+        if name_matches_indicator:
+            # Check if the fields are meaningful or just placeholders
+            meaningful_fields = self._count_meaningful_fields(fields)
+            if meaningful_fields <= 1:  # Only one or no meaningful fields
+                return True
+
+        return False
+
+    def _has_only_empty_or_text_fields(self, fields: List[Dict]) -> bool:
+        """Check if fields are only empty calculated fields or static text."""
+        if not fields:
+            return True
+
+        meaningful_fields = 0
+        for field in fields:
+            # Skip calculated fields with empty formulas
+            if self._is_empty_calculated_field(field):
+                continue
+
+            # Skip fields that are just static text or constants
+            original_name = field.get("original_name", "")
+            if original_name.startswith("[Calculation_") and not field.get(
+                "aggregation"
+            ):
+                continue
+
+            meaningful_fields += 1
+
+        return meaningful_fields == 0
+
+    def _count_meaningful_fields(self, fields: List[Dict]) -> int:
+        """Count meaningful fields (non-placeholder, non-empty calculated fields)."""
+        meaningful_count = 0
+
+        for field in fields:
+            # Skip empty calculated fields
+            if self._is_empty_calculated_field(field):
+                continue
+
+            # Count fields that have meaningful data
+            original_name = field.get("original_name", "")
+            aggregation = field.get("aggregation")
+            role = field.get("role", "")
+
+            # Count non-calculated fields as meaningful
+            if not original_name.startswith("[Calculation_"):
+                meaningful_count += 1
+            # Count calculated fields with aggregation or measure role as meaningful
+            elif aggregation or role == "measure":
+                meaningful_count += 1
+            # Count calculated fields with non-empty role as potentially meaningful
+            elif role and role != "dimension":
+                meaningful_count += 1
+
+        return meaningful_count
+
+    def _is_empty_calculated_field(self, field: Dict) -> bool:
+        """Check if a field is a calculated field with empty or trivial formula."""
+        original_name = field.get("original_name", "")
+
+        # Check if it's a calculated field
+        if not original_name.startswith("[Calculation_"):
+            return False
+
+        # Check if it has no meaningful aggregation or role
+        role = field.get("role", "")
+        aggregation = field.get("aggregation")
+
+        # Fields with only empty string formulas are likely placeholders
+        if role == "dimension" and not aggregation:
+            return True
+
+        return False
 
     def _clean_name(self, name: str) -> str:
         """Convert name to LookML-safe format."""

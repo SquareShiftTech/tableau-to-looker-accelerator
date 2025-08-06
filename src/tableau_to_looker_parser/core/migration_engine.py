@@ -218,6 +218,9 @@ class MigrationEngine:
         """
         Build mapping from field names to table names for calculated field inference.
 
+        When multiple datasources have the same field name, creates unique keys
+        by prefixing with datasource/table name to avoid conflicts.
+
         Args:
             elements: List of parsed elements from XMLParser
 
@@ -225,8 +228,9 @@ class MigrationEngine:
             Dict mapping field names to their table names
         """
         field_table_mapping = {}
+        field_occurrences = {}  # Track how many times each field name appears
 
-        # First, build mapping from main datasource elements
+        # First pass: count field name occurrences across all datasources
         for element in elements:
             if not element.get("data"):
                 continue
@@ -244,7 +248,41 @@ class MigrationEngine:
                     continue
 
                 if field_name and table_name:
-                    field_table_mapping[field_name] = table_name
+                    if field_name in field_occurrences:
+                        field_occurrences[field_name].add(table_name)
+                    else:
+                        field_occurrences[field_name] = {table_name}
+
+        # Second pass: build mapping with conflict resolution
+        for element in elements:
+            if not element.get("data"):
+                continue
+
+            data = element["data"]
+            element_type = element.get("type")
+
+            # Only process dimensions and measures that have table assignments
+            if element_type in ["dimension", "measure"]:
+                field_name = data.get("raw_name", "").strip("[]")
+                table_name = data.get("table_name")
+
+                # Skip calculated fields (they don't help with inference)
+                if data.get("calculation"):
+                    continue
+
+                if field_name and table_name:
+                    # If field name appears in multiple tables, create qualified keys
+                    if len(field_occurrences.get(field_name, set())) > 1:
+                        # Create qualified key: table_name.field_name
+                        qualified_key = f"{table_name}.{field_name}"
+                        field_table_mapping[qualified_key] = table_name
+                        # Also keep the unqualified key pointing to the first occurrence
+                        # for backward compatibility
+                        if field_name not in field_table_mapping:
+                            field_table_mapping[field_name] = table_name
+                    else:
+                        # Unique field name, use it directly
+                        field_table_mapping[field_name] = table_name
 
         # Additionally, try to extract fields from datasource-dependencies
         # This handles cases like Book6 where some fields are only defined in worksheet dependencies

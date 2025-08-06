@@ -17,32 +17,21 @@ view: {{ view_name }} {
     {% if dimension.description %}
     description: "{{ dimension.description | escape_quotes }}"
     {% endif %}
-    {% if dimension.datatype == 'string' %}
-    type: string
-    {% elif dimension.datatype == 'integer' %}
-    type: number
-    {% elif dimension.datatype == 'real' %}
-    type: number
-    {% elif dimension.datatype == 'date' %}
-    type: date
-    {% elif dimension.datatype == 'datetime' %}
-    type: datetime
-    {% elif dimension.datatype == 'time' %}
-    type: time
-    {% elif dimension.datatype == 'boolean' %}
-    type: yesno
-    {% elif dimension.field_type == 'string' %}
+    {% if dimension.field_type == 'string' %}
     type: string
     {% elif dimension.field_type == 'integer' %}
     type: number
     {% elif dimension.field_type == 'real' %}
     type: number
     {% elif dimension.field_type == 'date' %}
-    type: date
+    type: time
+    timeframes: [raw, time, date, week, month, quarter, year]
     {% elif dimension.field_type == 'datetime' %}
-    type: datetime
+    type: time
+    timeframes: [raw, time, date, week, month, quarter, year]
     {% elif dimension.field_type == 'time' %}
     type: time
+    timeframes: [raw, time, date, week, month, quarter, year]
     {% elif dimension.field_type == 'boolean' %}
     type: yesno
     {% else %}

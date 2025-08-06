@@ -26,6 +26,7 @@ class ChartType(str, Enum):
     AREA = "area"
     GANTT = "gantt"
     HEATMAP = "heatmap"
+    TIME_SERIES = "time_series"  # Time series charts
     # Connected Devices Dashboard Types
     DONUT = "donut"
     # Grouped/stacked variations

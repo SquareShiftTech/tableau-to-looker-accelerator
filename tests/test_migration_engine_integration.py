@@ -6,6 +6,9 @@ Test MigrationEngine with complete Phase 3 integration
 import sys
 from pathlib import Path
 
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from tableau_to_looker_parser.core.migration_engine import MigrationEngine
 
 

@@ -1175,6 +1175,10 @@ class TableauXMLParserV2:
         # Extract column instances (actual field usage)
         for column_instance in dependencies.findall("column-instance"):
             field_data = self._parse_column_instance(column_instance, worksheet)
+            if field_data.get("original_name") == "[RPT_DT]":
+                print(
+                    f"🔧 WORKSHEET DEBUG: Processing field '{field_data.get('original_name')}'"
+                )
             if field_data:
                 fields.append(field_data)
 
@@ -1200,15 +1204,38 @@ class TableauXMLParserV2:
 
         return None
 
+    def _lookup_column_definition(
+        self, worksheet: Element, column_ref: str
+    ) -> Optional[Dict]:
+        """Look up column definition from top-level datasource for authoritative field info."""
+        # Get the root workbook element to access top-level datasources
+        root = worksheet
+        while root.getparent() is not None:
+            root = root.getparent()
+
+        # Look in all top-level datasources for the column definition
+        for datasource in root.findall(".//datasources/datasource"):
+            for column in datasource.findall(".//column"):
+                if column.get("name") == column_ref:
+                    return {
+                        "type": column.get("type"),
+                        "role": column.get("role"),
+                        "caption": column.get("caption"),
+                        "datatype": column.get("datatype"),
+                    }
+
+        return None
+
     def _parse_column_instance(
         self, column_instance: Element, worksheet: Element
     ) -> Optional[Dict]:
         """Parse a column-instance element into field reference data."""
         column_ref = column_instance.get("column", "")
+        if column_ref == "[RPT_DT]":
+            print(f"🔧 WORKSHEET DEBUG: Processing field '{column_ref}'")
         instance_name = column_instance.get("name", "")
         derivation = column_instance.get("derivation", "None")
         # pivot = column_instance.get("pivot", "key")
-        field_type = column_instance.get("type", "")
 
         if not column_ref or not instance_name:
             return None
@@ -1217,15 +1244,21 @@ class TableauXMLParserV2:
         field_name = column_ref.strip("[]")
         clean_name = self._clean_name(field_name)
 
-        # Look up caption from column definition
-        caption = self._lookup_field_caption(worksheet, column_ref)
+        # Look up column definition for authoritative field_type and role
+        column_def = self._lookup_column_definition(worksheet, column_ref)
 
-        # Determine role from type and derivation
-        role = (
-            "measure"
-            if field_type == "quantitative" or derivation != "None"
-            else "dimension"
-        )
+        if column_def is not None:
+            # Use authoritative values from column definition
+            field_type = column_def.get("type", "nominal")  # Tableau field type
+            role = column_def.get("role", "dimension")  # Tableau role
+            caption = column_def.get("caption")  # Caption from column
+            datatype = column_def.get("datatype", "string")  # Data type
+        else:
+            # Fallback to column-instance values if no column definition found
+            field_type = column_instance.get("type", "nominal")
+            role = "measure" if field_type == "quantitative" else "dimension"
+            caption = self._lookup_field_caption(worksheet, column_ref)
+            datatype = self._infer_datatype_from_type(field_type)
 
         # Determine shelf placement
         shelf = self._determine_field_shelf(worksheet, instance_name)
@@ -1234,7 +1267,7 @@ class TableauXMLParserV2:
             "name": clean_name,
             "original_name": column_ref,
             "tableau_instance": instance_name,
-            "datatype": self._infer_datatype_from_type(field_type),
+            "datatype": datatype,
             "role": role,
             "aggregation": derivation if derivation != "None" else None,
             "shelf": shelf,

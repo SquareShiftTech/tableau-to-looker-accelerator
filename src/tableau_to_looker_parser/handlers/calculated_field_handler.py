@@ -506,6 +506,18 @@ class CalculatedFieldHandler(BaseHandler):
                         if field_name.lower() == dep.lower():
                             table_name = tbl_name
                             break
+
+                # If no direct match, try qualified names (table.field)
+                if not table_name:
+                    # Look for qualified field names that match our dependency
+                    for field_name, tbl_name in field_table_mapping.items():
+                        if "." in field_name:
+                            # Extract the field part from qualified name
+                            qualified_field = field_name.split(".", 1)[1]
+                            if qualified_field.lower() == dep.lower():
+                                table_name = tbl_name
+                                break
+
                 if table_name:
                     tables_found.add(table_name)
 

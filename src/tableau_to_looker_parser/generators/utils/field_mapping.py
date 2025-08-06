@@ -78,26 +78,24 @@ class FieldMapper:
     def _add_measure_aggregation_type(self, field_name: str, field) -> str:
         """
         Add proper aggregation type to measure field names for dashboard references.
+        For dimensions with tableau_instance, generate timeframe-specific field names.
 
         Args:
             field_name: Base field name
             field: Field object with type and aggregation info
 
         Returns:
-            Field name with aggregation prefix for measures, unchanged for dimensions
+            Field name with aggregation prefix for measures, or timeframe prefix for dimensions
         """
         # Get field type and aggregation from field object
         field_type = self._get_field_type(field)
         field_aggregation = self._get_field_aggregation(field)
 
-        # For date/time dimensions, don't add measure prefixes - keep as dimensions
-        field_lower = field_name.lower()
-        if any(
-            keyword in field_lower
-            for keyword in ["rpt_dt", "rpt_time", "date", "time", "hour", "day"]
-        ):
-            # These should remain as dimensions in the view
-            return field_name
+        # For dimensions, check if they have tableau_instance for timeframe mapping
+        if field_type == "dimension":
+            # Use generic tableau_instance parsing for timeframe fields
+            timeframe_field = self._get_timeframe_field_name(field_name, field)
+            return timeframe_field
 
         # Check if this is a measure field
         if field_type == "measure":
@@ -106,12 +104,12 @@ class FieldMapper:
 
                 # Map aggregation types to measure prefixes
                 prefix = self.aggregation_mapping.get(aggregation_lower, "total_")
-                return f"{prefix}{field_lower}"
+                return f"{prefix}{field_name.lower()}"
 
             # Fallback for measures without aggregation info
-            return f"total_{field_lower}"
+            return f"total_{field_name.lower()}"
 
-        # Return dimension fields as-is
+        # Return other field types as-is
         return field_name
 
     def _get_field_type(self, field) -> str:
@@ -131,6 +129,93 @@ class FieldMapper:
         elif hasattr(field, "get"):
             return field.get("aggregation", "")
         return ""
+
+    def _get_tableau_instance(self, field) -> str:
+        """Extract tableau_instance from field object."""
+        if hasattr(field, "tableau_instance"):
+            return getattr(field, "tableau_instance", "")
+        elif hasattr(field, "get"):
+            return field.get("tableau_instance", "")
+        return ""
+
+    def _parse_derivation_from_instance(self, tableau_instance: str) -> str:
+        """
+        Parse derivation prefix from tableau_instance.
+
+        Args:
+            tableau_instance: Tableau instance string like "[tdy:RPT_DT:ok]"
+
+        Returns:
+            Derivation prefix like "tdy", "thr", "dy", "none"
+        """
+        if not tableau_instance:
+            return ""
+
+        # Remove brackets and split by colons
+        # "[tdy:RPT_DT:ok]" -> ["tdy", "RPT_DT", "ok"]
+        cleaned = tableau_instance.strip("[]")
+        parts = cleaned.split(":")
+
+        if len(parts) >= 1:
+            return parts[0]  # Return derivation prefix
+
+        return ""
+
+    def _map_derivation_to_timeframe(self, derivation: str) -> str:
+        """
+        Map Tableau derivation to LookML timeframe prefix.
+
+        Args:
+            derivation: Tableau derivation like "tdy", "thr", "dy", "none"
+
+        Returns:
+            LookML timeframe prefix like "day_", "hour_", ""
+        """
+        derivation_mapping = {
+            "tdy": "day_",  # Day-Trunc -> day_
+            "dy": "day_",  # Day -> day_
+            "thr": "hour_",  # Hour-Trunc -> hour_
+            "hr": "hour_",  # Hour -> hour_
+            "tyr": "year_",  # Year-Trunc -> year_
+            "yr": "year_",  # Year -> year_
+            "tmn": "month_",  # Month-Trunc -> month_
+            "mn": "month_",  # Month -> month_
+            "tqr": "quarter_",  # Quarter-Trunc -> quarter_
+            "qr": "quarter_",  # Quarter -> quarter_
+            "twk": "week_",  # Week-Trunc -> week_
+            "wk": "week_",  # Week -> week_
+            "none": "",  # No derivation -> no prefix
+        }
+
+        return derivation_mapping.get(derivation.lower(), "")
+
+    def _get_timeframe_field_name(self, field_name: str, field) -> str:
+        """
+        Generate timeframe-specific field name from tableau_instance for datetime fields only.
+
+        Args:
+            field_name: Base field name
+            field: Field object with tableau_instance
+
+        Returns:
+            Field name with timeframe prefix for datetime fields, otherwise unchanged
+        """
+        # Only apply timeframe logic to datetime fields
+        datatype = self._get_field_datatype(field)
+        if datatype not in ["date", "datetime"]:
+            return field_name.lower()
+
+        tableau_instance = self._get_tableau_instance(field)
+
+        if tableau_instance:
+            derivation = self._parse_derivation_from_instance(tableau_instance)
+            timeframe_prefix = self._map_derivation_to_timeframe(derivation)
+
+            if timeframe_prefix:
+                return f"{timeframe_prefix}{field_name.lower()}"
+
+        # Return field name as-is for datetime fields without tableau_instance or timeframe mapping
+        return field_name.lower()
 
     def get_fill_fields_from_worksheet(self, worksheet, explore_name: str) -> List[str]:
         """
@@ -152,22 +237,24 @@ class FieldMapper:
         for field in worksheet_fields:
             field_name = self._get_field_name(field)
             datatype = self._get_field_datatype(field)
+            field_type = self._get_field_type(field)
 
-            # Check if field is a date/time field or has date-like name
-            is_date_field = datatype in ["date", "datetime"] or any(
-                keyword in field_name.lower()
-                for keyword in ["date", "time", "year", "month", "day", "quarter"]
+            # Check if field is a date/time dimension
+            is_date_field = (
+                datatype in ["date", "datetime"] and field_type == "dimension"
             )
 
             if is_date_field:
-                fill_fields.append(f"{explore_name.lower()}.{field_name}")
+                # Use the same timeframe logic for consistency
+                timeframe_field = self._get_timeframe_field_name(field_name, field)
+                fill_fields.append(f"{explore_name.lower()}.{timeframe_field}")
 
         return fill_fields
 
     def _get_field_datatype(self, field) -> str:
         """Extract field datatype from field object."""
         if hasattr(field, "datatype"):
-            return field.datatype
+            return getattr(field, "datatype", "")
         elif hasattr(field, "get"):
             return field.get("datatype", "")
         return ""

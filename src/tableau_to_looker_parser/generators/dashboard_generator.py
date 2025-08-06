@@ -69,9 +69,20 @@ class DashboardGenerator(BaseGenerator):
                 generated_files.append(file_path)
 
             except Exception as e:
-                logger.error(
-                    f"Failed to generate dashboard {dashboard_data.get('name', 'unknown')}: {e}"
+                # Enhanced error logging for validation errors
+                dashboard_name = (
+                    dashboard_data.get("name", "unknown")
+                    if isinstance(dashboard_data, dict)
+                    else "unknown"
                 )
+                logger.error(f"Failed to generate dashboard {dashboard_name}: {e}")
+                logger.error(
+                    f"Dashboard data keys: {list(dashboard_data.keys()) if isinstance(dashboard_data, dict) else 'Not a dict'}"
+                )
+
+                # Log specific validation error details if it's a pydantic error
+                if hasattr(e, "errors"):
+                    logger.error(f"Validation errors: {e.errors()}")
                 continue
 
         logger.info(f"Generated {len(generated_files)} dashboard files")
@@ -125,12 +136,12 @@ class DashboardGenerator(BaseGenerator):
                     lookml_element = self._convert_worksheet_element(
                         element, migration_data
                     )
-                elif element.element_type == ElementType.FILTER:
-                    lookml_element = self._convert_filter_element(element)
-                elif element.element_type == ElementType.PARAMETER:
-                    lookml_element = self._convert_parameter_element(element)
-                elif element.element_type == ElementType.TEXT:
-                    lookml_element = self._convert_text_element(element)
+                # lif element.element_type == ElementType.FILTER:
+                #    lookml_element = self._convert_filter_element(element)
+                # elif element.element_type == ElementType.PARAMETER:
+                #    lookml_element = self._convert_parameter_element(element)
+                # elif element.element_type == ElementType.TEXT:
+                # lookml_element = self._convert_text_element(element)
                 else:
                     logger.warning(f"Unsupported element type: {element.element_type}")
                     continue
@@ -155,6 +166,9 @@ class DashboardGenerator(BaseGenerator):
             return None
 
         worksheet = element.worksheet
+
+        if worksheet.name == "CD detail":
+            print(f"🔧 DASHBOARD DEBUG: Processing worksheet '{worksheet.name}'")
 
         # Determine chart type from worksheet visualization using factory
         dashboard_context = {

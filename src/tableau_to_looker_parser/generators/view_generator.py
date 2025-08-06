@@ -246,9 +246,12 @@ class ViewGenerator(BaseGenerator):
             # Determine LookML type for measures with aggregation
             lookml_type = self._determine_lookml_type(calc_field, calculation)
 
+            # Extract calculation ID from original_name to sync with dashboard references
+            field_name = self._extract_calculation_id(calc_field)
+
             # Build LookML field definition
             converted_field = {
-                "name": self._clean_name(calc_field.get("name", "")),
+                "name": field_name,  # Use calculation ID instead of friendly name
                 "original_name": calc_field.get("original_name", ""),
                 "field_type": calc_field.get("field_type", "dimension"),
                 "role": calc_field.get("role", "dimension"),
@@ -295,11 +298,12 @@ TODO: Manual migration required - please convert this formula manually""",
         """
         calculation = calc_field.get("calculation", {})
         original_formula = calculation.get("original_formula", "UNKNOWN_FORMULA")
-        field_name = calc_field.get("name", "unknown_field")
+        # Use calculation ID for field name to sync with dashboard references
+        field_name = self._extract_calculation_id(calc_field)
 
         # Create safe fallback field
         fallback_field = {
-            "name": self._clean_name(field_name),
+            "name": field_name,  # Use calculation ID instead of friendly name
             "original_name": calc_field.get("original_name", ""),
             "field_type": calc_field.get("field_type", "dimension"),
             "role": calc_field.get("role", "dimension"),
@@ -416,12 +420,13 @@ TODO: Manual migration required - please convert this formula manually""",
         Returns:
             Dict with two-step pattern fields (dimension and measure)
         """
-        base_name = self._clean_name(calc_field.get("name", ""))
+        # Extract calculation ID to sync with dashboard references
+        calc_id = self._extract_calculation_id(calc_field)
         original_formula = calculation.get("original_formula", "")
 
         # Create hidden dimension for row-level calculation
         dimension_field = {
-            "name": f"{base_name}_calc",
+            "name": f"{calc_id}_calc",  # Use calculation ID + _calc suffix
             "original_name": calc_field.get("original_name", ""),
             "field_type": "dimension",
             "role": "dimension",
@@ -430,29 +435,29 @@ TODO: Manual migration required - please convert this formula manually""",
             ),  # Usually numeric for measures
             "sql": lookml_sql,
             "original_formula": original_formula,
-            "description": f"Row-level calculation for {base_name}: {self._normalize_formula_for_description(original_formula)}",
+            "description": f"Row-level calculation for {calc_id}: {self._normalize_formula_for_description(original_formula)}",
             "lookml_type": "number",
             "hidden": True,  # Hide the calculation dimension
             "is_two_step_dimension": True,  # Flag for template
         }
 
-        # Create measure that aggregates the dimension
+        # Create measure that aggregates the dimension - use the exact calculation ID to match dashboard
         measure_field = {
-            "name": base_name,
+            "name": calc_id,  # Use exact calculation ID as dashboard references it
             "original_name": calc_field.get("original_name", ""),
             "field_type": "measure",
             "role": "measure",
             "datatype": calc_field.get("datatype", "real"),
-            "sql": f"${{{base_name}_calc}}",  # Reference the hidden dimension
+            "sql": f"${{{calc_id}_calc}}",  # Reference the hidden dimension
             "original_formula": original_formula,
             "description": f"Calculated field: {self._normalize_formula_for_description(original_formula)}",
             "lookml_type": "sum",  # Aggregate the dimension values
             "is_two_step_measure": True,  # Flag for template
-            "references_dimension": f"{base_name}_calc",  # Reference to dimension
+            "references_dimension": f"{calc_id}_calc",  # Reference to dimension
         }
 
         logger.debug(
-            f"Created two-step pattern for '{base_name}': dimension '{base_name}_calc' + measure '{base_name}'"
+            f"Created two-step pattern for '{calc_id}': dimension '{calc_id}_calc' + measure '{calc_id}'"
         )
 
         return {
@@ -460,6 +465,36 @@ TODO: Manual migration required - please convert this formula manually""",
             "dimension": dimension_field,
             "measure": measure_field,
         }
+
+    def _extract_calculation_id(self, calc_field: Dict) -> str:
+        """
+        Extract calculation ID from original_name field to sync with dashboard references.
+
+        Args:
+            calc_field: Calculated field data with original_name
+
+        Returns:
+            str: Calculation ID (e.g., 'calculation_1181350527289110528')
+        """
+        original_name = calc_field.get("original_name", "")
+        if not original_name:
+            # Fallback to friendly name if no original_name
+            return self._clean_name(calc_field.get("name", "unknown_calc"))
+
+        # Extract ID from format like "[Calculation_1181350527289110528]"
+        if original_name.startswith("[Calculation_") and original_name.endswith("]"):
+            calc_id = original_name[1:-1]  # Remove brackets
+            calc_id = calc_id.lower()  # Convert to lowercase for consistency
+            return calc_id
+        elif original_name.startswith("[") and original_name.endswith("]"):
+            # Handle other calculation formats, convert to lowercase and clean
+            calc_id = original_name[1:-1]  # Remove brackets
+            calc_id = self._clean_name(calc_id)
+            return calc_id
+        else:
+            # Fallback if format is unexpected
+            logger.warning(f"Unexpected original_name format: {original_name}")
+            return self._clean_name(calc_field.get("name", "unknown_calc"))
 
     def _normalize_formula_for_description(self, formula: str) -> str:
         """Normalize multi-line formulas for use in descriptions."""
