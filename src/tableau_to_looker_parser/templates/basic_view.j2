@@ -30,7 +30,7 @@ view: {{ view_name }} {
     {% elif dimension.field_type == 'date' %}
     type: date
     {% elif dimension.field_type == 'datetime' %}
-    type: datetime
+    type: date_time
     {% elif dimension.field_type == 'time' %}
     type: time
     {% elif dimension.field_type == 'boolean' %}
@@ -99,6 +99,8 @@ view: {{ view_name }} {
     type: number
     {% elif calc_field.datatype == 'boolean' %}
     type: yesno
+    {% elif calc_field.datatype == 'datetime' %}
+    type: date_time
     {% else %}
     type: string
     {% endif %}

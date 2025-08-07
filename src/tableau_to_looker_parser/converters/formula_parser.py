@@ -648,7 +648,6 @@ class FormulaParser:
                     "aggregation_function": func_name,
                     "field_name": field_node.field_name,
                     "original_field": field_node.original_name,
-                    "table_name": "<TO_BE_INFERRED_FROM_XML>",  # Injected later
                     "table_alias": "base",
                     "derived_table_alias": f"{func_name.lower()}_table",
                     "derived_field_alias": f"{func_name.capitalize()}Date",  # e.g., MaxDate
@@ -782,6 +781,9 @@ class FormulaParser:
 
         def visit(n: ASTNode):
             if n.node_type == NodeType.FIELD_REF and n.field_name:
+                dependencies.add(n.field_name)
+            if n.node_type == NodeType.DERIVED_TABLE:
+                n.field_name = n.properties["field_name"]
                 dependencies.add(n.field_name)
 
             # Visit child nodes

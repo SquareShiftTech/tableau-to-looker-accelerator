@@ -231,9 +231,13 @@ class ViewGenerator(BaseGenerator):
 
             # Convert dict to ASTNode object
             ast_node = ASTNode(**ast_data)
-
-            # Convert AST to LookML SQL expression
-            lookml_sql = self.ast_converter.convert_to_lookml(ast_node, "TABLE")
+            if ast_node.node_type == NodeType.DERIVED_TABLE:
+                lookml_sql = (
+                    f"{{TABLE}}.{ast_node.properties.get('derived_field_alias')}"
+                )
+            else:
+                # Convert AST to LookML SQL expression
+                lookml_sql = self.ast_converter.convert_to_lookml(ast_node, "TABLE")
 
             # Check if this is a fallback AST node created due to parsing failure
             is_fallback = (
