@@ -305,10 +305,29 @@ class TableauChartRuleEngine:
             "size_encoding": self._classify_field_encoding(size_field, fields),
             "has_color_encoding": bool(color_field),
             "has_size_encoding": bool(size_field),
+            "has_no_color_size_encoding": not bool(color_field)
+            and not bool(size_field),
+            "has_label_encoding": any(f.get("shelf") == "label" for f in fields),
+            "has_continuous_color_scale": False,  # TODO: Extract from color field analysis
+            "has_latitude_longitude_encoding": any(
+                "lat" in f.get("name", "").lower() or "lng" in f.get("name", "").lower()
+                for f in fields
+            ),
+            "has_hierarchical_layout": False,  # TODO: Extract from mark properties
+            "has_angle_encoding": any(f.get("shelf") == "angle" for f in fields),
+            "has_multiple_measures": len(
+                [f for f in fields if f.get("role") == "measure"]
+            )
+            > 1,
+            "has_mark_stacking": False,  # TODO: Extract from mark properties
+            "has_binned_fields": any(
+                "bin" in f.get("name", "").lower() for f in fields
+            ),
             # Text and table indicators
             "has_text_marks": has_text_marks,
             "text_encoding_has_measure": text_encoding_has_measure,
             "columns_shelf_count": len(x_axis_fields),
+            "rows_shelf_count": len(y_axis_fields),
             "rows_shelf_has_string": any(
                 f.get("datatype") == "string"
                 for f in fields
@@ -560,12 +579,27 @@ class TableauChartRuleEngine:
 
         elif condition_key in [
             "columns_shelf_count",
+            "rows_shelf_count",
             "dimensions_on_x_axis",
             "measures_on_y_axis",
         ]:
             return self._evaluate_numeric_condition(actual_value, expected_value)
 
         elif condition_key == "rows_shelf_has_string":
+            return bool(actual_value) == bool(expected_value)
+
+        elif condition_key in [
+            "has_no_color_size_encoding",
+            "has_label_encoding",
+            "has_continuous_color_scale",
+            "has_latitude_longitude_encoding",
+            "has_hierarchical_layout",
+            "has_geographic_fields",
+            "has_angle_encoding",
+            "has_multiple_measures",
+            "has_mark_stacking",
+            "has_binned_fields",
+        ]:
             return bool(actual_value) == bool(expected_value)
 
         elif condition_key in [

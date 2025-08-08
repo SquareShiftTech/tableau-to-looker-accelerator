@@ -147,7 +147,6 @@ class ViewGenerator(BaseGenerator):
             if (
                 calc_field.get("table_name") == actual_table_name
                 or calc_field.get("table_name") == "__UNASSIGNED_TABLE__"
-
             ):
                 # Convert AST to LookML SQL using our converter
                 converted_field = self._convert_calculated_field(calc_field, view_name)

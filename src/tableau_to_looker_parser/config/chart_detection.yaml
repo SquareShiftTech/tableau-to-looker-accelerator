@@ -12,13 +12,13 @@ basic_chart_detection:
     variants:
       - crosstab_table:
           conditions:
-            - row_count: ">1"
-            - column_count: ">1"
-            - measure_in_text: "SUM"
+            - rows_shelf_count: ">1"
+            - columns_shelf_count: ">1"
+            - text_encoding_has_measure: "SUM"
       - heatmap_table:
           conditions:
             - color_encoding: "measure"
-            - continuous_color_scale: true
+            - has_continuous_color_scale: true
     pivot_required: true
     pivot_type: "crosstab"
     looker_equivalent: "looker_grid"
@@ -44,11 +44,11 @@ basic_chart_detection:
       - stacked_bar:
           conditions:
             - color_encoding: "categorical"
-            - mark_stacking: true
+            - has_mark_stacking: true
       - grouped_bar:
           conditions:
             - color_encoding: "categorical"
-            - mark_stacking: false
+            - has_mark_stacking: false
     pivot_required: false
     looker_equivalent: "looker_bar"
 
@@ -67,11 +67,11 @@ basic_chart_detection:
       - stacked_column:
           conditions:
             - color_encoding: "categorical"
-            - mark_stacking: true
+            - has_mark_stacking: true
       - grouped_column:
           conditions:
             - color_encoding: "categorical"
-            - mark_stacking: false
+            - has_mark_stacking: false
     pivot_required: false
     looker_equivalent: "looker_column"
 
@@ -94,7 +94,7 @@ basic_chart_detection:
       - dual_axis_line:
           conditions:
             - has_dual_axis: true
-            - multiple_measures: true
+            - has_multiple_measures: true
     pivot_required: false
     looker_equivalent: "looker_line"
 
@@ -112,7 +112,7 @@ basic_chart_detection:
       - stacked_area:
           conditions:
             - color_encoding: "categorical"
-            - mark_stacking: true
+            - has_mark_stacking: true
           pivot_required: true
           pivot_type: "series"
     looker_equivalent: "looker_area"
@@ -122,7 +122,7 @@ basic_chart_detection:
     conditions:
       - mark_type: "Pie"
       - color_encoding: "categorical"
-      - angle_encoding: "measure"
+      - has_angle_encoding: "measure"
     confidence: 100
     variants:
       - simple_pie:
@@ -130,7 +130,7 @@ basic_chart_detection:
             - has_dual_axis: false
       - pie_with_labels:
           conditions:
-            - label_encoding: true
+            - has_label_encoding: true
     pivot_required: false
     looker_equivalent: "looker_pie"
 
@@ -173,7 +173,7 @@ basic_chart_detection:
       - mark_type: "Bar"
       - x_encoding: "binned_dimension"
       - y_encoding: ["COUNT", "frequency"]
-      - has_bins: true
+      - has_binned_fields: true
     confidence: 95
     variants:
       - simple_histogram:
@@ -206,7 +206,7 @@ basic_chart_detection:
       - mark_type: "Square"
       - size_encoding: "measure"
       - color_encoding: ["categorical", "measure"]
-      - hierarchical_layout: true
+      - has_hierarchical_layout: true
     confidence: 95
     variants:
       - categorical_treemap:
@@ -223,7 +223,7 @@ basic_chart_detection:
     conditions:
       - mark_type: "Text"
       - has_text_marks: true
-      - no_color_size_encoding: true
+      - has_no_color_size_encoding: true
     confidence: 90
     looker_equivalent: "looker_grid"
     pivot_required: true
@@ -233,8 +233,8 @@ basic_chart_detection:
   symbol_map:
     conditions:
       - mark_type: "Circle"
-      - has_geographic_field: true
-      - latitude_longitude_encoding: true
+      - has_geographic_fields: true
+      - has_latitude_longitude_encoding: true
     confidence: 95
     variants:
       - point_map:
@@ -248,7 +248,7 @@ basic_chart_detection:
   filled_map:
     conditions:
       - mark_type: "Shape"
-      - has_geographic_field: true
+      - has_geographic_fields: true
       - color_encoding: "measure"
     confidence: 95
     looker_equivalent: "looker_map"
