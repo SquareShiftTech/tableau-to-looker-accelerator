@@ -420,16 +420,9 @@ class MigrationEngine:
 
                     # NEW: Route derived fields through appropriate handlers with deduplication
                     derived_fields = processed.get("derived_fields", [])
-                    print(
-                        f"🔧 MIGRATION ENGINE DEBUG: Worksheet '{processed['name']}' has {len(derived_fields)} derived fields to route"
-                    )
                     for derived_field in derived_fields:
                         field_type = derived_field.get("field_type", "dimension")
                         field_name = derived_field.get("name", "unknown")
-
-                        print(
-                            f"   🔧 Routing derived field '{field_name}' of type '{field_type}'"
-                        )
 
                         # Check for duplicates before adding
                         is_duplicate = False
@@ -460,25 +453,14 @@ class MigrationEngine:
                             # Add derived fields directly to result (bypass handlers to preserve metadata)
                             if field_type == "measure":
                                 result["measures"].append(derived_field)
-                                print(
-                                    f"   ✅ Added derived measure '{field_name}' to result"
-                                )
 
                             elif field_type == "dimension_group":
                                 result["dimensions"].append(derived_field)
-                                print(
-                                    f"   ✅ Added derived dimension_group '{field_name}' to result"
-                                )
 
                             elif field_type == "dimension":
                                 result["dimensions"].append(derived_field)
-                                print(
-                                    f"   ✅ Added derived dimension '{field_name}' to result"
-                                )
                         else:
-                            print(
-                                f"   ⚠️ Skipped duplicate derived field '{field_name}' ({tableau_instance})"
-                            )
+                            pass  # Duplicate field, skip
 
                     if derived_fields:
                         self.logger.info(

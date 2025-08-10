@@ -167,9 +167,6 @@ class DashboardGenerator(BaseGenerator):
 
         worksheet = element.worksheet
 
-        if worksheet.name == "CD detail":
-            print(f"🔧 DASHBOARD DEBUG: Processing worksheet '{worksheet.name}'")
-
         # Determine chart type from worksheet visualization using factory
         dashboard_context = {
             "dashboard_name": element.worksheet.name if element.worksheet else "",
@@ -255,11 +252,9 @@ class DashboardGenerator(BaseGenerator):
         color_palettes = migration_data.get("color_palettes", {})
         field_encodings = migration_data.get("field_encodings", {})
 
-        print(f"🔧 DASHBOARD DEBUG: Processing worksheet '{worksheet.name}'")
         print(f"   Chart Type: {worksheet.visualization.chart_type}")
         print(f"   LookML Type: {chart_type}")
         print(f"   Color Palettes Available: {list(color_palettes.keys())}")
-        print(f"   Field Encodings Available: {len(field_encodings)} worksheets")
 
         chart_config = self.chart_config_factory.generate_chart_config(
             worksheet.visualization.chart_type,
@@ -271,7 +266,6 @@ class DashboardGenerator(BaseGenerator):
             field_encodings,
         )
 
-        print(f"   Chart Config Generated: {bool(chart_config)}")
         if chart_config:
             print(f"   Chart Config Keys: {list(chart_config.keys())}")
             # Show ECharts-specific properties if present

@@ -1176,10 +1176,6 @@ class TableauXMLParserV2:
         # Extract column instances (actual field usage)
         for column_instance in dependencies.findall("column-instance"):
             field_data = self._parse_column_instance(column_instance, worksheet)
-            if field_data.get("original_name") == "[RPT_DT]":
-                print(
-                    f"🔧 WORKSHEET DEBUG: Processing field '{field_data.get('original_name')}'"
-                )
             if field_data:
                 fields.append(field_data)
 
@@ -1232,8 +1228,6 @@ class TableauXMLParserV2:
     ) -> Optional[Dict]:
         """Parse a column-instance element into field reference data."""
         column_ref = column_instance.get("column", "")
-        if column_ref == "[RPT_DT]":
-            print(f"🔧 WORKSHEET DEBUG: Processing field '{column_ref}'")
         instance_name = column_instance.get("name", "")
         derivation = column_instance.get("derivation", "None")
         # pivot = column_instance.get("pivot", "key")
@@ -1284,18 +1278,6 @@ class TableauXMLParserV2:
         shelf = "detail"  # Default shelf
         encodings_list = []  # List of all encodings
 
-        worksheet_name = worksheet.get("name", "unknown")
-
-        # Debug for CD st worksheet specifically
-        debug_cd_st = (
-            worksheet_name == "CD st"
-            and "Calculation_5910989867950081" in instance_name
-        )
-        if debug_cd_st:
-            print(
-                f"🔧 SHELF DEBUG: Processing field '{instance_name}' in worksheet '{worksheet_name}'"
-            )
-
         # Check rows shelf
         rows_elem = worksheet.find(".//rows")
         if rows_elem is not None and instance_name in (rows_elem.text or ""):
@@ -1308,23 +1290,13 @@ class TableauXMLParserV2:
 
         # Check all encodings (color, size, text, etc.) - CHECK ALL PANES
         panes = worksheet.findall(".//pane")
-        if debug_cd_st:
-            print(f"🔧 SHELF DEBUG: Found {len(panes)} panes")
 
         for pane_idx, pane in enumerate(panes):
-            if debug_cd_st:
-                print(f"🔧 SHELF DEBUG: Checking pane {pane_idx}")
-
             # Check direct encoding attributes
             encodings = pane.find("encodings")
             if encodings is not None:
                 for child in encodings:
                     encoding_column = child.get("column", "")
-
-                    if debug_cd_st:
-                        print(
-                            f"🔧 SHELF DEBUG: Found encoding '{child.tag}' with column '{encoding_column}'"
-                        )
 
                     # Check for exact match or suffix match (handle federated prefix)
                     if (
@@ -1334,10 +1306,6 @@ class TableauXMLParserV2:
                     ):
                         if child.tag not in encodings_list:  # Avoid duplicates
                             encodings_list.append(child.tag)
-                            if debug_cd_st:
-                                print(
-                                    f"🔧 SHELF DEBUG: ✅ MATCHED encoding '{child.tag}' for field '{instance_name}'"
-                                )
 
         # Set shelf based on primary encoding if found
         if "color" in encodings_list:
@@ -1346,11 +1314,6 @@ class TableauXMLParserV2:
             shelf = "size"
         elif "text" in encodings_list:
             shelf = "text"
-
-        if debug_cd_st:
-            print(
-                f"🔧 SHELF DEBUG: Final result - shelf: '{shelf}', encodings: {encodings_list}"
-            )
 
         return {"shelf": shelf, "encodings": encodings_list}
 

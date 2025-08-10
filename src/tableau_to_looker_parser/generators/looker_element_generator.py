@@ -284,7 +284,6 @@ class LookerElementGenerator:
         pivot_selection_logic = yaml_detection.get("pivot_selection_logic")
 
         # Debug for CD interval specifically
-        print("🔧 PIVOT SELECTION DEBUG:")
         print(f"   source_fields: {source_fields}")
         print(f"   pivot_selection_logic: {pivot_selection_logic}")
         print(f"   yaml_detection keys: {list(yaml_detection.keys())}")
@@ -296,15 +295,12 @@ class LookerElementGenerator:
             # [year, day, hour] -> [year, day]
             if len(source_fields) > 1:
                 selected = source_fields[:-1]
-                print(f"   ✅ APPLIED all_except_last: {selected}")
                 return selected
             else:
                 # If only one field, return it
-                print(f"   ✅ SINGLE FIELD: {source_fields}")
                 return source_fields
         else:
             # Default behavior: return all fields
-            print(f"   ✅ DEFAULT (no logic): {source_fields}")
             return source_fields
 
     def _generate_sorts(self, worksheet: WorksheetSchema, chart_type: str) -> List[str]:

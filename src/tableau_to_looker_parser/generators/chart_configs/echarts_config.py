@@ -47,14 +47,12 @@ class EChartsConfig(BaseChartConfig):
         chart_type = worksheet.visualization.chart_type.lower()
         worksheet_name = worksheet.name
 
-        print(f"📊 ECHARTS DEBUG: Generating config for '{worksheet_name}'")
         print(f"   Chart type: {chart_type}")
         print(f"   Fields: {fields}")
         print(f"   Color palettes available: {bool(color_palettes)}")
 
         # Start with complete ECharts configuration
         config = self._get_comprehensive_echarts_config()
-        print(f"   Base ECharts config keys: {list(config.keys())}")
 
         # Override with Tableau color palettes if available
         if color_palettes:
@@ -96,7 +94,6 @@ class EChartsConfig(BaseChartConfig):
             config["pivots"] = pivots
             print(f"   Added pivots: {len(pivots)} items")
 
-        print(f"   FINAL CONFIG KEYS: {list(config.keys())}")
         echarts_props = ["chartType", "colorPalette", "themeSelector", "showTooltip"]
         for prop in echarts_props:
             if prop in config:
@@ -618,8 +615,6 @@ class EChartsConfig(BaseChartConfig):
         if chart_type.lower() not in ["text_table", "table"]:
             print(f"   No pivots for chart type: {chart_type} (only tables get pivots)")
             return pivots
-
-        print(f"   Generating pivots for table chart: {chart_type}")
 
         # Pattern 1: Time-based pivots (most common for tables)
         # Example: pivots: [day_rpt_dt, hour_rpt_time]

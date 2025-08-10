@@ -66,8 +66,6 @@ class WorksheetHandler(BaseHandler):
         # Check for text-only or placeholder worksheets
         if self._is_text_or_placeholder_worksheet(data, fields):
             # Debug output for CD detail
-            if data.get("name") == "CD detail":
-                print("🔧 CD DETAIL FILTERED OUT by _is_text_or_placeholder_worksheet")
             return 0.0
 
         # High confidence if it has typical worksheet elements
@@ -90,8 +88,6 @@ class WorksheetHandler(BaseHandler):
 
         # Extract basic properties
         name = data["name"]
-        if name in ["CD st"]:
-            print(f"🔧 WORKSHEET DEBUG: Processing worksheet '{name}'")
         clean_name = data.get("clean_name", self._clean_name(name))
         datasource_id = data["datasource_id"]
 
@@ -118,16 +114,9 @@ class WorksheetHandler(BaseHandler):
         derived_fields = self._identify_derived_fields_from_visualization(
             visualization, datasource_id
         )
-        print(
-            f"🚀 WORKSHEET HANDLER DEBUG: {name} has {len(derived_fields)} derived fields"
+        logger.debug(
+            f"WORKSHEET HANDLER: {name} has {len(derived_fields)} derived fields"
         )
-        if derived_fields:
-            for df in derived_fields:
-                print(
-                    f"   - {df.get('name')} ({df.get('field_type')}) from {df.get('original_tableau_instance')}"
-                )
-        else:
-            print("   - No derived fields found")
 
         # Build WorksheetSchema data
         worksheet_data = {
@@ -219,11 +208,7 @@ class WorksheetHandler(BaseHandler):
             worksheet_name = worksheet_data.get("name", "unknown")
             logger.debug(f"Running YAML rule detection for worksheet: {worksheet_name}")
 
-            # Debug output for CD detail
-            if worksheet_name == "CD detail":
-                print(
-                    f"🔧 CD DETAIL YAML DETECTION: enabled={self.enable_yaml_detection}, detector={self.chart_detector is not None}"
-                )
+            # Debug YAML detection
 
             # Prepare data for YAML rule detection
             detection_input = {
@@ -241,27 +226,13 @@ class WorksheetHandler(BaseHandler):
                 )
                 logger.debug(f"YAML detection result: {detection_result}")
 
-                # Debug for CD detail specifically
-                if worksheet_name == "CD detail":
-                    print(f"🔧 CD DETAIL YAML RESULT: {detection_result}")
+                logger.debug(
+                    f"YAML detection result for {worksheet_name}: {detection_result}"
+                )
             except Exception as e:
                 logger.error(f"YAML detection failed for {worksheet_name}: {e}")
-                if worksheet_name == "CD detail":
-                    print(f"🔧 CD DETAIL YAML ERROR: {e}")
                 # Fall back to basic detection
                 return viz_config
-
-            # Debug for CD worksheets specifically
-            if worksheet_data.get("name") in [
-                "CD detail",
-                "CD st",
-                "CD pre",
-                "CD interval",
-                "connect total",
-            ]:
-                print("🔧 CD ST DEBUG - Detection Input:")
-                print(f"   viz_config: {viz_config}")
-                print(f"   detection_result: {detection_result}")
 
             # Update visualization config with YAML rule results
             viz_config.update(

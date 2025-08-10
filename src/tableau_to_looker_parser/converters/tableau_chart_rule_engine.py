@@ -186,13 +186,6 @@ class TableauChartRuleEngine:
             worksheet_data, viz_config, fields
         )
 
-        # Debug for CD worksheets
-        if worksheet_name in ["CD st", "CD pre", "CD interval", "connect total"]:
-            print("🔧 CD ST RULE ENGINE DEBUG:")
-            print(f"   worksheet_name: {worksheet_name}")
-            print(f"   viz_config keys: {list(viz_config.keys())}")
-            print(f"   detection_context: {detection_context}")
-
         # Apply rules in priority order
         detection_result = self._apply_rules(detection_context, worksheet_name)
 

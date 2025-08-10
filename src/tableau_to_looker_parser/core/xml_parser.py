@@ -94,18 +94,14 @@ class TableauXMLParser:
             ElementTree root element
         """
         # Debug parsing
-        print("\nDebug: Parsing TWB file...")
         tree = ET.parse(file_path)
         root = tree.getroot()
 
         # Debug object graphs
         for graph in root.findall(".//object-graph"):
-            print("\nDebug: Found object-graph")
-
             # Print object count
             objects = graph.find("objects")
             if objects is not None:
-                print(f"Debug: Found {len(list(objects))} objects:")
                 for obj in objects:
                     print(
                         f"  - {obj.tag} id={obj.get('id')} caption={obj.get('caption')}"
@@ -114,12 +110,10 @@ class TableauXMLParser:
             # Print relationship count
             rels = graph.find("relationships")
             if rels is not None:
-                print(f"\nDebug: Found {len(list(rels))} relationships:")
                 for rel in rels:
                     print(f"  - {rel.tag}")
                     expr = rel.find("expression")
                     if expr is not None:
-                        print(f"    Expression: op={expr.get('op')}")
                         for e in expr.findall("expression"):
                             if e.text:
                                 print(f"      - Text: {e.text}")
