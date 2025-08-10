@@ -96,7 +96,12 @@ class LookerNativeDashboardGenerator(BaseGenerator):
 
         # Use main table as explore name (following existing pattern)
         tables = migration_data.get("tables", [])
-        explore_name = tables[0].get("name", "main_table") if tables else "main_table"
+        if tables:
+            # Use same cleaning logic as model template: clean_name filter
+            raw_table_name = tables[0].get("name", "main_table")
+            explore_name = self._clean_name(raw_table_name)
+        else:
+            explore_name = "main_table"
 
         self.element_generator.set_model_explore(model_name, explore_name)
         logger.debug(f"Set element generator context: {model_name}.{explore_name}")

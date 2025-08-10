@@ -89,7 +89,10 @@ class LookerElementGenerator:
         return element
 
     def _generate_title(self, worksheet: WorksheetSchema) -> str:
-        """Generate human-readable title from worksheet name."""
+        """Generate human-readable title from worksheet title or name as fallback."""
+        if worksheet.title and worksheet.title.strip():
+            return worksheet.title.strip()
+        # Fallback to cleaned worksheet name
         return worksheet.name.replace("_", " ").title()
 
     def _generate_fields(self, worksheet: WorksheetSchema) -> List[str]:

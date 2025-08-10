@@ -133,6 +133,7 @@ class WorksheetHandler(BaseHandler):
         worksheet_data = {
             "name": name,
             "clean_name": clean_name,
+            "title": data.get("title", ""),
             "datasource_id": datasource_id,
             "fields": fields,
             "calculated_fields": self._extract_calculated_fields(fields),

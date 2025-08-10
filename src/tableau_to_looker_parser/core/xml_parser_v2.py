@@ -990,6 +990,7 @@ class TableauXMLParserV2:
                 worksheet_data = {
                     "name": worksheet_name,
                     "clean_name": self._clean_name(worksheet_name),
+                    "title": self._extract_worksheet_title(worksheet),
                     "datasource_id": self._extract_worksheet_datasource_id(worksheet),
                     "fields": self._extract_worksheet_fields(worksheet),
                     "visualization": self._extract_visualization_config(worksheet),
@@ -1681,6 +1682,17 @@ class TableauXMLParserV2:
         # Look for totals configuration in worksheet
         totals = worksheet.find(".//totals")
         return totals is not None
+
+    def _extract_worksheet_title(self, worksheet: Element) -> str:
+        """Extract worksheet title from layout options."""
+        # Look for title in layout-options/title/formatted-text/run
+        title_elem = worksheet.find(".//layout-options/title/formatted-text/run")
+        if title_elem is not None and title_elem.text:
+            return title_elem.text.strip()
+
+        # Fallback to worksheet name if no title found
+        worksheet_name = worksheet.get("name", "Untitled")
+        return worksheet_name.replace("_", " ").title()
 
     def _determine_layout_type(self, dashboard: Element) -> str:
         """

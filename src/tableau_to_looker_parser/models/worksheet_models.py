@@ -190,6 +190,9 @@ class WorksheetSchema(BaseModel):
     # Identity
     name: str = Field(..., description="Worksheet name as it appears in Tableau")
     clean_name: str = Field(..., description="LookML-safe name (snake_case, no spaces)")
+    title: str = Field(
+        default="", description="Human-readable worksheet title from Tableau"
+    )
     datasource_id: str = Field(..., description="ID of the connected datasource")
 
     # Complete field usage (no external references needed)
