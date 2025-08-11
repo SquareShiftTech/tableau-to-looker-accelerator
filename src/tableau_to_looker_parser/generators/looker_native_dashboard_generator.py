@@ -163,15 +163,12 @@ class LookerNativeDashboardGenerator(BaseGenerator):
 
         # Calculate height-based row positions and standardized widths for all elements
         height_based_rows = self.layout_calculator.calculate_height_based_rows(elements)
-        standardized_widths = self.layout_calculator.calculate_standardized_widths(
-            elements
-        )
 
         for element in elements:
             try:
                 if element.element_type == ElementType.WORKSHEET:
                     looker_element = self._convert_worksheet_element(
-                        element, migration_data, height_based_rows, standardized_widths
+                        element, migration_data, height_based_rows
                     )
                     if looker_element:
                         looker_elements.append(looker_element)
@@ -191,7 +188,6 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         element: DashboardElement,
         migration_data: Dict,
         height_based_rows: Dict[str, int] = None,
-        standardized_widths: Dict[str, int] = None,
     ) -> Optional[Dict]:
         """Convert worksheet element using the LookerElementGenerator."""
         if not element.worksheet:
@@ -202,7 +198,7 @@ class LookerNativeDashboardGenerator(BaseGenerator):
 
         # Calculate position using existing layout calculator with height-based rows and standardized widths
         position = self.layout_calculator.calculate_looker_position(
-            element, migration_data, height_based_rows, standardized_widths
+            element, migration_data, height_based_rows
         )
 
         # Generate element using the dedicated generator

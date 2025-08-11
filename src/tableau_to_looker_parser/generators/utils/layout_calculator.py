@@ -247,7 +247,6 @@ class LayoutCalculator:
         element: DashboardElement,
         migration_data: Dict[str, Any],
         height_based_rows: Dict[str, int] = None,
-        standardized_widths: Dict[str, int] = None,
     ) -> Dict[str, int]:
         """
         Calculate clean Looker-native positioning from dashboard element.
