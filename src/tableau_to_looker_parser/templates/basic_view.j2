@@ -1,7 +1,11 @@
 view: {{ view_name }} {
   # Generated from Tableau view: {{ view.original_name if view.original_name else view.name }}
-
-  {% if table_name %}
+  {% if is_derived_table %}
+  derived_table: {
+    sql:
+      {{ derived_table_sql }} ;;
+  }
+  {% else %}
   sql_table_name: {{ table_name }} ;;
   {% endif %}
 
@@ -54,6 +58,14 @@ view: {{ view_name }} {
     type: number
     {% elif dimension.field_type == 'real' %}
     type: number
+
+    {% elif dimension.field_type == 'date' %}
+    type: date
+    {% elif dimension.field_type == 'datetime' %}
+    type: date_time
+    {% elif dimension.field_type == 'time' %}
+    type: time
+
     {% elif dimension.field_type == 'boolean' %}
     type: yesno
     {% else %}
@@ -116,6 +128,8 @@ view: {{ view_name }} {
     type: number
     {% elif calc_field.datatype == 'boolean' %}
     type: yesno
+    {% elif calc_field.datatype == 'datetime' %}
+    type: date_time
     {% else %}
     type: string
     {% endif %}
