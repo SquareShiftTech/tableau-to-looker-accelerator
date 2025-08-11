@@ -8,6 +8,7 @@ The converter uses the Visitor pattern to recursively walk the AST tree and buil
 import logging
 from typing import Dict
 from ..models.ast_schema import ASTNode, NodeType, DataType
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,12 @@ class ASTToLookMLConverter:
         self.function_registry = self._build_function_registry()
         logger.debug("AST to LookML converter initialized")
 
-    def convert_to_lookml(self, ast_node: ASTNode, table_context: str = "TABLE") -> str:
+    def convert_to_lookml(
+        self,
+        ast_node: ASTNode,
+        table_context: str = "TABLE",
+        table_name: Optional[str] = None,
+    ) -> str:
         """
         Convert an AST node to LookML SQL expression.
 
@@ -44,14 +50,16 @@ class ASTToLookMLConverter:
             Output: "${TABLE}.adult"
         """
         try:
-            result = self._convert_node(ast_node, table_context)
+            result = self._convert_node(ast_node, table_context, table_name)
             logger.debug(f"Converted AST to LookML: {result}")
             return result
         except Exception as e:
             logger.error(f"Failed to convert AST to LookML: {str(e)}")
             return f"/* Conversion error: {str(e)} */"
 
-    def _convert_node(self, node: ASTNode, table_context: str) -> str:
+    def _convert_node(
+        self, node: ASTNode, table_context: str, table_name: Optional[str] = None
+    ) -> str:
         """
         Core recursive method that converts individual AST nodes.
 
@@ -81,6 +89,8 @@ class ASTToLookMLConverter:
             return self._convert_case(node, table_context)
         elif node.node_type == NodeType.LOD_EXPRESSION:
             return self._convert_lod_expression(node, table_context)
+        elif node.node_type == NodeType.DERIVED_TABLE:
+            return self._convert_derived_table(node, table_context, table_name)
         elif node.node_type == NodeType.WINDOW_FUNCTION:
             return self._convert_window_function(node, table_context)
         elif node.node_type == NodeType.UNARY:
@@ -697,6 +707,48 @@ class ASTToLookMLConverter:
 
         logger.debug(f"Converted LOD expression to: {sql_expr}")
         return sql_expr
+
+    def _convert_derived_table(
+        self, node: ASTNode, table_context: str, table_name: Optional[str] = None
+    ) -> str:
+        """
+        Convert derived table expressions like {MAX([DTTM])} into LookML SQL subqueries.
+
+        Args:
+            node: Derived table AST node with aggregation_function, field_name, etc.
+            table_context: Not used here; relies on explicit properties.
+
+        Returns:
+            str: LookML-compatible SQL subquery
+        """
+        props = node.properties or {}
+
+        # Required fields
+        agg_func = props.get("aggregation_function")
+        field = props.get("field_name")
+        table_name = table_name
+        derived_alias = props.get("derived_table_alias", "derived_table")
+        derived_field_alias = props.get("derived_field_alias", "DerivedValue")
+        table_alias = props.get("table_alias", "base")
+
+        if not agg_func or not field or not table_name:
+            return f"/* Missing info for derived table: {props} */"
+
+        # Generate subquery: SELECT AGG(field) AS alias FROM table
+        subquery = (
+            f"(SELECT {agg_func}({field}) AS {derived_field_alias} FROM {table_name})"
+        )
+
+        final_sql = (
+            f"WITH {derived_alias} AS "
+            f"{subquery} "
+            f"SELECT {table_alias}.*, {derived_alias}.{derived_field_alias} "
+            f"FROM {table_name} AS {table_alias} "
+            f"CROSS JOIN {derived_alias}"
+        )
+
+        # Final SQL expression (can be wrapped or used in FROM clause)
+        return final_sql
 
     def _convert_window_function(self, node: ASTNode, table_context: str) -> str:
         """

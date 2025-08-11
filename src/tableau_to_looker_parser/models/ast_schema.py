@@ -32,6 +32,7 @@ class NodeType(str, Enum):
     RANGE = "range"  # For BETWEEN clauses
     LOD_EXPRESSION = "lod_expression"  # {FIXED/INCLUDE/EXCLUDE [dims] : AGG([field])}
     WINDOW_FUNCTION = "window_function"  # RUNNING_SUM(), RANK(), WINDOW_SUM(), etc.
+    DERIVED_TABLE = "derived_table"
 
     # Unary operations
     UNARY = "unary"  # NOT, -, +
@@ -309,6 +310,10 @@ class ASTValidator:
                 errors.append("Literal node missing value")
 
         elif node.node_type == NodeType.FUNCTION:
+            if not node.function_name:
+                errors.append("Function node missing function_name")
+
+        elif node.node_type == NodeType.DERIVED_TABLE:
             if not node.function_name:
                 errors.append("Function node missing function_name")
 
