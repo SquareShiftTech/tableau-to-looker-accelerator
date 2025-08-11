@@ -266,15 +266,7 @@ class LayoutCalculator:
             ),  # Use consistent scaling with other methods
         }
 
-        # Calculate percentage-based minimums for intelligent sizing
-        min_width = max(1, self.grid_columns // 3)  # 33% of screen width (8 cols)
-        min_height = max(1, self.max_rows // 5)  # 20% of screen height (6 rows)
-
-        # Apply minimum sizes but preserve original positioning
-        position["width"] = max(min_width, position["width"])
-        position["height"] = max(min_height, position["height"])
-
-        # Preserve original positions - don't adjust col/row to prevent overflow
-        # Allow charts to extend beyond boundaries to maintain Tableau positioning
+        # Follow manual dashboard pattern: trust original Tableau proportions
+        # No minimum size constraints - natural sizing works best
 
         return position
