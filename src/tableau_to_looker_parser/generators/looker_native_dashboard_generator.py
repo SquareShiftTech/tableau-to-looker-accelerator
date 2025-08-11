@@ -135,8 +135,8 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             dashboard.elements, migration_data
         )
 
-        # Convert global filters (simplified)
-        filters = self._convert_global_filters(dashboard.global_filters)
+        # Skip global filters - we handle filters at element level now
+        filters = []
 
         # Build template context with minimal properties
         context = {

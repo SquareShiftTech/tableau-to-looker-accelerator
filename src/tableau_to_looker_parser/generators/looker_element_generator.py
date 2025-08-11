@@ -8,6 +8,7 @@ Focuses on essential properties without ECharts complexity.
 from typing import Dict, List, Any
 import logging
 from ..models.worksheet_models import WorksheetSchema, FieldReference
+from .filter_processor import FilterProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -329,9 +330,18 @@ class LookerElementGenerator:
         return sorts
 
     def _generate_filters(self, worksheet: WorksheetSchema) -> Dict[str, str]:
-        """Generate filters from worksheet filter configuration."""
-        # Return empty for now - filters handled at dashboard level
-        return {}
+        """Generate filters from worksheet filter configuration using clean Pydantic processor."""
+        if not hasattr(worksheet, "filters") or not worksheet.filters:
+            return {}
+
+        # Initialize filter processor with explore context
+        filter_processor = FilterProcessor(explore_name=self.explore_name)
+
+        # Convert worksheet filters to LookML element filters
+        filters = filter_processor.process_worksheet_filters(worksheet.filters)
+
+        # Filter out empty values to avoid validation issues
+        return {k: v for k, v in filters.items() if v.strip()}
 
     def _create_fallback_element(
         self, worksheet: WorksheetSchema, position: Dict[str, Any]

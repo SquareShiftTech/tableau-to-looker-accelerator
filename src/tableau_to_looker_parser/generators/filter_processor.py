@@ -1,0 +1,159 @@
+"""
+Filter Processor - Convert Tableau filters to LookML using Pydantic models.
+
+Clean, type-safe filter conversion with configurable mapping rules.
+"""
+
+from typing import Dict, List, Optional
+import logging
+from ..models.filter_mapping_models import (
+    FilterMappingConfig,
+    TableauFilter,
+    LookMLFilter,
+    GroupfilterLogic,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class FilterProcessor:
+    """Process Tableau filters to LookML element filters."""
+
+    def __init__(self, explore_name: str, config: Optional[FilterMappingConfig] = None):
+        """Initialize with explore context and mapping configuration."""
+        self.explore_name = explore_name
+        self.config = config or FilterMappingConfig()
+
+    def process_worksheet_filters(
+        self, worksheet_filters: List[Dict]
+    ) -> Dict[str, str]:
+        """
+        Convert worksheet filters to LookML element filters.
+
+        Args:
+            worksheet_filters: List of filter dicts from worksheet JSON
+
+        Returns:
+            Dict mapping field keys to filter values for LookML
+        """
+        lookml_filters = {}
+
+        for filter_data in worksheet_filters:
+            try:
+                # Parse Tableau filter with Pydantic validation
+                tableau_filter = TableauFilter(**filter_data)
+
+                # Convert to LookML filter
+                lookml_filter = self._convert_filter(tableau_filter)
+                if lookml_filter:
+                    lookml_filters[lookml_filter.field_key] = lookml_filter.field_value
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to process filter {filter_data.get('field_name', 'unknown')}: {e}"
+                )
+
+        return lookml_filters
+
+    def _convert_filter(self, tableau_filter: TableauFilter) -> Optional[LookMLFilter]:
+        """Convert single Tableau filter to LookML filter."""
+
+        # Skip action filters - these are internal Tableau UI actions, not data filters
+        if tableau_filter.field_name.lower().startswith("action"):
+            return None
+
+        # Get mapping rule
+        rule = self.config.get_filter_rule(
+            tableau_filter.filter_type, tableau_filter.filter_class
+        )
+
+        if not rule:
+            logger.warning(
+                f"No mapping rule for filter type: {tableau_filter.filter_type}, class: {tableau_filter.filter_class}"
+            )
+            return None
+
+        # Clean field name
+        clean_field = self.config.clean_field_name(tableau_filter.field_name)
+        if not clean_field:
+            logger.warning(f"Invalid field name: {tableau_filter.field_name}")
+            return None
+
+        # Create field key in explore.field format
+        field_key = f"{self.explore_name}.{clean_field}"
+
+        # Process filter value based on rule
+        filter_value = self._process_filter_value(tableau_filter, rule)
+
+        return LookMLFilter(
+            field_key=field_key, field_value=filter_value, filter_type=rule.lookml_type
+        )
+
+    def _process_filter_value(self, tableau_filter: TableauFilter, rule) -> str:
+        """Process filter value based on mapping rule."""
+
+        # Use existing values if available
+        if tableau_filter.values:
+            return tableau_filter.values
+
+        # Process based on rule type
+        if rule.processor_method == "process_categorical_filter":
+            return self._process_categorical_filter(tableau_filter)
+        elif rule.processor_method == "process_date_filter":
+            return self._process_date_filter(tableau_filter)
+        elif rule.processor_method == "process_card_filter":
+            return self._process_card_filter(tableau_filter)
+
+        return ""
+
+    def _process_categorical_filter(self, tableau_filter: TableauFilter) -> str:
+        """Process categorical filter from groupfilter logic."""
+        if not tableau_filter.groupfilter_logic:
+            return ""
+
+        extracted_values = []
+
+        for logic in tableau_filter.groupfilter_logic:
+            values = self._extract_values_from_logic(logic)
+            extracted_values.extend(values)
+
+        # Remove duplicates and return
+        unique_values = list(dict.fromkeys(extracted_values))  # Preserve order
+        return ",".join(unique_values) if unique_values else ""
+
+    def _process_date_filter(self, tableau_filter: TableauFilter) -> str:
+        """Process date filter."""
+        # Date filters typically don't need specific values in element filters
+        return ""
+
+    def _process_card_filter(self, tableau_filter: TableauFilter) -> str:
+        """Process worksheet card filter."""
+        # Card filters are UI controls, typically no default value
+        return ""
+
+    def _extract_values_from_logic(self, logic: GroupfilterLogic) -> List[str]:
+        """Extract filter values from groupfilter logic."""
+        values = []
+
+        # Get rule for this function
+        rule = self.config.get_groupfilter_rule(logic.function)
+        if not rule:
+            return values
+
+        if not rule.extract_values:
+            # Functions like level-members don't extract specific values
+            return [rule.default_value] if rule.default_value else []
+
+        if rule.value_source == "member" and logic.member:
+            # Extract direct member value
+            clean_value = logic.member.strip("\"'")
+            if clean_value:
+                values.append(clean_value)
+
+        elif rule.value_source == "nested_members" and logic.nested_filters:
+            # Extract from nested filters (union, etc.)
+            for nested in logic.nested_filters:
+                nested_values = self._extract_values_from_logic(nested)
+                values.extend(nested_values)
+
+        return values
