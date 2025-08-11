@@ -266,7 +266,10 @@ class LayoutCalculator:
             ),  # Use consistent scaling with other methods
         }
 
-        # Follow manual dashboard pattern: trust original Tableau proportions
-        # No minimum size constraints - natural sizing works best
+        # Apply manual dashboard minimum sizes: width=6, height=5 for donut charts
+        position["width"] = max(6, position["width"])  # Match manual dashboard minimum
+        position["height"] = max(
+            5, position["height"]
+        )  # Match manual dashboard minimum
 
         return position
