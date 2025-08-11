@@ -47,12 +47,20 @@ class FilterProcessor:
                 # Parse Tableau filter with Pydantic validation
                 tableau_filter = TableauFilter(**filter_data)
 
-                # Skip calculated fields if specified
-                if calculated_fields and tableau_filter.field_name in calculated_fields:
-                    logger.debug(
-                        f"Skipping calculated field filter: {tableau_filter.field_name}"
+                # Skip calculated fields if specified - normalize field names for comparison
+                if calculated_fields:
+                    # Normalize field name for comparison: remove spaces, parentheses, make lowercase
+                    normalized_filter_name = (
+                        tableau_filter.field_name.replace(" ", "_")
+                        .replace("(", "")
+                        .replace(")", "")
+                        .lower()
                     )
-                    continue
+                    if normalized_filter_name in calculated_fields:
+                        logger.debug(
+                            f"Skipping calculated field filter: {tableau_filter.field_name}"
+                        )
+                        continue
 
                 # Convert to LookML filter
                 lookml_filter = self._convert_filter(tableau_filter)
