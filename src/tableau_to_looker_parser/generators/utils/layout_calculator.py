@@ -262,13 +262,16 @@ class LayoutCalculator:
             "col": max(0, int(element.position.x * self.grid_columns)),
             "width": max(1, int(element.position.width * self.grid_columns)),
             "height": max(
-                1, int(element.position.height * 10)
-            ),  # Slightly compressed for clean look
+                1, int(element.position.height * 20)
+            ),  # Use consistent scaling with other methods
         }
 
-        # Ensure reasonable minimums for readability
-        position["width"] = max(6, position["width"])  # At least 6 columns wide
-        position["height"] = max(4, position["height"])  # At least 4 rows high
+        # Calculate percentage-based minimums for intelligent sizing
+        min_width = max(1, self.grid_columns // 3)  # 33% of screen width (8 cols)
+        min_height = max(1, self.max_rows // 5)  # 20% of screen height (6 rows)
+
+        position["width"] = max(min_width, position["width"])
+        position["height"] = max(min_height, position["height"])
 
         # Ensure elements don't overflow
         if position["col"] + position["width"] > self.grid_columns:
