@@ -274,11 +274,15 @@ class LayoutCalculator:
             "height": max(1, int(element.position.height * 20)),
         }
 
-        # Use standardized width if provided, otherwise apply minimum
+        # Use standardized width if provided, otherwise apply intelligent sizing
         if standardized_widths and element.element_id in standardized_widths:
             position["width"] = standardized_widths[element.element_id]
         else:
-            position["width"] = max(6, position["width"])  # Fallback minimum
+            # Smart width: tables get full width, charts get minimum 6
+            if position["width"] > 15:  # Likely a table/large element
+                position["width"] = 24  # Full width
+            else:
+                position["width"] = max(6, position["width"])  # Chart minimum
 
         position["height"] = max(
             5, position["height"]
