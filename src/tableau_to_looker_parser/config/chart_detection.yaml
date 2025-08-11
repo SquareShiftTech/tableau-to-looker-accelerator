@@ -1,0 +1,270 @@
+basic_chart_detection:
+
+  # Table/Crosstab Detection (Your Favorite)
+  table_chart:
+    conditions:
+      - mark_type: "Square"
+      - has_text_marks: true
+      - columns_shelf_count: ">1"  # day(dt), hour(dt)
+      - rows_shelf_has_string: true
+      - text_encoding_has_measure: true  # SUM(Sales) in text
+    confidence: 95
+    variants:
+      - crosstab_table:
+          conditions:
+            - rows_shelf_count: ">1"
+            - columns_shelf_count: ">1"
+            - text_encoding_has_measure: "SUM"
+      - heatmap_table:
+          conditions:
+            - color_encoding: "measure"
+            - has_continuous_color_scale: true
+    pivot_required: true
+    pivot_type: "crosstab"
+    looker_equivalent: "looker_grid"
+    fields_sources: ["rows_shelf","column_shelf", "text_marks"]
+    pivot_field_source: ["columns_shelf"]
+
+  # Bar Chart Detection (Your Favorite)
+  bar_chart:
+    conditions:
+      - mark_type: ["Bar", "Automatic"]
+      - has_color_encoding: true
+    confidence: 100
+    variants:
+      - horizontal_bar:
+          conditions:
+            - mark_type: "Bar"
+            - x_encoding: "measure"
+            - y_encoding: ["categorical", "string"]
+            - orientation: "horizontal"
+      - automatic_bar:
+          conditions:
+            - mark_type: "Automatic"
+            - x_encoding: "measure"
+            - has_text_marks: true
+      - stacked_bar:
+          conditions:
+            - color_encoding: "categorical"
+            - has_mark_stacking: true
+      - grouped_bar:
+          conditions:
+            - color_encoding: "categorical"
+            - has_mark_stacking: false
+    pivot_required: false
+    looker_equivalent: "looker_bar"
+
+  # Column Chart (Vertical Bars)
+  column_chart:
+    conditions:
+      - mark_type: "Bar"
+      - x_encoding: ["categorical", "string", "temporal"]
+      - y_encoding: "measure"
+      - orientation: "vertical"
+    confidence: 100
+    variants:
+      - simple_column:
+          conditions:
+            - color_encoding: null
+      - stacked_column:
+          conditions:
+            - color_encoding: "categorical"
+            - has_mark_stacking: true
+      - grouped_column:
+          conditions:
+            - color_encoding: "categorical"
+            - has_mark_stacking: false
+      - temporal_column:
+          conditions:
+            - x_encoding: "temporal"
+            - columns_shelf_count: ">1"  # Multiple fields on columns (e.g., date + time)
+          pivot_required: true
+          fields_sources: ["rows_shelf", "columns_shelf"]
+          pivot_field_source: ["columns_shelf"]
+          pivot_selection_logic: "all_except_last"  # Take all fields except the last one
+    pivot_required: true
+    looker_equivalent: "looker_column"
+    fields_sources: ["rows_shelf", "columns_shelf"]
+    pivot_field_source: ["columns_shelf"]
+    pivot_selection_logic: "all_except_last"
+
+
+  # Line Chart
+  line_chart:
+    conditions:
+      - mark_type: "Line"
+      - x_encoding: ["temporal", "continuous", "date"]
+      - y_encoding: "measure"
+    confidence: 100
+    variants:
+      - single_line:
+          conditions:
+            - color_encoding: null
+      - multi_line:
+          conditions:
+            - color_encoding: "categorical"
+          pivot_required: true
+          pivot_type: "series"
+      - dual_axis_line:
+          conditions:
+            - has_dual_axis: true
+            - has_multiple_measures: true
+    pivot_required: false
+    looker_equivalent: "looker_line"
+
+  # Area Chart
+  area_chart:
+    conditions:
+      - mark_type: "Area"
+      - x_encoding: ["temporal", "continuous"]
+      - y_encoding: "measure"
+    confidence: 100
+    variants:
+      - single_area:
+          conditions:
+            - color_encoding: null
+      - stacked_area:
+          conditions:
+            - color_encoding: "categorical"
+            - has_mark_stacking: true
+          pivot_required: true
+          pivot_type: "series"
+    looker_equivalent: "looker_area"
+
+  # Pie Chart
+  pie_chart:
+    conditions:
+      - mark_type: "Pie"
+      - color_encoding: "categorical"
+      - has_angle_encoding: "measure"
+    confidence: 100
+    variants:
+      - simple_pie:
+          conditions:
+            - has_dual_axis: false
+      - pie_with_labels:
+          conditions:
+            - has_label_encoding: true
+    pivot_required: false
+    looker_equivalent: "looker_pie"
+
+  # Donut Chart Detection (Your Favorite - Pie with dual axis)
+  donut_chart:
+    conditions:
+      - mark_type: "Pie"
+      - has_dual_axis: true
+      #- inner_radius: ">0"
+    confidence: 90
+    detection_notes: "Pie chart with dual axis indicates donut configuration"
+    pivot_required: true
+    fields_sources: ["color_marks", "text_marks"]
+    pivot_field_source: ["color_marks"]
+    looker_equivalent: "looker_donut_multiples"  # Note: Looker doesn't support donut, will be pie
+    migration_warning: "Looker doesn't support donut charts - will convert to pie"
+
+  # Scatter Plot
+  scatter_plot:
+    conditions:
+      - mark_type: "Circle"
+      - x_encoding: "measure"
+      - y_encoding: "measure"
+    confidence: 100
+    variants:
+      - basic_scatter:
+          conditions:
+            - size_encoding: null
+            - color_encoding: null
+      - bubble_chart:
+          conditions:
+            - size_encoding: "measure"
+      - color_coded_scatter:
+          conditions:
+            - color_encoding: ["categorical", "measure"]
+    pivot_required: false
+    looker_equivalent: "looker_scatter"
+
+  # Histogram
+  histogram:
+    conditions:
+      - mark_type: "Bar"
+      - x_encoding: "binned_dimension"
+      - y_encoding: ["COUNT", "frequency"]
+      - has_binned_fields: true
+    confidence: 95
+    variants:
+      - simple_histogram:
+          conditions:
+            - color_encoding: null
+      - grouped_histogram:
+          conditions:
+            - color_encoding: "categorical"
+    looker_equivalent: "looker_column"
+
+  # Box Plot
+  box_plot:
+    conditions:
+      - mark_type: "Box"
+      - x_encoding: "categorical"
+      - y_encoding: "measure"
+    confidence: 100
+    variants:
+      - simple_box:
+          conditions:
+            - color_encoding: null
+      - grouped_box:
+          conditions:
+            - color_encoding: "categorical"
+    looker_equivalent: "looker_boxplot"
+
+  # Treemap
+  treemap:
+    conditions:
+      - mark_type: "Square"
+      - size_encoding: "measure"
+      - color_encoding: ["categorical", "measure"]
+      - has_hierarchical_layout: true
+    confidence: 95
+    variants:
+      - categorical_treemap:
+          conditions:
+            - color_encoding: "categorical"
+      - measure_treemap:
+          conditions:
+            - color_encoding: "measure"
+    pivot_required: false
+    looker_equivalent: "looker_grid"  # Limited support
+
+  # Text Table (Simple)
+  text_table:
+    conditions:
+      - mark_type: "Text"
+      - has_text_marks: true
+      - has_no_color_size_encoding: true
+    confidence: 90
+    looker_equivalent: "looker_grid"
+    pivot_required: true
+    pivot_type: "simple_table"
+
+  # Map Charts
+  symbol_map:
+    conditions:
+      - mark_type: "Circle"
+      - has_geographic_fields: true
+      - has_latitude_longitude_encoding: true
+    confidence: 95
+    variants:
+      - point_map:
+          conditions:
+            - size_encoding: null
+      - bubble_map:
+          conditions:
+            - size_encoding: "measure"
+    looker_equivalent: "looker_map"
+
+  filled_map:
+    conditions:
+      - mark_type: "Shape"
+      - has_geographic_fields: true
+      - color_encoding: "measure"
+    confidence: 95
+    looker_equivalent: "looker_map"

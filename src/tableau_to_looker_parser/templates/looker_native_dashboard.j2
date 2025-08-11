@@ -1,0 +1,40 @@
+- dashboard: {{ dashboard_name }}
+  title: {{ title }}
+  layout: {{ layout_type }}
+  preferred_viewer: {{ preferred_viewer }}
+{% if description %}  description: '{{ description }}'{% endif %}
+  elements:
+{% for element in elements %}
+  - title: {{ element.title }}
+    name: {{ element.name }}
+    model: {{ element.model }}
+    explore: {{ element.explore }}
+    type: {{ element.type }}
+{% if element.fields and element.fields|length > 0 %}    fields: [{% for field in element.fields %}{{ field }}{% if not loop.last %},
+{% endif %}{% endfor %}]
+{% endif %}{% if element.pivots and element.pivots|length > 0 %}    pivots: [{% for pivot in element.pivots %}{{ pivot }}{% if not loop.last %},
+{% endif %}{% endfor %}]
+{% endif %}
+{% if element.filters and element.filters|length > 0 %}    filters:
+{% for filter_key, filter_value in element.filters.items() %}      {{ filter_key }}: {{ filter_value }}
+{% endfor %}{% endif %}
+{% if element.sorts and element.sorts|length > 0 %}    sorts: [{% for sort in element.sorts %}{% if not loop.first %},
+      {% endif %}{{ sort }}{% endfor %}]
+{% endif %}    limit: {{ element.limit }}
+{% if element.column_limit %}    column_limit: {{ element.column_limit }}
+{% endif %}    row: {{ element.row }}
+    col: {{ element.col }}
+    width: {{ element.width }}
+    height: {{ element.height }}
+
+{% endfor %}
+{% if filters and filters|length > 0 %}  filters:
+{% for filter in filters %}
+  - name: {{ filter.name }}
+    title: {{ filter.title }}
+    type: {{ filter.type }}
+{% if filter.default_value %}    default_value: {{ filter.default_value }}{% endif %}
+    model: {{ filter.model }}
+    explore: {{ filter.explore }}
+    field: {{ filter.field }}
+{% endfor %}{% endif %}

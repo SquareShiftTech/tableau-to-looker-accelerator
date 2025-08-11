@@ -990,6 +990,7 @@ class TableauXMLParserV2:
                 worksheet_data = {
                     "name": worksheet_name,
                     "clean_name": self._clean_name(worksheet_name),
+                    "title": self._extract_worksheet_title(worksheet),
                     "datasource_id": self._extract_worksheet_datasource_id(worksheet),
                     "fields": self._extract_worksheet_fields(worksheet),
                     "visualization": self._extract_visualization_config(worksheet),
@@ -1088,7 +1089,7 @@ class TableauXMLParserV2:
                 if pane_encodings is not None:
                     for encoding in pane_encodings:
                         encoding_type = encoding.tag
-                        field = encoding.get("field", "")
+                        field = encoding.get("column", "")
                         palette = encoding.get("palette", "")
 
                         if encoding_type == "color":
@@ -1175,10 +1176,6 @@ class TableauXMLParserV2:
         # Extract column instances (actual field usage)
         for column_instance in dependencies.findall("column-instance"):
             field_data = self._parse_column_instance(column_instance, worksheet)
-            if field_data.get("original_name") == "[RPT_DT]":
-                print(
-                    f"🔧 WORKSHEET DEBUG: Processing field '{field_data.get('original_name')}'"
-                )
             if field_data:
                 fields.append(field_data)
 
@@ -1231,8 +1228,6 @@ class TableauXMLParserV2:
     ) -> Optional[Dict]:
         """Parse a column-instance element into field reference data."""
         column_ref = column_instance.get("column", "")
-        if column_ref == "[RPT_DT]":
-            print(f"🔧 WORKSHEET DEBUG: Processing field '{column_ref}'")
         instance_name = column_instance.get("name", "")
         derivation = column_instance.get("derivation", "None")
         # pivot = column_instance.get("pivot", "key")
@@ -1260,8 +1255,8 @@ class TableauXMLParserV2:
             caption = self._lookup_field_caption(worksheet, column_ref)
             datatype = self._infer_datatype_from_type(field_type)
 
-        # Determine shelf placement
-        shelf = self._determine_field_shelf(worksheet, instance_name)
+        # Determine shelf placement and encoding type
+        shelf_info = self._determine_field_shelf_and_encoding(worksheet, instance_name)
 
         return {
             "name": clean_name,
@@ -1270,39 +1265,62 @@ class TableauXMLParserV2:
             "datatype": datatype,
             "role": role,
             "aggregation": derivation if derivation != "None" else None,
-            "shelf": shelf,
+            "shelf": shelf_info["shelf"],
+            "encodings": shelf_info["encodings"],  # List of all encodings
             "derivation": derivation,
             "caption": caption,
         }
 
-    def _determine_field_shelf(self, worksheet: Element, instance_name: str) -> str:
-        """Determine which shelf a field instance is placed on."""
+    def _determine_field_shelf_and_encoding(
+        self, worksheet: Element, instance_name: str
+    ) -> Dict:
+        """Determine both shelf placement and encoding types for a field instance."""
+        shelf = "detail"  # Default shelf
+        encodings_list = []  # List of all encodings
+
         # Check rows shelf
         rows_elem = worksheet.find(".//rows")
         if rows_elem is not None and instance_name in (rows_elem.text or ""):
-            return "rows"
+            shelf = "rows"
 
         # Check columns shelf
         cols_elem = worksheet.find(".//cols")
         if cols_elem is not None and instance_name in (cols_elem.text or ""):
-            return "columns"
+            shelf = "columns"
 
-        # Check encodings (color, size, etc.)
-        pane = worksheet.find(".//pane")
-        if pane is not None:
-            for encoding in pane.findall(".//encoding") or []:
-                encoding_type = encoding.tag
-                if encoding.get("column") == instance_name:
-                    return encoding_type
+        # Check all encodings (color, size, text, etc.) - CHECK ALL PANES
+        panes = worksheet.findall(".//pane")
 
+        for pane_idx, pane in enumerate(panes):
             # Check direct encoding attributes
             encodings = pane.find("encodings")
             if encodings is not None:
                 for child in encodings:
-                    if child.get("column") == instance_name:
-                        return child.tag
+                    encoding_column = child.get("column", "")
 
-        return "detail"  # Default shelf
+                    # Check for exact match or suffix match (handle federated prefix)
+                    if (
+                        encoding_column == instance_name
+                        or encoding_column.endswith(f"].{instance_name}")
+                        or encoding_column.endswith(instance_name)
+                    ):
+                        if child.tag not in encodings_list:  # Avoid duplicates
+                            encodings_list.append(child.tag)
+
+        # Set shelf based on primary encoding if found
+        if "color" in encodings_list:
+            shelf = "color"
+        elif "size" in encodings_list:
+            shelf = "size"
+        elif "text" in encodings_list:
+            shelf = "text"
+
+        return {"shelf": shelf, "encodings": encodings_list}
+
+    def _determine_field_shelf(self, worksheet: Element, instance_name: str) -> str:
+        """Legacy method - determine which shelf a field instance is placed on."""
+        shelf_info = self._determine_field_shelf_and_encoding(worksheet, instance_name)
+        return shelf_info["shelf"]
 
     def _extract_visualization_config(self, worksheet: Element) -> Dict:
         """Extract visualization configuration from worksheet panes."""
@@ -1426,10 +1444,191 @@ class TableauXMLParserV2:
         return sorts
 
     def _extract_worksheet_filters(self, worksheet: Element) -> List[Dict]:
-        """Extract filter configuration from worksheet."""
-        # This is a placeholder - worksheet filters are complex
-        # Would need to parse filter elements, quick filters, etc.
-        return []
+        """Extract filter configuration from worksheet.
+
+        Parses BOTH:
+        1. <filter> elements (actual filter definitions - THE REAL FILTERS)
+        2. <card type='filter'> elements (UI filter cards)
+
+        Extensible design to handle new filter types as they're discovered.
+        """
+        filters = []
+
+        try:
+            # Method 1: Extract ACTUAL filter definitions from <filter> elements
+            filter_definitions = worksheet.findall(".//filter")
+            for filter_elem in filter_definitions:
+                filter_data = self._parse_filter_definition(filter_elem)
+                if filter_data:
+                    filters.append(filter_data)
+
+            # Method 2: Extract UI filter cards from <card type='filter'> elements
+            filter_cards = worksheet.findall(".//card[@type='filter']")
+
+            # Method 3: Check associated worksheet window for filter cards
+            worksheet_name = worksheet.get("name")
+            if worksheet_name:
+                root = worksheet
+                while root.getparent() is not None:
+                    root = root.getparent()
+
+                window = root.find(
+                    f".//window[@class='worksheet'][@name='{worksheet_name}']"
+                )
+                if window is not None:
+                    window_filter_cards = window.findall(".//card[@type='filter']")
+                    filter_cards.extend(window_filter_cards)
+
+            # Parse all found filter cards
+            for card in filter_cards:
+                filter_data = self._parse_filter_card(card)
+                if filter_data:
+                    filters.append(filter_data)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to extract worksheet filters: {e}")
+            # Return empty list to avoid breaking existing functionality
+
+        return filters
+
+    # ============================================================================
+    # FILTER PARSING HELPER METHODS - FULLY GENERIC & EXTENSIBLE
+    # ============================================================================
+
+    def _parse_filter_card(self, card: Element) -> Optional[Dict]:
+        """Parse worksheet filter card - completely generic.
+
+        No hardcoded values - extracts all attributes for extensibility.
+        """
+        try:
+            param = card.get("param")
+            if not param:
+                return None
+
+            # Parse field reference generically
+            field_info = self._parse_filter_field_reference(param)
+            if not field_info:
+                return None
+
+            # Generic extraction of ALL card attributes
+            filter_config = {
+                "field_name": field_info["field_name"],
+                "field_reference": param,
+                "datasource_id": field_info.get("datasource_id"),
+                "filter_type": "worksheet_card",
+                # Extract ALL attributes generically - no hardcoding
+                **{attr: value for attr, value in card.attrib.items()},
+                "field_info": field_info,
+                "position_context": self._extract_card_position_context(card),
+            }
+
+            return filter_config
+
+        except Exception as e:
+            self.logger.warning(f"Failed to parse filter card: {e}")
+            return None
+
+    def _parse_filter_zone(self, zone: Element) -> Optional[Dict]:
+        """Parse dashboard filter zone - completely generic.
+
+        No hardcoded values - extracts all attributes for extensibility.
+        """
+        try:
+            param = zone.get("param")
+            if not param:
+                return None
+
+            # Parse field reference generically
+            field_info = self._parse_filter_field_reference(param)
+            if not field_info:
+                return None
+
+            # Generic extraction of ALL zone attributes
+            filter_config = {
+                "field_name": field_info["field_name"],
+                "field_reference": param,
+                "datasource_id": field_info.get("datasource_id"),
+                "filter_type": "dashboard_zone",
+                # Extract ALL attributes generically - no hardcoding
+                **{attr: value for attr, value in zone.attrib.items()},
+                "field_info": field_info,
+                "position": self._extract_zone_position(zone)
+                if hasattr(self, "_extract_zone_position")
+                else {},
+            }
+
+            return filter_config
+
+        except Exception as e:
+            self.logger.warning(f"Failed to parse filter zone: {e}")
+            return None
+
+    def _parse_filter_field_reference(self, param: str) -> Optional[Dict]:
+        """Parse filter field reference - completely generic.
+
+        Handles any field reference pattern without hardcoding.
+        """
+        if not param:
+            return None
+
+        try:
+            # Generic parsing of complex field references
+            field_info = {
+                "original_param": param,
+                "clean_param": param.strip("[]"),
+            }
+
+            # Handle federated references: [datasource].[field]
+            if "].[" in param:
+                parts = param.split("].[", 1)
+                field_info["datasource_id"] = parts[0].strip("[")
+                field_reference = parts[1].strip("]")
+            else:
+                field_info["datasource_id"] = ""
+                field_reference = param.strip("[]")
+
+            # Parse field components generically: type:name:qualifier
+            components = field_reference.split(":")
+            field_info["components"] = components
+            field_info["field_name"] = (
+                components[1] if len(components) > 1 else field_reference
+            )
+            field_info["field_type"] = components[0] if len(components) > 0 else ""
+            field_info["field_qualifier"] = components[2] if len(components) > 2 else ""
+
+            # Store all components for extensibility
+            if len(components) > 3:
+                field_info["additional_components"] = components[3:]
+
+            return field_info
+
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to parse filter field reference '{param}': {e}"
+            )
+            return None
+
+    def _extract_card_position_context(self, card: Element) -> Dict:
+        """Extract positioning context for filter card - generic."""
+        context = {}
+
+        try:
+            # Get parent strip info generically
+            parent = card.getparent()
+            if parent is not None:
+                context["parent_tag"] = parent.tag
+                context["parent_attributes"] = dict(parent.attrib)
+
+                # Get grandparent context
+                grandparent = parent.getparent()
+                if grandparent is not None:
+                    context["grandparent_tag"] = grandparent.tag
+                    context["grandparent_attributes"] = dict(grandparent.attrib)
+
+        except Exception:
+            pass
+
+        return context
 
     def _extract_worksheet_actions(self, worksheet: Element) -> List[Dict]:
         """Extract action configuration from worksheet."""
@@ -1628,6 +1827,17 @@ class TableauXMLParserV2:
         totals = worksheet.find(".//totals")
         return totals is not None
 
+    def _extract_worksheet_title(self, worksheet: Element) -> str:
+        """Extract worksheet title from layout options."""
+        # Look for title in layout-options/title/formatted-text/run
+        title_elem = worksheet.find(".//layout-options/title/formatted-text/run")
+        if title_elem is not None and title_elem.text:
+            return title_elem.text.strip()
+
+        # Fallback to worksheet name if no title found
+        worksheet_name = worksheet.get("name", "Untitled")
+        return worksheet_name.replace("_", " ").title()
+
     def _determine_layout_type(self, dashboard: Element) -> str:
         """
         Determine dashboard layout type from Tableau layout information.
@@ -1732,6 +1942,240 @@ class TableauXMLParserV2:
         return analysis
 
     def _extract_dashboard_filters(self, dashboard: Element) -> List[Dict]:
-        """Extract dashboard-level filters."""
-        # This is a placeholder - dashboard filters are complex
-        return []
+        """Extract dashboard-level filters.
+
+        Parses <zone type-v2='filter'> elements from dashboard zones.
+        Extensible design to handle new filter types as they're discovered.
+        """
+        filters = []
+
+        try:
+            # Find all filter zones in dashboard
+            filter_zones = dashboard.findall(".//zone[@type-v2='filter']")
+
+            for zone in filter_zones:
+                filter_data = self._parse_filter_zone(zone)
+                if filter_data:
+                    filters.append(filter_data)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to extract dashboard filters: {e}")
+            # Return empty list to avoid breaking existing functionality
+
+        return filters
+
+    # ============================================================================
+    # FILTER PARSING HELPER METHODS - FULLY GENERIC & EXTENSIBLE
+    # ============================================================================
+
+    def _parse_filter_card(self, card: Element) -> Optional[Dict]:
+        """Parse worksheet filter card - completely generic.
+
+        No hardcoded values - extracts all attributes for extensibility.
+        """
+        try:
+            param = card.get("param")
+            if not param:
+                return None
+
+            # Parse field reference generically
+            field_info = self._parse_filter_field_reference(param)
+            if not field_info:
+                return None
+
+            # Generic extraction of ALL card attributes
+            filter_config = {
+                "field_name": field_info["field_name"],
+                "field_reference": param,
+                "datasource_id": field_info.get("datasource_id"),
+                "filter_type": "worksheet_card",
+                # Extract ALL attributes generically - no hardcoding
+                **{attr: value for attr, value in card.attrib.items()},
+                "field_info": field_info,
+                "position_context": self._extract_card_position_context(card),
+            }
+
+            return filter_config
+
+        except Exception as e:
+            self.logger.warning(f"Failed to parse filter card: {e}")
+            return None
+
+    def _parse_filter_zone(self, zone: Element) -> Optional[Dict]:
+        """Parse dashboard filter zone - completely generic.
+
+        No hardcoded values - extracts all attributes for extensibility.
+        """
+        try:
+            param = zone.get("param")
+            if not param:
+                return None
+
+            # Parse field reference generically
+            field_info = self._parse_filter_field_reference(param)
+            if not field_info:
+                return None
+
+            # Generic extraction of ALL zone attributes
+            filter_config = {
+                "field_name": field_info["field_name"],
+                "field_reference": param,
+                "datasource_id": field_info.get("datasource_id"),
+                "filter_type": "dashboard_zone",
+                # Extract ALL attributes generically - no hardcoding
+                **{attr: value for attr, value in zone.attrib.items()},
+                "field_info": field_info,
+                "position": self._extract_zone_position(zone)
+                if hasattr(self, "_extract_zone_position")
+                else {},
+            }
+
+            return filter_config
+
+        except Exception as e:
+            self.logger.warning(f"Failed to parse filter zone: {e}")
+            return None
+
+    def _parse_filter_field_reference(self, param: str) -> Optional[Dict]:
+        """Parse filter field reference - completely generic.
+
+        Handles any field reference pattern without hardcoding.
+        """
+        if not param:
+            return None
+
+        try:
+            # Generic parsing of complex field references
+            field_info = {
+                "original_param": param,
+                "clean_param": param.strip("[]"),
+            }
+
+            # Handle federated references: [datasource].[field]
+            if "].[" in param:
+                parts = param.split("].[", 1)
+                field_info["datasource_id"] = parts[0].strip("[")
+                field_reference = parts[1].strip("]")
+            else:
+                field_info["datasource_id"] = ""
+                field_reference = param.strip("[]")
+
+            # Parse field components generically: type:name:qualifier
+            components = field_reference.split(":")
+            field_info["components"] = components
+            field_info["field_name"] = (
+                components[1] if len(components) > 1 else field_reference
+            )
+            field_info["field_type"] = components[0] if len(components) > 0 else ""
+            field_info["field_qualifier"] = components[2] if len(components) > 2 else ""
+
+            # Store all components for extensibility
+            if len(components) > 3:
+                field_info["additional_components"] = components[3:]
+
+            return field_info
+
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to parse filter field reference '{param}': {e}"
+            )
+            return None
+
+    def _extract_card_position_context(self, card: Element) -> Dict:
+        """Extract positioning context for filter card - generic."""
+        context = {}
+
+        try:
+            # Get parent strip info generically
+            parent = card.getparent()
+            if parent is not None:
+                context["parent_tag"] = parent.tag
+                context["parent_attributes"] = dict(parent.attrib)
+
+                # Get grandparent context
+                grandparent = parent.getparent()
+                if grandparent is not None:
+                    context["grandparent_tag"] = grandparent.tag
+                    context["grandparent_attributes"] = dict(grandparent.attrib)
+
+        except Exception:
+            pass
+
+        return context
+
+    def _parse_filter_definition(self, filter_elem: Element) -> Optional[Dict]:
+        """Parse <filter class='categorical'> elements - completely generic.
+
+        Extracts actual filter logic from Tableau filter definitions.
+        """
+        try:
+            # Extract basic filter attributes
+            filter_class = filter_elem.get("class", "")
+            column = filter_elem.get("column", "")
+            filter_group = filter_elem.get("filter-group", "")
+
+            # Parse field reference from column attribute
+            field_info = self._parse_filter_field_reference(column)
+            if not field_info:
+                return None
+
+            # Generic extraction of ALL filter attributes
+            filter_config = {
+                "field_name": field_info.get("field_name", ""),
+                "field_reference": column,
+                "datasource_id": field_info.get("datasource_id", ""),
+                "filter_type": "filter_definition",
+                "filter_class": filter_class,
+                "filter_group": filter_group,
+                "field_info": field_info,
+                "groupfilter_logic": [],
+            }
+
+            # Extract all attributes generically
+            for attr, value in filter_elem.attrib.items():
+                if attr not in filter_config:
+                    filter_config[attr] = value
+
+            # Parse groupfilter logic
+            groupfilters = filter_elem.findall(".//groupfilter")
+            for groupfilter in groupfilters:
+                groupfilter_data = self._parse_groupfilter_logic(groupfilter)
+                if groupfilter_data:
+                    filter_config["groupfilter_logic"].append(groupfilter_data)
+
+            return filter_config
+
+        except Exception as e:
+            self.logger.warning(f"Failed to parse filter definition: {e}")
+            return None
+
+    def _parse_groupfilter_logic(self, groupfilter: Element) -> Optional[Dict]:
+        """Parse groupfilter logic within filter definitions - completely generic."""
+        try:
+            # Extract function type and attributes
+            function = groupfilter.get("function", "")
+            level = groupfilter.get("level", "")
+            member = groupfilter.get("member", "")
+
+            # Generic extraction of ALL groupfilter attributes
+            groupfilter_data = {"function": function, "level": level, "member": member}
+
+            # Extract all attributes generically
+            for attr, value in groupfilter.attrib.items():
+                if attr not in groupfilter_data:
+                    groupfilter_data[attr] = value
+
+            # Handle nested groupfilters (for crossjoin, union, etc.)
+            nested_groupfilters = groupfilter.findall("groupfilter")
+            if nested_groupfilters:
+                groupfilter_data["nested_filters"] = []
+                for nested in nested_groupfilters:
+                    nested_data = self._parse_groupfilter_logic(nested)
+                    if nested_data:
+                        groupfilter_data["nested_filters"].append(nested_data)
+
+            return groupfilter_data
+
+        except Exception as e:
+            self.logger.warning(f"Failed to parse groupfilter logic: {e}")
+            return None

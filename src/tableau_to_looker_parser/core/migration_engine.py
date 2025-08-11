@@ -50,7 +50,7 @@ class MigrationEngine:
         )  # After regular fields
 
         # Register Phase 3 handlers (worksheets and dashboards)
-        self.register_handler(WorksheetHandler(), priority=7)
+        self.register_handler(WorksheetHandler(enable_yaml_detection=True), priority=7)
         self.register_handler(DashboardHandler(), priority=8)
 
     def register_handler(self, handler: BaseHandler, priority: int = 100) -> None:
@@ -416,6 +416,55 @@ class MigrationEngine:
                     if identified_measures:
                         self.logger.info(
                             f"Routed {len(identified_measures)} worksheet measures through MeasureHandler"
+                        )
+
+                    # NEW: Route derived fields through appropriate handlers with deduplication
+                    derived_fields = processed.get("derived_fields", [])
+                    for derived_field in derived_fields:
+                        field_type = derived_field.get("field_type", "dimension")
+                        field_name = derived_field.get("name", "unknown")
+
+                        # Check for duplicates before adding
+                        is_duplicate = False
+                        target_list = None
+
+                        if field_type == "measure":
+                            target_list = result["measures"]
+                        elif field_type in ["dimension_group", "dimension"]:
+                            target_list = result["dimensions"]
+
+                        if target_list:
+                            # Check if derived field already exists with same name and derivation pattern
+                            tableau_instance = derived_field.get("tableau_instance", "")
+                            derivation = derived_field.get("derivation", "")
+                            for existing_field in target_list:
+                                # Only compare against other derived fields, and match by both name and derivation
+                                if (
+                                    existing_field.get("is_derived", False)
+                                    and existing_field.get("name") == field_name
+                                    and existing_field.get("derivation") == derivation
+                                    and existing_field.get("tableau_instance")
+                                    == tableau_instance
+                                ):
+                                    is_duplicate = True
+                                    break
+
+                        if not is_duplicate:
+                            # Add derived fields directly to result (bypass handlers to preserve metadata)
+                            if field_type == "measure":
+                                result["measures"].append(derived_field)
+
+                            elif field_type == "dimension_group":
+                                result["dimensions"].append(derived_field)
+
+                            elif field_type == "dimension":
+                                result["dimensions"].append(derived_field)
+                        else:
+                            pass  # Duplicate field, skip
+
+                    if derived_fields:
+                        self.logger.info(
+                            f"Routed {len(derived_fields)} derived fields through appropriate handlers"
                         )
 
                     self.logger.info(

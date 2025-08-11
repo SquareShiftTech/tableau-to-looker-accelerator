@@ -43,6 +43,7 @@ class ModelGenerator(BaseGenerator):
                 "connection_name": connection_name,
                 "views": [{"name": view_name} for view_name in sorted(view_names)],
                 "explores": explores,
+                "dashboards": migration_data.get("dashboards", []),
             }
 
             # Render template (same as original)

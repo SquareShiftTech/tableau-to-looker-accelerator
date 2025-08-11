@@ -126,7 +126,6 @@ class ChartConfigFactory:
         """
         config = self.get_chart_config(chart_type, dashboard_context)
 
-        print(f"🏭 FACTORY DEBUG: Selected config type: {type(config).__name__}")
         print(f"   Chart type: {chart_type}")
         print(f"   Config instance: {config}")
         print(

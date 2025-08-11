@@ -10,7 +10,7 @@ from .base_generator import BaseGenerator
 from .connection_generator import ConnectionGenerator
 from .view_generator import ViewGenerator
 from .model_generator import ModelGenerator
-from .dashboard_generator import DashboardGenerator
+from .looker_native_dashboard_generator import LookerNativeDashboardGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,10 @@ class ProjectGenerator(BaseGenerator):
         self.connection_generator = ConnectionGenerator(template_dir)
         self.view_generator = ViewGenerator(template_dir)
         self.model_generator = ModelGenerator(template_dir)
-        self.dashboard_generator = DashboardGenerator(template_dir)
+        self.dashboard_generator = LookerNativeDashboardGenerator(template_dir)
 
         logger.info(
-            "Project generator initialized with all sub-generators including dashboard generator"
+            "Project generator initialized with all sub-generators including Looker-native dashboard generator"
         )
 
     def generate_project_files(

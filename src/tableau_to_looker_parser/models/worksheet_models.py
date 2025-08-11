@@ -17,6 +17,7 @@ class ChartType(str, Enum):
     """Tableau chart/mark types."""
 
     BAR = "bar"
+    COLUMN = "column"  # Column charts (vertical bars)
     LINE = "line"
     PIE = "pie"
     SCATTER = "scatter"
@@ -67,6 +68,10 @@ class FieldReference(BaseModel):
     # Usage context
     shelf: str = Field(
         ..., description="Shelf placement: rows, columns, color, size, detail, etc."
+    )
+    encodings: List[str] = Field(
+        default_factory=list,
+        description="List of encoding types: text, color, size, tooltip, etc.",
     )
     derivation: str = Field(
         default="None", description="Tableau derivation like 'Sum', 'None', 'Avg'"
@@ -129,6 +134,11 @@ class VisualizationConfig(BaseModel):
         None, description="Enhanced chart type detection metadata"
     )
 
+    # YAML rule-based detection metadata
+    yaml_detection: Optional[Dict[str, Any]] = Field(
+        None, description="YAML rule-based chart type detection metadata"
+    )
+
     # Raw Tableau configuration for unknown properties
     raw_config: Dict[str, Any] = Field(
         default_factory=dict, description="Raw Tableau configuration"
@@ -180,6 +190,9 @@ class WorksheetSchema(BaseModel):
     # Identity
     name: str = Field(..., description="Worksheet name as it appears in Tableau")
     clean_name: str = Field(..., description="LookML-safe name (snake_case, no spaces)")
+    title: str = Field(
+        default="", description="Human-readable worksheet title from Tableau"
+    )
     datasource_id: str = Field(..., description="ID of the connected datasource")
 
     # Complete field usage (no external references needed)
@@ -219,6 +232,10 @@ class WorksheetSchema(BaseModel):
     identified_measures: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="Worksheet-specific measures identified from field aggregations",
+    )
+    derived_fields: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Derived fields identified from Tableau instances (time functions, aggregations)",
     )
 
     # Processing metadata

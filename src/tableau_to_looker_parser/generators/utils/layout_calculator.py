@@ -241,3 +241,159 @@ class LayoutCalculator:
                     suggestions["overlapping_elements"].append((i, j, overlap))
 
         return suggestions
+
+    def calculate_looker_position(
+        self,
+        element: DashboardElement,
+        migration_data: Dict[str, Any],
+        height_based_rows: Dict[str, int] = None,
+        standardized_widths: Dict[str, int] = None,
+    ) -> Dict[str, int]:
+        """
+        Calculate clean Looker-native positioning from dashboard element.
+
+        Simplified version for Looker-native dashboards without ECharts complexity.
+
+        Args:
+            element: Dashboard element with position information
+            migration_data: Migration data containing dashboard context
+
+        Returns:
+            Dictionary with row, col, width, height for Looker LookML
+        """
+        # Use height-based row if provided, otherwise fall back to y-coordinate
+        if height_based_rows and element.element_id in height_based_rows:
+            calculated_row = height_based_rows[element.element_id]
+        else:
+            calculated_row = max(0, int(element.position.y * 20))
+
+        position = {
+            "row": calculated_row,
+            "col": max(0, int(element.position.x * self.grid_columns)),
+            "width": max(1, int(element.position.width * self.grid_columns)),
+            "height": max(1, int(element.position.height * 20)),
+        }
+
+        # Use standardized width if provided, otherwise apply minimum
+        if standardized_widths and element.element_id in standardized_widths:
+            position["width"] = standardized_widths[element.element_id]
+        else:
+            position["width"] = max(6, position["width"])  # Fallback minimum
+
+        position["height"] = max(
+            5, position["height"]
+        )  # Match manual dashboard minimum
+
+        return position
+
+    def calculate_height_based_rows(self, elements: list) -> Dict[str, int]:
+        """
+        Calculate proper row positioning based on element heights to avoid overlapping.
+
+        Args:
+            elements: List of dashboard elements with position information
+
+        Returns:
+            Dictionary mapping element_id to calculated row position
+        """
+        if not elements:
+            return {}
+
+        # Group elements by their y-coordinate (same visual row)
+        y_tolerance = 0.05  # Elements within 5% y-difference are considered same row
+        row_groups = []
+
+        for element in elements:
+            y_pos = element.position.y
+
+            # Find existing group with similar y-coordinate
+            found_group = False
+            for group in row_groups:
+                if abs(group[0].position.y - y_pos) <= y_tolerance:
+                    group.append(element)
+                    found_group = True
+                    break
+
+            # Create new group if no match found
+            if not found_group:
+                row_groups.append([element])
+
+        # Sort groups by y-coordinate
+        row_groups.sort(key=lambda group: group[0].position.y)
+
+        # Calculate cumulative row positions based on heights
+        element_rows = {}
+        current_row = 0
+
+        for group in row_groups:
+            # Calculate heights for all elements in this group
+            group_heights = []
+            for elem in group:
+                calculated_height = max(5, int(elem.position.height * 20))
+                group_heights.append(calculated_height)
+
+            # All elements in same group get same row value
+            max_height_in_group = max(group_heights)
+
+            for elem in group:
+                element_rows[elem.element_id] = current_row
+
+            # Next row starts after this group's max height + spacing
+            current_row += max_height_in_group + 2  # +2 for proper spacing
+
+        return element_rows
+
+    def calculate_standardized_widths(self, elements: list) -> Dict[str, int]:
+        """
+        Standardize all rows to full width (24 columns) by calculating element widths per row.
+
+        Args:
+            elements: List of dashboard elements with position information
+
+        Returns:
+            Dictionary mapping element_id to standardized width
+        """
+        if not elements:
+            return {}
+
+        # Group elements by their y-coordinate (same visual row)
+        y_tolerance = 0.05  # Elements within 5% y-difference are considered same row
+        row_groups = []
+
+        for element in elements:
+            y_pos = element.position.y
+
+            # Find existing group with similar y-coordinate
+            found_group = False
+            for group in row_groups:
+                if abs(group[0].position.y - y_pos) <= y_tolerance:
+                    group.append(element)
+                    found_group = True
+                    break
+
+            # Create new group if no match found
+            if not found_group:
+                row_groups.append([element])
+
+        element_widths = {}
+
+        for group in row_groups:
+            num_elements = len(group)
+
+            if num_elements == 1:
+                # Single element gets full width
+                element_widths[group[0].element_id] = 24
+            else:
+                # Multiple elements share width equally
+                width_per_element = 24 // num_elements
+                remaining_width = 24 % num_elements
+
+                # Sort elements by x position for consistent assignment
+                group.sort(key=lambda elem: elem.position.x)
+
+                for i, element in enumerate(group):
+                    # Distribute remaining width to first few elements
+                    extra_width = 1 if i < remaining_width else 0
+                    element_widths[element.element_id] = width_per_element + extra_width
+
+        return element_widths

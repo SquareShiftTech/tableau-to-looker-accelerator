@@ -16,11 +16,15 @@ view: {{ view_name }} {
   # Date dimension groups
   {% if has_dimensions %}
   {% for dimension in dimensions %}
-  {% if dimension.field_type == 'date' or dimension.field_type == 'datetime' or dimension.field_type == 'time' %}
+  {% if dimension.field_type == 'date' or dimension.field_type == 'datetime' or dimension.field_type == 'time' or dimension.field_type == 'dimension_group' %}
 
   dimension_group: {{ dimension.name | clean_name }} {
     type: time
+    {% if dimension.timeframes %}
+    timeframes: [{{ dimension.timeframes | join(', ') }}]
+    {% else %}
     timeframes: [raw, time, date, week, month, quarter, year]
+    {% endif %}
     sql: ${TABLE}.{{ (dimension.sql_column or dimension.name) | sql_column }} ;;
     {% if dimension.description %}
     description: "{{ dimension.description | escape_quotes }}"
@@ -31,6 +35,9 @@ view: {{ view_name }} {
     {% if dimension.label %}
     label: "{{ dimension.label | escape_quotes }}"
     {% endif %}
+    {% if dimension.derivation and dimension.derivation.startswith('time_function:') %}
+    # Derived from Tableau time function: {{ dimension.original_tableau_instance }}
+    {% endif %}
   }
   {% endif %}
   {% endfor %}
@@ -39,7 +46,7 @@ view: {{ view_name }} {
   # Dimensions
   {% if has_dimensions %}
   {% for dimension in dimensions %}
-  {% if not (dimension.field_type == 'date' or dimension.field_type == 'datetime' or dimension.field_type == 'time') %}
+  {% if not (dimension.field_type == 'date' or dimension.field_type == 'datetime' or dimension.field_type == 'time' or dimension.field_type == 'dimension_group') %}
 
   dimension: {{ dimension.name | clean_name }} {
     {% if dimension.description %}
@@ -77,6 +84,11 @@ view: {{ view_name }} {
     {% endif %}
     {% if dimension.group_label %}
     group_label: "{{ dimension.group_label | escape_quotes }}"
+    {% endif %}
+    {% if dimension.derivation and dimension.derivation.startswith('aggregation:') %}
+    # Derived from Tableau aggregation: {{ dimension.original_tableau_instance }}
+    {% elif dimension.derivation and dimension.derivation == 'direct_reference' %}
+    # Derived from Tableau direct reference: {{ dimension.original_tableau_instance }}
     {% endif %}
   }
   {% endif %}
@@ -166,6 +178,10 @@ view: {{ view_name }} {
     {# Two-step pattern: measure references hidden dimension #}
     type: {{ measure.aggregation.value if measure.aggregation.value else 'sum' }}
     sql: ${ {{- measure.dimension_reference -}} } ;;
+    {% elif measure.lookml_type %}
+    {# Derived measure with specific type #}
+    type: {{ measure.lookml_type }}
+    sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
     {% else %}
     {# Legacy pattern: measure references table column directly #}
     type: number
@@ -185,6 +201,9 @@ view: {{ view_name }} {
     {% endif %}
     {% if measure.drill_fields %}
     drill_fields: [{{ measure.drill_fields | join(', ') }}]
+    {% endif %}
+    {% if measure.derivation and measure.derivation.startswith('aggregation:') %}
+    # Derived from Tableau aggregation: {{ measure.original_tableau_instance }}
     {% endif %}
   }
   {% endfor %}

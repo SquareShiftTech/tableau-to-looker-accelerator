@@ -8,7 +8,6 @@ into a single, thorough test suite with Looker compatibility validation.
 
 import sys
 import os
-import tempfile
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -142,124 +141,6 @@ def test_dashboard_pipeline(test_file=None):
         return False
 
 
-def test_template_rendering():
-    """Test dashboard template rendering with sample data."""
-    print("=== Dashboard Template Rendering Test ===\n")
-
-    try:
-        from tableau_to_looker_parser.generators.dashboard_generator import (
-            DashboardGenerator,
-        )
-        from tableau_to_looker_parser.models.dashboard_models import (
-            DashboardSchema,
-            DashboardElement,
-            ElementType,
-        )
-        from tableau_to_looker_parser.models.position_models import Position
-        from tableau_to_looker_parser.models.worksheet_models import (
-            WorksheetSchema,
-            FieldReference,
-            VisualizationConfig,
-        )
-
-        # Create sample data
-        sample_worksheet = WorksheetSchema(
-            name="Sample_Worksheet",
-            clean_name="sample_worksheet",
-            datasource_id="test_datasource",
-            fields=[
-                FieldReference(
-                    name="category",
-                    original_name="[Category]",
-                    tableau_instance="[none:Category:nk]",
-                    datatype="string",
-                    role="dimension",
-                    shelf="columns",
-                    derivation="None",
-                    display_label="Category",
-                ),
-                FieldReference(
-                    name="sales",
-                    original_name="[Sales]",
-                    tableau_instance="[sum:Sales:qk]",
-                    datatype="number",
-                    role="measure",
-                    shelf="rows",
-                    derivation="Sum",
-                    display_label="Sales",
-                ),
-            ],
-            visualization=VisualizationConfig(
-                chart_type="bar",
-                encodings={"color": "[none:Region:nk]", "size": None, "detail": None},
-            ),
-            sorting=[],
-            filters=[],
-        )
-
-        sample_element = DashboardElement(
-            element_id="1",
-            element_type=ElementType.WORKSHEET,
-            position=Position(x=0.0, y=0.0, width=0.5, height=0.5),
-            worksheet=sample_worksheet,
-        )
-
-        sample_dashboard = DashboardSchema(
-            name="Test_Dashboard",
-            clean_name="test_dashboard",
-            title="Test Dashboard",
-            canvas_size={"width": 1000, "height": 800},
-            layout_type="newspaper",
-            elements=[sample_element],
-            global_filters=[],
-            cross_filter_enabled=True,
-        )
-
-        # Test dashboard generation
-        generator = DashboardGenerator()
-        migration_data = {
-            "dashboards": [sample_dashboard.model_dump()],
-            "metadata": {"project_name": "test_project"},
-        }
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            generated_files = generator.generate(migration_data, temp_dir)
-
-            if not generated_files:
-                print("❌ No files generated")
-                return False
-
-            print(f"✅ Generated {len(generated_files)} dashboard files")
-
-            # Read and validate content
-            with open(generated_files[0], "r") as f:
-                content = f.read()
-
-            print("📝 Generated dashboard content:")
-            print("-" * 50)
-            print(content)
-            print("-" * 50)
-
-            basic_valid = validate_dashboard_content(content)
-            looker_valid = validate_looker_compatibility(content)
-
-            if basic_valid and looker_valid:
-                print("✅ Template rendering test passed")
-                return True
-            else:
-                print(
-                    f"❌ Template rendering test failed - Basic: {basic_valid}, Looker: {looker_valid}"
-                )
-                return False
-
-    except Exception as e:
-        print(f"❌ Template rendering test failed: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
-        return False
-
-
 def validate_dashboard_content(content: str) -> bool:
     """Validate basic LookML dashboard format."""
     required_elements = [
@@ -379,10 +260,7 @@ def main():
 
     test_results = []
 
-    # Test 1: Template rendering
-    test_results.append(("Template Rendering", test_template_rendering()))
-
-    # Test 2: Full pipeline with validation
+    # Test: Full pipeline with validation
     test_results.append(("Pipeline & Validation", test_dashboard_pipeline(test_file)))
 
     # Summary
