@@ -39,9 +39,9 @@ chart_styling_config:
   looker_grid:
     properties:
       series_colors: true        # Apply color mappings to cells
-      conditional_formatting: true  # Enable conditional formatting
+      conditional_formatting: false  # Enable conditional formatting
       show_row_numbers: false    # Hide row numbers
-      show_totals: true          # Show row/column totals
+      show_totals: false          # Show row/column totals
       table_theme: "white"       # Clean white theme
     title_style:
       font_weight: "bold"        # Bold titles

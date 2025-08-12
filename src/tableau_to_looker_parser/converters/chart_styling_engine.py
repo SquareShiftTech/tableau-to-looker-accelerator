@@ -202,11 +202,11 @@ class ChartStylingEngine:
         if label_styles:
             # Header text colors
             if "column_text_color" in label_styles:
-                table_config["header_text_color"] = label_styles["column_text_color"]
+                table_config["header_font_color"] = label_styles["column_text_color"]
             if "row_text_color" in label_styles:
-                table_config["row_header_text_color"] = label_styles["row_text_color"]
+                table_config["row_header_font_color"] = label_styles["row_text_color"]
             if "text_align" in label_styles:
-                table_config["header_text_align"] = label_styles["text_align"]
+                table_config["header_font_align"] = label_styles["text_align"]
 
         # Map cell styling (ash cell colors)
         cell_styles = table_style_data.get("cells", {})
@@ -228,9 +228,10 @@ class ChartStylingEngine:
         data_value_styles = table_style_data.get("data_values", {})
         if data_value_styles:
             if "value_color_palette" in data_value_styles:
-                table_config["value_color_palette"] = data_value_styles[
-                    "value_color_palette"
-                ]
+                # table_config["value_color_palette"] = data_value_styles[
+                #    "value_color_palette"
+                # ]
+                pass  # TODO: implement this
 
         if table_config:
             logger.debug(f"Applied table styling: {list(table_config.keys())}")
