@@ -246,6 +246,12 @@ class WorksheetSchema(BaseModel):
         default_factory=list, description="Any parsing errors encountered"
     )
 
+    # Styling information extracted from Tableau
+    styling: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Extracted styling information from Tableau (colors, fonts, tooltips)",
+    )
+
     # Extensibility for future features
     custom_properties: Dict[str, Any] = Field(
         default_factory=dict, description="Custom properties for extensibility"

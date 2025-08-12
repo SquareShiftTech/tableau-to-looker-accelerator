@@ -9,6 +9,7 @@ from typing import Dict, List, Any
 import logging
 from ..models.worksheet_models import WorksheetSchema, FieldReference
 from .filter_processor import FilterProcessor
+from ..converters.chart_styling_engine import ChartStylingEngine
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,9 @@ class LookerElementGenerator:
         """Initialize element generator with model and explore context."""
         self.model_name = model_name or "default_model"
         self.explore_name = explore_name or "default_explore"
+
+        # Initialize styling engine
+        self.styling_engine = ChartStylingEngine()
 
         # Unified source mapping configuration
         self.source_mapping = {
@@ -68,6 +72,9 @@ class LookerElementGenerator:
             "column_limit": 50,
         }
 
+        if worksheet.name == "CD st":
+            print(f"Worksheet {worksheet.name} has styling: {worksheet.styling}")
+
         # Add optional components based on YAML metadata
         pivots = self._generate_pivots(worksheet, yaml_detection)
         if pivots:
@@ -80,6 +87,14 @@ class LookerElementGenerator:
         filters = self._generate_filters(worksheet)
         if filters:
             element["filters"] = filters
+
+        # Apply styling configuration using extracted Tableau styling data
+        if hasattr(worksheet, "styling") and worksheet.styling:
+            styled_element = self.styling_engine.apply_styling(
+                element, worksheet.styling, looker_chart_type
+            )
+            element = styled_element
+            logger.debug(f"Applied styling configuration to {worksheet.name}")
 
         # Add position information
         element.update(position)

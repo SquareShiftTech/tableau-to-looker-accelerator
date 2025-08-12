@@ -18,6 +18,7 @@ from typing import Dict, Iterator, List, Optional, Union, Any
 from lxml import etree as ET
 from lxml.etree import Element
 import logging
+from .tableau_style_extractor import TableauStyleExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class TableauXMLParserV2:
         """
         self.chunk_size = chunk_size
         self.logger = logging.getLogger(__name__)
+        self.style_extractor = TableauStyleExtractor()
 
     def parse_file(self, file_path: Union[str, Path]) -> Dict:
         """Parse a Tableau workbook file into structured data.
@@ -998,6 +1000,25 @@ class TableauXMLParserV2:
                     "sorts": self._extract_worksheet_sorts(worksheet),
                     "actions": self._extract_worksheet_actions(worksheet),
                 }
+
+                # NEW: Extract styling data using separate module (non-breaking)
+                try:
+                    styling_data = self.style_extractor.extract_worksheet_styling(
+                        worksheet, worksheet_name
+                    )
+                    if styling_data and any(
+                        styling_data.values()
+                    ):  # Only add if we found styling
+                        worksheet_data["styling"] = styling_data
+                        self.logger.debug(
+                            f"Extracted styling for worksheet: {worksheet_name}"
+                        )
+                except Exception as style_error:
+                    # Don't break worksheet processing if styling extraction fails
+                    self.logger.warning(
+                        f"Failed to extract styling for worksheet '{worksheet_name}': {style_error}"
+                    )
+
                 worksheets.append(worksheet_data)
 
             except Exception as e:

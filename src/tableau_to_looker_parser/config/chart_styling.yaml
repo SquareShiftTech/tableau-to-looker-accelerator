@@ -1,0 +1,106 @@
+chart_styling_config:
+
+  # Donut/Pie Chart Styling
+  looker_donut_multiples:
+    properties:
+      series_colors: true        # Apply color mappings (New=#4e79a7, Upgrade=#f28e2b)
+      show_value_labels: true    # Show data labels on slices
+      value_labels: "bold"       # Make value labels bold
+      show_legend: true          # Display legend
+      legend_position: "right"   # Position legend on right
+    title_style:
+      font_weight: "bold"        # Bold titles
+      font_size: 12              # Title font size
+      text_align: "center"       # Center align titles
+    supported_styling:
+      - color_mappings           # Categorical color mappings
+      - title_style              # Title formatting
+      - custom_tooltip           # Custom tooltip formatting
+
+  # Bar Chart Styling
+  looker_bar:
+    properties:
+      series_colors: true        # Apply color mappings
+      show_value_labels: false   # Hide value labels for cleaner look
+      x_axis_label: true         # Show X-axis labels
+      y_axis_label: true         # Show Y-axis labels
+      show_legend: true          # Display legend
+      legend_position: "top"     # Position legend on top
+    title_style:
+      font_weight: "bold"        # Bold titles
+      font_size: 11              # Title font size
+      text_align: "left"         # Left align titles
+    supported_styling:
+      - color_mappings           # Categorical color mappings
+      - title_style              # Title formatting
+      - custom_tooltip           # Custom tooltip formatting
+
+  # Grid/Table Styling
+  looker_grid:
+    properties:
+      series_colors: true        # Apply color mappings to cells
+      conditional_formatting: true  # Enable conditional formatting
+      show_row_numbers: false    # Hide row numbers
+      show_totals: true          # Show row/column totals
+      table_theme: "white"       # Clean white theme
+    title_style:
+      font_weight: "bold"        # Bold titles
+      font_size: 10              # Smaller title for tables
+      text_align: "left"         # Left align titles
+    supported_styling:
+      - color_mappings           # Categorical color mappings
+      - title_style              # Title formatting
+      - chart_detection          # Chart type detection metadata
+      - table_style              # Table-specific styling (headers, cells)
+
+  # Line Chart Styling
+  looker_line:
+    properties:
+      series_colors: true        # Apply color mappings
+      show_value_labels: false   # Hide value labels for cleaner lines
+      x_axis_label: true         # Show X-axis labels
+      y_axis_label: true         # Show Y-axis labels
+      show_legend: true          # Display legend
+      legend_position: "bottom"  # Position legend at bottom
+      line_width: 2              # Line thickness
+    title_style:
+      font_weight: "bold"        # Bold titles
+      font_size: 11              # Title font size
+      text_align: "center"       # Center align titles
+    supported_styling:
+      - color_mappings           # Categorical color mappings
+      - title_style              # Title formatting
+      - custom_tooltip           # Custom tooltip formatting
+
+  # Default/Fallback Table Styling
+  table:
+    properties:
+      series_colors: false       # No color mappings for basic tables
+      show_row_numbers: true     # Show row numbers
+      show_totals: false         # No totals for basic tables
+      table_theme: "white"       # Clean white theme
+    title_style:
+      font_weight: "normal"      # Normal weight titles
+      font_size: 10              # Standard font size
+      text_align: "left"         # Left align titles
+    supported_styling:
+      - title_style              # Title formatting only
+
+# Global styling defaults
+global_styling:
+  default_colors:
+    primary: "#4e79a7"           # Default blue (matches Tableau New)
+    secondary: "#f28e2b"         # Default orange (matches Tableau Upgrade)
+    accent: "#e15759"            # Default red
+    success: "#59a14f"           # Default green
+    warning: "#edc948"           # Default yellow
+    info: "#af7aa1"              # Default purple
+
+  fonts:
+    title_font: "Arial, sans-serif"
+    label_font: "Arial, sans-serif"
+    default_size: 10
+
+  spacing:
+    padding: 10
+    margin: 5

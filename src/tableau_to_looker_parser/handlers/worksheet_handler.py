@@ -141,6 +141,15 @@ class WorksheetHandler(BaseHandler):
             "custom_properties": {},
         }
 
+        # NEW: Add styling data if extracted from XML parser with field-specific color mapping
+        if "styling" in data:
+            # Extract field-specific color mappings based on field encodings
+            styling_data = self._extract_field_specific_styling(data["styling"], fields)
+            worksheet_data["styling"] = styling_data
+            logger.debug(
+                f"Added field-specific styling data to worksheet {name}: {list(styling_data.keys())}"
+            )
+
         # Validate with Pydantic schema
         try:
             worksheet = WorksheetSchema(**worksheet_data)
@@ -861,3 +870,130 @@ class WorksheetHandler(BaseHandler):
         clean = re.sub(r"[^a-zA-Z0-9_]", "_", name.lower())
         clean = re.sub(r"_+", "_", clean)  # Remove multiple underscores
         return clean.strip("_")
+
+    def _extract_field_specific_styling(
+        self, styling_data: Dict[str, Any], fields: List[Dict]
+    ) -> Dict[str, Any]:
+        """
+        Extract field-specific color mappings based on which fields have color encodings.
+
+        Args:
+            styling_data: Raw styling data from XML parser
+            fields: List of worksheet fields with encoding information
+
+        Returns:
+            Dict containing styling data with field-specific color mappings
+        """
+        try:
+            # Start with existing styling data
+            result_styling = dict(styling_data)
+
+            # Find fields that have "color" in their encodings
+            color_fields = [
+                field for field in fields if "color" in field.get("encodings", [])
+            ]
+
+            if not color_fields:
+                logger.debug(
+                    "No fields with color encodings found - returning original styling"
+                )
+                return result_styling
+
+            # Check if we have field-specific color mappings available in datasource styles
+            field_color_mappings = styling_data.get("field_color_mappings", {})
+
+            if not field_color_mappings:
+                logger.debug("No field color mappings found in styling data")
+                return result_styling
+
+            # For each color field, try to find its specific categorical color mapping
+            for field in color_fields:
+                field_name = field.get("name", "")
+                original_name = field.get("original_name", "")
+                tableau_instance = field.get("tableau_instance", "")
+
+                # Try to match field with available color mappings
+                matching_mapping = self._find_matching_color_mapping(
+                    field_name, original_name, tableau_instance, field_color_mappings
+                )
+
+                if matching_mapping:
+                    # Replace the generic color_mappings with field-specific ones
+                    result_styling["color_mappings"] = matching_mapping
+                    logger.debug(
+                        f"Applied field-specific color mapping for field {field_name}: {list(matching_mapping.get('mappings', {}).keys())}"
+                    )
+                    break  # Use the first matching field's colors
+
+            return result_styling
+
+        except Exception as e:
+            logger.warning(f"Failed to extract field-specific styling: {str(e)}")
+            return styling_data
+
+    def _find_matching_color_mapping(
+        self,
+        field_name: str,
+        original_name: str,
+        tableau_instance: str,
+        field_color_mappings: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find the best matching color mapping for a given field.
+
+        Args:
+            field_name: Clean field name (e.g., 'calculation_5910989867950081')
+            original_name: Original field name (e.g., '[Calculation_5910989867950081]')
+            tableau_instance: Tableau instance reference (e.g., '[none:Calculation_5910989867950081:nk]')
+            field_color_mappings: Available field color mappings from datasource
+
+        Returns:
+            Matching color mapping dict or None if no match found
+        """
+        # Priority order for matching:
+        # 1. Exact field name match
+        # 2. Match in original name
+        # 3. Match in tableau instance
+        # 4. Partial substring match for calculated fields
+
+        # Direct field name match
+        if field_name in field_color_mappings:
+            return field_color_mappings[field_name]
+
+        # Check original name patterns
+        for mapping_key, mapping_data in field_color_mappings.items():
+            # Match calculation fields by ID
+            if (
+                "calculation_" in field_name.lower()
+                and "calculation_" in mapping_key.lower()
+            ):
+                # Extract the numeric ID part
+                field_id = (
+                    field_name.split("calculation_")[-1]
+                    if "calculation_" in field_name
+                    else ""
+                )
+                mapping_id = (
+                    mapping_key.split("calculation_")[-1]
+                    if "calculation_" in mapping_key
+                    else ""
+                )
+                if field_id and mapping_id and field_id == mapping_id:
+                    return mapping_data
+
+            # Match other field patterns (is_preorder, mkt, channel, etc.)
+            if (
+                mapping_key.lower() in field_name.lower()
+                or field_name.lower() in mapping_key.lower()
+            ):
+                return mapping_data
+
+            # Check if field name appears in tableau instance or original name
+            if original_name and mapping_key in original_name:
+                return mapping_data
+
+            if tableau_instance and mapping_key in tableau_instance:
+                return mapping_data
+
+        logger.debug(f"No matching color mapping found for field {field_name}")
+        return None

@@ -20,6 +20,24 @@
 {% endfor %}{% endif %}
 {% if element.sorts and element.sorts|length > 0 %}    sorts: [{% for sort in element.sorts %}{% if not loop.first %},
       {% endif %}{{ sort }}{% endfor %}]
+{% endif %}{% if element.series_colors and element.series_colors is mapping and element.series_colors|length > 0 %}    series_colors:
+{% for color_key, color_value in element.series_colors.items() %}      "{{ color_key }}": "{{ color_value }}"
+{% endfor %}{% endif %}{% if element.show_value_labels is defined %}    show_value_labels: {{ element.show_value_labels|lower }}
+{% endif %}{% if element.value_labels %}    value_labels: "{{ element.value_labels }}"
+{% endif %}{% if element.show_legend is defined %}    show_legend: {{ element.show_legend|lower }}
+{% endif %}{% if element.legend_position %}    legend_position: "{{ element.legend_position }}"
+{% endif %}{% if element.x_axis_label is defined %}    x_axis_label: {{ element.x_axis_label|lower }}
+{% endif %}{% if element.y_axis_label is defined %}    y_axis_label: {{ element.y_axis_label|lower }}
+{% endif %}{% if element.conditional_formatting is defined %}    conditional_formatting: {{ element.conditional_formatting|lower }}
+{% endif %}{% if element.show_row_numbers is defined %}    show_row_numbers: {{ element.show_row_numbers|lower }}
+{% endif %}{% if element.show_totals is defined %}    show_totals: {{ element.show_totals|lower }}
+{% endif %}{% if element.table_theme %}    table_theme: "{{ element.table_theme }}"
+{% endif %}{% if element.line_width %}    line_width: {{ element.line_width }}
+{% endif %}{% if element.header_background_color %}    header_background_color: "{{ element.header_background_color }}"
+{% endif %}{% if element.header_text_color %}    header_text_color: "{{ element.header_text_color }}"
+{% endif %}{% if element.cell_background_color %}    cell_background_color: "{{ element.cell_background_color }}"
+{% endif %}{% if element.table_background_color %}    table_background_color: "{{ element.table_background_color }}"
+{% endif %}{% if element.value_color_palette %}    value_color_palette: "{{ element.value_color_palette }}"
 {% endif %}    limit: {{ element.limit }}
 {% if element.column_limit %}    column_limit: {{ element.column_limit }}
 {% endif %}    row: {{ element.row }}

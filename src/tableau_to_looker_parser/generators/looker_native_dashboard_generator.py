@@ -135,6 +135,23 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             dashboard.elements, migration_data
         )
 
+        # Debug: Check if any elements have series_colors
+        for element in elements:
+            if (
+                element.get("name") == "cd_st"
+            ):  # The CD st worksheet that should have colors
+                logger.info(
+                    f"Element {element.get('name')} keys: {list(element.keys())}"
+                )
+                if "series_colors" in element:
+                    logger.info(
+                        f"Element {element.get('name')} has series_colors: {element['series_colors']}"
+                    )
+                else:
+                    logger.warning(
+                        f"Element {element.get('name')} missing series_colors"
+                    )
+
         # Skip global filters - we handle filters at element level now
         filters = []
 
