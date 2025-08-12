@@ -30,7 +30,7 @@ basic_chart_detection:
     conditions:
       - mark_type: ["Bar", "Automatic"]
       - has_color_encoding: true
-    confidence: 100
+    confidence: 95
     variants:
       - horizontal_bar:
           conditions:
@@ -53,6 +53,19 @@ basic_chart_detection:
             - has_mark_stacking: false
     pivot_required: false
     looker_equivalent: "looker_bar"
+
+
+  stacked_chart:
+    conditions:
+      - mark_type: ["Automatic"]
+      - has_color_encoding: true
+      - columns_shelf_count: ">0"
+    confidence: 100
+    stacked_type: true
+    pivot_required: true
+    looker_equivalent: "looker_bar"
+    fields_sources: ["color_marks", "columns_shelf"]
+    pivot_field_source: ["color_marks"]
 
   # Column Chart (Vertical Bars)
   column_chart:
