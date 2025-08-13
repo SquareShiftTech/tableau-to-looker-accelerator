@@ -9,6 +9,7 @@ import logging
 from typing import Dict
 from ..models.ast_schema import ASTNode, NodeType, DataType
 from typing import Optional
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -226,10 +227,33 @@ class ASTToLookMLConverter:
             return "/* Missing field name */"
 
         # Clean field name - replace spaces with underscores, make lowercase
-        clean_field_name = node.field_name.lower().replace(" ", "_")
+        clean_field_name = node.field_name
+        clean_field_name = re.sub(
+            r"\[([^\]]+)\]", r"\1", clean_field_name
+        )  # Remove brackets
+        clean_field_name = re.sub(
+            r"[^\w\s]", "_", clean_field_name
+        )  # Replace special chars with underscore
+        clean_field_name = re.sub(
+            r"\s+", "_", clean_field_name
+        )  # Replace spaces with underscore
+        clean_field_name = re.sub(
+            r"_+", "_", clean_field_name
+        )  # Replace multiple underscores with single
+        clean_field_name = clean_field_name.strip("_").lower()
 
         # Build LookML field reference
-        lookml_ref = f"${{{table_context}}}.{clean_field_name}"
+        numbers_after_underscore = re.findall(r"_(\d+)", clean_field_name)
+
+        # Flatten all digits into one string
+        total_digits = "".join(numbers_after_underscore)
+
+        if len(total_digits) >= 10:
+            # Treat it as a global field reference
+            lookml_ref = f"${{{clean_field_name}}}"
+        else:
+            # Default case with table prefix
+            lookml_ref = f"${{{table_context}}}.{clean_field_name}"
 
         logger.debug(f"Converted field reference: {node.field_name} → {lookml_ref}")
         return lookml_ref
@@ -609,17 +633,28 @@ class ASTToLookMLConverter:
 
         case_parts = ["CASE"]
 
-        # Handle simple CASE vs searched CASE
-        if node.case_expression:
-            # Simple CASE: CASE [field] WHEN value1 THEN result1 ...
-            case_expr = self._convert_node(node.case_expression, table_context)
-            case_parts.append(case_expr)
-        # If no case_expression, it's searched CASE: CASE WHEN condition1 THEN result1 ...
+        base_case_expr = (
+            self._convert_node(node.case_expression, table_context)
+            if node.case_expression
+            else None
+        )
 
-        # Convert all WHEN clauses
         for when_clause in node.when_clauses:
-            condition_expr = self._convert_node(when_clause.condition, table_context)
+            raw_condition_expr = self._convert_node(
+                when_clause.condition, table_context
+            )
             result_expr = self._convert_node(when_clause.result, table_context)
+            if base_case_expr is not None:
+                if when_clause.condition.node_type in (
+                    NodeType.COMPARISON,
+                    NodeType.LOGICAL,
+                    NodeType.CONDITIONAL,
+                ):
+                    condition_expr = raw_condition_expr
+                else:
+                    condition_expr = f"({base_case_expr} = {raw_condition_expr})"
+            else:
+                condition_expr = raw_condition_expr
 
             case_parts.append(f"WHEN {condition_expr} THEN {result_expr}")
 

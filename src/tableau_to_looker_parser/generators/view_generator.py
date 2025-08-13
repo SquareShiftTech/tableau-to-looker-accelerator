@@ -252,7 +252,7 @@ class ViewGenerator(BaseGenerator):
             ast_node = ASTNode(**ast_data)
             if ast_node.node_type == NodeType.DERIVED_TABLE:
                 lookml_sql = (
-                    f"{{TABLE}}.{ast_node.properties.get('derived_field_alias')}"
+                    f"${{TABLE}}.{ast_node.properties.get('derived_field_alias')}"
                 )
             else:
                 # Convert AST to LookML SQL expression
