@@ -38,13 +38,13 @@ view: {{ view_name }} {
     {% if dimension.derivation and dimension.derivation.startswith('time_function:') %}
     # Derived from Tableau time function: {{ dimension.original_tableau_instance }}
     {% endif %}
+  }
 
-    dimension: {{ dimension.name | clean_name }}_hour_formatted {
+  dimension: {{ dimension.name | clean_name }}_hour_formatted {
     type: string
     sql: FORMAT_TIMESTAMP('%l %p',
       TIMESTAMP_TRUNC(CAST(${{ dimension.name | clean_name }}_raw AS TIMESTAMP), HOUR)) ;;
     label: "Hour"
-  }
   }
 
 
