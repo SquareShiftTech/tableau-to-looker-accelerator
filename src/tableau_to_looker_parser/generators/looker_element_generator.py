@@ -237,7 +237,7 @@ class LookerElementGenerator:
             if aggregation and "day" in aggregation.lower():
                 return f"{field_name}_date"
             elif aggregation and "hour" in aggregation.lower():
-                return f"{field_name}_time"
+                return f"{field_name}_hour_formatted"
             else:
                 return f"{field_name}_date"  # Default to date
         elif role == "measure":
