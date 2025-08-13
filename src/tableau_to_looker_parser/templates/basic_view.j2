@@ -43,7 +43,7 @@ view: {{ view_name }} {
   dimension: {{ dimension.name | clean_name }}_hour_formatted {
     type: string
     sql: FORMAT_TIMESTAMP('%l %p',
-      TIMESTAMP_TRUNC(CAST(${{ dimension.name | clean_name }}_raw AS TIMESTAMP), HOUR)) ;;
+      TIMESTAMP_TRUNC(CAST(${{ '{' + (dimension.name | clean_name) + '_raw}' }} AS TIMESTAMP), HOUR)) ;;
     label: "Hour"
   }
 
