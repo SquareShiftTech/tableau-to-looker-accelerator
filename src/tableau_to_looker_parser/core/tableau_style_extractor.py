@@ -192,47 +192,85 @@ class TableauStyleExtractor:
         return color_data
 
     def _extract_datasource_color_mappings(self, worksheet: Element) -> Dict[str, Any]:
-        """Extract all categorical color mappings from datasource styles."""
-        root = worksheet.getroottree().getroot()
+        """
+        Extract field-specific categorical color mappings from datasource style rules,
+        organized by datasource to handle multiple datasources correctly.
 
-        # Store all field-specific color mappings
-        field_color_mappings = {}
+        Args:
+            worksheet: Worksheet XML element
 
-        # Look for categorical color mappings in datasource style rules
-        for datasource in root.findall(".//datasource"):
-            for style_rule in datasource.findall(".//style-rule[@element='mark']"):
-                for encoding in style_rule.findall("encoding[@attr='color']"):
-                    field = encoding.get("field", "") or encoding.get("column", "")
-                    encoding_type = encoding.get("type", "")
+        Returns:
+            Dict containing datasource-specific field color mappings in format:
+            {"field_color_mappings": {"datasource_name": {"field_name": {"type": "categorical", "mappings": {...}}}}}
+        """
+        try:
+            # Get the root document to access datasource styles
+            root = worksheet.getroottree().getroot()
 
-                    if not field or encoding_type != "palette":
-                        continue
+            # Group color mappings by datasource
+            datasource_color_mappings = {}
 
-                    # Extract discrete color mappings
-                    mappings = {}
-                    for map_elem in encoding.findall("map"):
-                        color = map_elem.get("to")
-                        bucket = map_elem.find("bucket")
+            # Look for color mappings in datasource style rules
+            for datasource in root.findall(".//datasource"):
+                datasource_name = datasource.get("name", "unknown")
+                datasource_caption = datasource.get("caption", datasource_name)
 
-                        if bucket is not None and bucket.text and color:
-                            value = bucket.text.strip('"')
-                            mappings[value] = color
+                # Initialize datasource entry if not exists
+                if datasource_name not in datasource_color_mappings:
+                    datasource_color_mappings[datasource_name] = {
+                        "name": datasource_name,
+                        "caption": datasource_caption,
+                        "fields": {},
+                    }
 
-                    if mappings:
+                # Extract color mappings for this specific datasource
+                for style_rule in datasource.findall(".//style-rule[@element='mark']"):
+                    for encoding in style_rule.findall("encoding[@attr='color']"):
+                        field = encoding.get("field", "")
+                        encoding_type = encoding.get("type", "")
+
+                        if not field or encoding_type != "palette":
+                            continue
+
+                        # Extract field name from the full reference
                         field_name = self._extract_field_name(field)
-                        field_color_mappings[field_name] = {
-                            "type": "categorical",
-                            "field": field_name,
-                            "mappings": mappings,
-                            "full_field_reference": field,
-                        }
 
-        # Return all field mappings for this worksheet to use
-        return (
-            {"field_color_mappings": field_color_mappings}
-            if field_color_mappings
-            else {}
-        )
+                        # Look for discrete color mappings
+                        mappings = {}
+                        for map_elem in encoding.findall("map"):
+                            color = map_elem.get("to")
+                            bucket = map_elem.find("bucket")
+
+                            if bucket is not None and bucket.text and color:
+                                value = bucket.text.strip('"')
+                                mappings[value] = color
+
+                        if mappings:
+                            datasource_color_mappings[datasource_name]["fields"][
+                                field_name
+                            ] = {
+                                "type": "categorical",
+                                "field": field_name,
+                                "mappings": mappings,
+                                "full_field_reference": field,
+                                "datasource": datasource_name,
+                            }
+                            self.logger.debug(
+                                f"Found color mappings for field {field_name} in datasource {datasource_name}: {list(mappings.keys())}"
+                            )
+
+            # Return datasource-organized field mappings
+            return (
+                {"field_color_mappings": datasource_color_mappings}
+                if datasource_color_mappings
+                else {}
+            )
+
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to extract datasource color mappings: {str(e)}"
+            )
+            return {}
 
     def _extract_datasource_color_mappings_original(
         self, worksheet: Element
@@ -619,70 +657,6 @@ class TableauStyleExtractor:
                     }
 
         return palettes
-
-    def _extract_datasource_color_mappings(self, worksheet: Element) -> Dict[str, Any]:
-        """
-        Extract field-specific categorical color mappings from datasource style rules.
-
-        Args:
-            worksheet: Worksheet XML element
-
-        Returns:
-            Dict containing field color mappings in format:
-            {"field_color_mappings": {"field_name": {"type": "categorical", "mappings": {...}}}}
-        """
-        try:
-            # Get the root document to access datasource styles
-            root = worksheet.getroottree().getroot()
-
-            field_color_mappings = {}
-
-            # Look for color mappings in datasource style rules
-            for datasource in root.findall(".//datasource"):
-                for style_rule in datasource.findall(".//style-rule[@element='mark']"):
-                    for encoding in style_rule.findall("encoding[@attr='color']"):
-                        field = encoding.get("field", "")
-                        encoding_type = encoding.get("type", "")
-
-                        if not field or encoding_type != "palette":
-                            continue
-
-                        # Extract field name from the full reference
-                        field_name = self._extract_field_name(field)
-
-                        # Look for discrete color mappings
-                        mappings = {}
-                        for map_elem in encoding.findall("map"):
-                            color = map_elem.get("to")
-                            bucket = map_elem.find("bucket")
-
-                            if bucket is not None and bucket.text and color:
-                                value = bucket.text.strip('"')
-                                mappings[value] = color
-
-                        if mappings:
-                            field_color_mappings[field_name] = {
-                                "type": "categorical",
-                                "field": field_name,
-                                "mappings": mappings,
-                                "full_field_reference": field,
-                            }
-                            self.logger.debug(
-                                f"Found color mappings for field {field_name}: {list(mappings.keys())}"
-                            )
-
-            # Return all field mappings
-            return (
-                {"field_color_mappings": field_color_mappings}
-                if field_color_mappings
-                else {}
-            )
-
-        except Exception as e:
-            self.logger.warning(
-                f"Failed to extract datasource color mappings: {str(e)}"
-            )
-            return {}
 
     def _extract_field_name(self, field_reference: str) -> str:
         """
