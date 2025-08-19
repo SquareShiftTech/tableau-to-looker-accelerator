@@ -91,6 +91,9 @@ class WorksheetHandler(BaseHandler):
         clean_name = data.get("clean_name", self._clean_name(name))
         datasource_id = data["datasource_id"]
 
+        if name == "bychannel2_chnl":
+            print(f"Worksheet {name} has data: {data}")
+
         # Process fields
         fields = self._process_fields(data.get("fields", []))
 

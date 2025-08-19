@@ -985,6 +985,10 @@ class TableauXMLParserV2:
 
         for worksheet in root.findall(".//worksheet"):
             worksheet_name = worksheet.get("name")
+
+            if worksheet_name == "bychannel2_chnl":
+                print(f"Worksheet {worksheet_name} has data: {worksheet}")
+
             if not worksheet_name:
                 continue
 
@@ -1190,15 +1194,18 @@ class TableauXMLParserV2:
         """Extract field usage from worksheet datasource-dependencies."""
         fields = []
 
-        dependencies = worksheet.find(".//datasource-dependencies")
-        if dependencies is None:
+        # Find all datasource-dependencies elements
+        all_dependencies = worksheet.findall(".//datasource-dependencies")
+        if not all_dependencies:
             return fields
 
-        # Extract column instances (actual field usage)
-        for column_instance in dependencies.findall("column-instance"):
-            field_data = self._parse_column_instance(column_instance, worksheet)
-            if field_data:
-                fields.append(field_data)
+        # Process each datasource-dependencies element
+        for dependencies in all_dependencies:
+            # Extract column instances (actual field usage)
+            for column_instance in dependencies.findall("column-instance"):
+                field_data = self._parse_column_instance(column_instance, worksheet)
+                if field_data:
+                    fields.append(field_data)
 
         return fields
 
@@ -1367,6 +1374,16 @@ class TableauXMLParserV2:
         # Extract encodings - RAW DATA ONLY
         encodings_info = self._extract_pane_encodings(pane)
 
+        # NEW: Extract pane-level styling
+        pane_styling = self._extract_pane_styling(pane)
+
+        if pane_styling:
+            self.logger.debug(f"Extracted pane styling: {list(pane_styling.keys())}")
+            for element_type, rules in pane_styling.items():
+                self.logger.debug(f"  {element_type}: {len(rules)} styling rules")
+        else:
+            self.logger.debug("No pane styling found")
+
         # Extract field mappings
         viz_config = {
             "chart_type": chart_type,  # Raw chart type from XML
@@ -1383,6 +1400,7 @@ class TableauXMLParserV2:
                 "chart_type": chart_type,
                 "mark_class": chart_type,
                 "encodings": encodings_info,  # Raw encoding data for handler
+                "pane_styling": pane_styling,  # NEW: Pane-specific styling
             },
         }
 
@@ -2200,3 +2218,65 @@ class TableauXMLParserV2:
         except Exception as e:
             self.logger.warning(f"Failed to parse groupfilter logic: {e}")
             return None
+
+    def _extract_pane_styling(self, pane: Element) -> Dict[str, Any]:
+        """
+        Extract pane-level styling information from <style> elements inside the pane.
+
+        Args:
+            pane: Pane XML element
+
+        Returns:
+            Dict containing pane-specific styling rules
+        """
+        try:
+            pane_styling = {}
+
+            # Find all <style> elements within this pane
+            style_elements = pane.findall(".//style")
+
+            if style_elements:
+                self.logger.debug(f"Found {len(style_elements)} style elements in pane")
+
+            for style in style_elements:
+                # Find style-rule elements within this style
+                style_rules = style.findall(".//style-rule")
+
+                for rule in style_rules:
+                    element_type = rule.get("element", "unknown")
+
+                    # Extract format attributes
+                    formats = rule.findall(".//format")
+                    rule_formats = {}
+
+                    for fmt in formats:
+                        attr = fmt.get("attr", "")
+                        value = fmt.get("value", "")
+                        if attr and value:
+                            rule_formats[attr] = value
+
+                    # Store the styling rule
+                    if element_type not in pane_styling:
+                        pane_styling[element_type] = []
+
+                    pane_styling[element_type].append(
+                        {
+                            "formats": rule_formats
+                            # Removed raw_rule to avoid JSON serialization issues
+                        }
+                    )
+
+                    self.logger.debug(
+                        f"Extracted {element_type} styling rule with {len(rule_formats)} formats: {list(rule_formats.keys())}"
+                    )
+
+            if pane_styling:
+                self.logger.debug(
+                    f"Extracted pane styling for elements: {list(pane_styling.keys())}"
+                )
+
+            return pane_styling
+
+        except Exception as e:
+            self.logger.warning(f"Failed to extract pane styling: {str(e)}")
+            return {}
