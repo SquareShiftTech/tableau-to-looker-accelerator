@@ -144,7 +144,10 @@ class WorksheetHandler(BaseHandler):
         # NEW: Add styling data if extracted from XML parser with field-specific color mapping
         if "styling" in data:
             # Extract field-specific color mappings based on field encodings
-            styling_data = self._extract_field_specific_styling(data["styling"], fields)
+            # Pass the datasource_id so we can match the correct datasource color mappings
+            styling_data = self._extract_field_specific_styling(
+                data["styling"], fields, datasource_id
+            )
             worksheet_data["styling"] = styling_data
             logger.debug(
                 f"Added field-specific styling data to worksheet {name}: {list(styling_data.keys())}"
@@ -878,23 +881,29 @@ class WorksheetHandler(BaseHandler):
         return clean.strip("_")
 
     def _extract_field_specific_styling(
-        self, styling_data: Dict[str, Any], fields: List[Dict]
+        self, styling_data: Dict[str, Any], fields: List[Dict], datasource_id: str
     ) -> Dict[str, Any]:
         """
-        Extract field-specific color mappings based on which fields have color encodings.
+        Extract field-specific styling information, including datasource-specific color mappings.
 
         Args:
-            styling_data: Raw styling data from XML parser
-            fields: List of worksheet fields with encoding information
+            styling_data: Raw styling data from TableauStyleExtractor
+            fields: List of worksheet fields with datasource information
+            datasource_id: The worksheet's datasource ID
 
         Returns:
-            Dict containing styling data with field-specific color mappings
+            Enhanced styling data with field-specific color mappings
         """
         try:
-            # Start with existing styling data
-            result_styling = dict(styling_data)
+            result_styling = styling_data.copy()
 
-            # Find fields that have "color" in their encodings
+            # Get datasource-specific color mappings
+            datasource_color_mappings = styling_data.get("field_color_mappings", {})
+            if not datasource_color_mappings:
+                logger.debug("No datasource color mappings found in styling data")
+                return result_styling
+
+            # Find fields with color encodings
             color_fields = [
                 field for field in fields if "color" in field.get("encodings", [])
             ]
@@ -905,11 +914,32 @@ class WorksheetHandler(BaseHandler):
                 )
                 return result_styling
 
-            # Check if we have field-specific color mappings available in datasource styles
-            field_color_mappings = styling_data.get("field_color_mappings", {})
+            # Get the datasource ID from the worksheet data (not from individual fields)
+            # We need to get this from the worksheet context, not from individual fields
+            # For now, let's try to find any datasource that has color mappings
+            if not datasource_color_mappings:
+                logger.debug("No datasource color mappings found")
+                return result_styling
 
-            if not field_color_mappings:
-                logger.debug("No field color mappings found in styling data")
+            # Find the matching datasource color mappings using the worksheet's datasource_id
+            matching_datasource_mappings = None
+            for datasource_name, datasource_data in datasource_color_mappings.items():
+                # Check if this datasource matches the worksheet's datasource
+                if (
+                    datasource_name == datasource_id
+                    or datasource_name in datasource_id
+                    or datasource_id in datasource_name
+                ):
+                    matching_datasource_mappings = datasource_data
+                    logger.debug(
+                        f"Found matching datasource color mappings for {datasource_name}"
+                    )
+                    break
+
+            if not matching_datasource_mappings:
+                logger.debug(
+                    f"No matching datasource color mappings found for {datasource_id}"
+                )
                 return result_styling
 
             # For each color field, try to find its specific categorical color mapping
@@ -918,16 +948,19 @@ class WorksheetHandler(BaseHandler):
                 original_name = field.get("original_name", "")
                 tableau_instance = field.get("tableau_instance", "")
 
-                # Try to match field with available color mappings
+                # Try to match field with available color mappings from the matching datasource
                 matching_mapping = self._find_matching_color_mapping(
-                    field_name, original_name, tableau_instance, field_color_mappings
+                    field_name,
+                    original_name,
+                    tableau_instance,
+                    matching_datasource_mappings["fields"],
                 )
 
                 if matching_mapping:
                     # Replace the generic color_mappings with field-specific ones
                     result_styling["color_mappings"] = matching_mapping
                     logger.debug(
-                        f"Applied field-specific color mapping for field {field_name}: {list(matching_mapping.get('mappings', {}).keys())}"
+                        f"Applied datasource-specific color mapping for field {field_name} from {datasource_id}: {list(matching_mapping.get('mappings', {}).keys())}"
                     )
                     break  # Use the first matching field's colors
 
