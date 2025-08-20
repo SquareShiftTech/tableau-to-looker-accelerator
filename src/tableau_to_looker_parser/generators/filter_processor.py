@@ -167,7 +167,11 @@ class FilterProcessor:
             # Functions like level-members don't extract specific values
             return [rule.default_value] if rule.default_value else []
 
-        if rule.value_source == "member" and logic.member:
+        if (
+            rule.value_source == "member"
+            and logic.member
+            and logic.member not in ["%null%"]
+        ):
             # Extract direct member value
             clean_value = logic.member.strip("\"'")
             if clean_value:
