@@ -48,6 +48,9 @@ class LookerElementGenerator:
         Returns:
             Dict containing complete dashboard element configuration
         """
+        if worksheet.name == "byTypeS apple":
+            print(f"Worksheet {worksheet.name} has data: {worksheet}")
+
         if not worksheet.visualization:
             logger.warning(f"Worksheet {worksheet.name} has no visualization config")
             return self._create_fallback_element(worksheet, position)
