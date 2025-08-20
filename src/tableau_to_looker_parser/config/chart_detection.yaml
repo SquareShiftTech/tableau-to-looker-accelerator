@@ -26,45 +26,47 @@ basic_chart_detection:
     pivot_field_source: ["columns_shelf"]
 
   # Bar Chart Detection (Your Favorite)
-  bar_chart:
-    conditions:
-      - mark_type: ["Bar", "Automatic"]
-      - has_color_encoding: true
-    confidence: 95
-    variants:
-      - horizontal_bar:
-          conditions:
-            - mark_type: "Bar"
-            - x_encoding: "measure"
-            - y_encoding: ["categorical", "string"]
-            - orientation: "horizontal"
-      - automatic_bar:
-          conditions:
-            - mark_type: "Automatic"
-            - x_encoding: "measure"
-            - has_text_marks: true
-      - stacked_bar:
-          conditions:
-            - color_encoding: "categorical"
-            - has_mark_stacking: true
-      - grouped_bar:
-          conditions:
-            - color_encoding: "categorical"
-            - has_mark_stacking: false
-    pivot_required: false
-    looker_equivalent: "looker_bar"
 
-
-  stacked_chart:
+  stacked_1dim_bar_chart:
     conditions:
       - mark_type: ["Automatic"]
       - has_color_encoding: true
       - columns_shelf_count: ">0"
+      - x_encoding: "measure"
+      - has_text_marks: true
     confidence: 100
     stacked_type: true
     pivot_required: true
     looker_equivalent: "looker_bar"
-    fields_sources: ["color_marks", "columns_shelf"]
+    fields_sources: ["color_marks","columns_shelf"]
+    pivot_field_source: ["color_marks"]
+
+  stacked_2dim_column_chart:
+    conditions:
+      - mark_type: ["Automatic"]
+      - has_color_encoding: true
+      - columns_shelf_count: ">0"
+      - x_encoding: ["categorical", "string"]
+      - y_encoding: "measure"
+    confidence: 100
+    stacked_type: true
+    pivot_required: true
+    looker_equivalent: "looker_column"
+    fields_sources: ["color_marks", "rows_shelf", "columns_shelf"]
+    pivot_field_source: ["color_marks"]
+
+  stacked_2dim_bar_chart:
+    conditions:
+      - mark_type: ["Automatic"]
+      - has_color_encoding: true
+      - columns_shelf_count: ">0"
+      - x_encoding: "measure"
+      - y_encoding: ["categorical", "string"]
+    confidence: 100
+    stacked_type: true
+    pivot_required: true
+    looker_equivalent: "looker_bar"
+    fields_sources: ["color_marks", rows_shelf, "columns_shelf"]
     pivot_field_source: ["color_marks"]
 
   # Column Chart (Vertical Bars)
