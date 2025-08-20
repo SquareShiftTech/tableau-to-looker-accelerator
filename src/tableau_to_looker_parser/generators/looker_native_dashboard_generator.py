@@ -176,7 +176,6 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         self, elements: List[DashboardElement], migration_data: Dict
     ) -> List[Dict]:
         """Convert dashboard elements to Looker-native format using element generator."""
-        from collections import defaultdict
 
         looker_elements = []
 
@@ -200,52 +199,10 @@ class LookerNativeDashboardGenerator(BaseGenerator):
                 logger.error(f"Failed to convert element {element.element_id}: {e}")
                 continue
 
-        # Step 2: Group elements by row
-        row_groups = defaultdict(list)
-
-        # Step 1: Group elements by row
-        for elem in looker_elements:
-            row = elem.get("row")
-            if row is not None:
-                row_groups[row].append(elem)
-
-        # Step 2: Compute max row width across the dashboard
-        row_widths = {}
-        for row, elems in row_groups.items():
-            row_widths[row] = sum(e.get("width", 0) for e in elems)
-        max_row_width = max(row_widths.values())
-
-        logger.info(f"Max row width across dashboard = {max_row_width}")
-
-        # Step 3: Apply logic to each row
-        for row, elems in row_groups.items():
-            if len(elems) == 1:
-                # Single element row → set to dashboard-wide max
-                old_width = elems[0].get("width", 0)
-                elems[0]["width"] = max_row_width
-                elems[0]["col"] = 0
-                logger.info(
-                    f"Row {row}: single element adjusted from {old_width} → {max_row_width}"
-                )
-            else:
-                # Multi-element rows → keep original widths
-                logger.info(
-                    f"Row {row}: multi-element row, widths unchanged = {[e.get('width', 0) for e in elems]}"
-                )
-                # # Multi-element row → distribute remaining space
-                # row_sum_width = sum([e.get("width", 0) for e in elems])
-                # extra_space = max_row_width - row_sum_width
-                # add_per_element = extra_space // len(elems) if elems else 0
-
-                # col = 0
-                # for e in elems:
-                #     old_width = e.get("width", 0)
-                #     e["width"] = old_width + add_per_element
-                #     e["col"] = col
-                #     col += e["width"]
-                #     logger.info(
-                #         f"Row {row}: element {e.get('title', e.get('name'))} width {old_width} → {e['width']}"
-                #     )
+        # normalize widths across all elements
+        looker_elements = self.layout_calculator.normalize_element_widths(
+            looker_elements
+        )
 
         return looker_elements
 
