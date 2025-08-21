@@ -7,6 +7,10 @@ support for different layout types and responsive design.
 
 from typing import Dict, Any
 from ...models.dashboard_models import DashboardElement
+from collections import defaultdict
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LayoutCalculator:
@@ -338,6 +342,64 @@ class LayoutCalculator:
             current_row += max_height_in_group + 2  # +2 for proper spacing
 
         return element_rows
+
+    def normalize_element_widths(self, looker_elements):
+        """
+        Normalize element widths to ensure they fit within the max-column grid of the dashboard.
+
+        Args:
+            looker_elements: Dict of LookML elements of the dashboard
+
+        Returns:
+            Dict containing complete dashboard element configuration with normalized widths
+        """
+        # Step 2: Group elements by row
+        row_groups = defaultdict(list)
+
+        # Step 1: Group elements by row
+        for elem in looker_elements:
+            row = elem.get("row")
+            if row is not None:
+                row_groups[row].append(elem)
+
+        # Step 2: Compute max row width across the dashboard
+        row_widths = {}
+        for row, elems in row_groups.items():
+            row_widths[row] = sum(e.get("width", 0) for e in elems)
+        max_row_width = max(row_widths.values())
+
+        logger.info(f"Max row width across dashboard = {max_row_width}")
+
+        # Step 3: Apply logic to each row
+        for row, elems in row_groups.items():
+            if len(elems) == 1:
+                # Single element row → set to dashboard-wide max
+                old_width = elems[0].get("width", 0)
+                elems[0]["width"] = max_row_width
+                elems[0]["col"] = 0
+                logger.info(
+                    f"Row {row}: single element adjusted from {old_width} → {max_row_width}"
+                )
+            else:
+                # Multi-element rows → keep original widths
+                logger.info(
+                    f"Row {row}: multi-element row, widths unchanged = {[e.get('width', 0) for e in elems]}"
+                )
+                # # Multi-element row → distribute remaining space
+                # row_sum_width = sum([e.get("width", 0) for e in elems])
+                # extra_space = max_row_width - row_sum_width
+                # add_per_element = extra_space // len(elems) if elems else 0
+
+                # col = 0
+                # for e in elems:
+                #     old_width = e.get("width", 0)
+                #     e["width"] = old_width + add_per_element
+                #     e["col"] = col
+                #     col += e["width"]
+                #     logger.info(
+                #         f"Row {row}: element {e.get('title', e.get('name'))} width {old_width} → {e['width']}"
+                #     )
+        return looker_elements
 
     def calculate_standardized_widths(self, elements: list) -> Dict[str, int]:
         """

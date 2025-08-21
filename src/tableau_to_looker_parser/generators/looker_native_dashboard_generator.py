@@ -176,6 +176,7 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         self, elements: List[DashboardElement], migration_data: Dict
     ) -> List[Dict]:
         """Convert dashboard elements to Looker-native format using element generator."""
+
         looker_elements = []
 
         # Calculate height-based row positions and standardized widths for all elements
@@ -197,6 +198,11 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             except Exception as e:
                 logger.error(f"Failed to convert element {element.element_id}: {e}")
                 continue
+
+        # normalize widths across all elements
+        looker_elements = self.layout_calculator.normalize_element_widths(
+            looker_elements
+        )
 
         return looker_elements
 
