@@ -38,7 +38,6 @@ view: {{ view_name }} {
     {% if dimension.derivation and dimension.derivation.startswith('time_function:') %}
     # Derived from Tableau time function: {{ dimension.original_tableau_instance }}
     {% endif %}
-    order_by_field: {{ dimension.name | clean_name }}_raw
   }
 
   dimension: {{ dimension.name | clean_name }}_hour_formatted {
@@ -46,6 +45,7 @@ view: {{ view_name }} {
     sql: FORMAT_TIMESTAMP('%l %p',
       TIMESTAMP_TRUNC(CAST(${{ '{' + (dimension.name | clean_name) + '_raw}' }} AS TIMESTAMP), HOUR)) ;;
     label: "Hour"
+    order_by_field: {{ dimension.name | clean_name }}_raw
   }
 
 
