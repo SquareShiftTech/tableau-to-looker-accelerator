@@ -198,6 +198,7 @@ class WorksheetHandler(BaseHandler):
                 "suggested_type": self._suggest_lookml_type(field),
                 "drill_fields": [],
                 "display_label": display_label,
+                "datasource_id": field.get("datasource_id"),
             }
 
             processed_fields.append(field_ref)

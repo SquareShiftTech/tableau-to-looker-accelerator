@@ -88,6 +88,8 @@ class FieldReference(BaseModel):
         ...,
         description="Human-readable label for LookML (from Tableau caption or cleaned original name)",
     )
+    datasource_id: str = Field(..., description="ID of the connected datasource")
+    view_mapping_name: Optional[str] = Field(None, description="View mapping name")
 
 
 class VisualizationConfig(BaseModel):

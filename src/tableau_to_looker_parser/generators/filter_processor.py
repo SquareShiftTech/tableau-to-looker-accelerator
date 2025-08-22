@@ -28,6 +28,7 @@ class FilterProcessor:
         self,
         worksheet_filters: List[Dict],
         calculated_fields: Optional[List[str]] = None,
+        field_mappings: Dict = None,
     ) -> Dict[str, str]:
         """
         Convert worksheet filters to LookML element filters.
@@ -65,6 +66,27 @@ class FilterProcessor:
                             f"Skipping calculated field filter: {tableau_filter.field_name}"
                         )
                         continue
+                dimensions = field_mappings.get("dimensions", {})
+                # measures = field_mappings.get("measures", {})
+                calculated_fields_mappings = field_mappings.get("calculated_fields", {})
+
+                datasource_id = tableau_filter.datasource_id
+                local_name = f"[{tableau_filter.field_name}]"
+                datasource_fields = dimensions.get(datasource_id, {})
+
+                clean_name = None
+                if datasource_fields:
+                    clean_name = datasource_fields.get(local_name, {}).get("clean_name")
+                    tableau_filter.view_mapping_name = clean_name
+                if not clean_name:
+                    datasource_fields = calculated_fields_mappings.get(
+                        datasource_id, {}
+                    )
+                    if datasource_fields:
+                        clean_name = datasource_fields.get(local_name, {}).get(
+                            "clean_name"
+                        )
+                        tableau_filter.view_mapping_name = clean_name
 
                 # Convert to LookML filter
                 lookml_filter = self._convert_filter(tableau_filter)
@@ -97,7 +119,8 @@ class FilterProcessor:
             return None
 
         # Clean field name
-        clean_field = self.config.clean_field_name(tableau_filter.field_name)
+
+        clean_field = tableau_filter.view_mapping_name
         if not clean_field:
             logger.warning(f"Invalid field name: {tableau_filter.field_name}")
             return None
@@ -167,7 +190,11 @@ class FilterProcessor:
             # Functions like level-members don't extract specific values
             return [rule.default_value] if rule.default_value else []
 
-        if rule.value_source == "member" and logic.member:
+        if (
+            rule.value_source == "member"
+            and logic.member
+            and logic.member not in ["%null%"]
+        ):
             # Extract direct member value
             clean_value = logic.member.strip("\"'")
             if clean_value:

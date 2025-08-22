@@ -141,6 +141,8 @@ class TableauXMLParserV2:
                 f"Processing datasource: {datasource.get('name', 'unnamed')}"
             )
 
+            datasource_id = datasource.get("name")
+
             # Phase 1: Extract base fields from metadata-records (PRIMARY SOURCE)
             metadata_fields = self._extract_metadata_fields(datasource)
             self.logger.info(
@@ -153,7 +155,7 @@ class TableauXMLParserV2:
 
             # Phase 3: Merge and enhance fields
             enhanced_fields = self._merge_field_data(
-                metadata_fields, column_enhancements
+                metadata_fields, column_enhancements, datasource_id
             )
             self.logger.info(
                 f"Created {len(enhanced_fields)} enhanced field definitions"
@@ -310,6 +312,9 @@ class TableauXMLParserV2:
                 "is_internal": self._is_internal_field(col),
             }
 
+            if col.get("caption") == "Rolling 24":
+                print(col.get("caption"))
+
             # Check for calculations (CALCULATED FIELDS)
             calc_element = col.find("calculation")
             if calc_element is not None:
@@ -361,13 +366,17 @@ class TableauXMLParserV2:
         return column_enhancements
 
     def _merge_field_data(
-        self, metadata_fields: Dict[str, Dict], column_enhancements: Dict[str, Dict]
+        self,
+        metadata_fields: Dict[str, Dict],
+        column_enhancements: Dict[str, Dict],
+        datasource_id: str,
     ) -> Dict[str, Dict]:
         """Merge metadata fields with column enhancements for complete field definitions.
 
         Args:
             metadata_fields: Base fields from metadata-records
             column_enhancements: Enhancements from column elements
+            datasource_id: Datasource ID
 
         Returns:
             Dict of merged field definitions with complete data
@@ -395,6 +404,7 @@ class TableauXMLParserV2:
                 enhanced_field["semantic_role"] = enhancement.get("semantic_role")
                 enhanced_field["folder"] = enhancement.get("folder")
                 enhanced_field["description"] = enhancement.get("description")
+                enhanced_field["datasource_id"] = datasource_id
 
                 # Override field type if it's a parameter
                 if enhancement.get("param_domain_type"):
@@ -425,12 +435,18 @@ class TableauXMLParserV2:
         # Add calculated fields that exist only in column elements (NO METADATA)
         for field_name, enhancement in column_enhancements.items():
             if field_name not in enhanced_fields and enhancement.get("is_calculated"):
+                # Get any table name from existing fields for calculated field
+                any_table_name = None
+                if metadata_fields:
+                    first_field = next(iter(metadata_fields.values()))
+                    any_table_name = first_field.get("table_name")
+
                 # This is a calculated field not in metadata
                 calculated_field = {
                     "field_name": field_name,
                     "local_name": f"[{field_name}]",
                     "remote_name": None,  # Calculated fields don't have remote names
-                    "table_name": None,  # Will be inferred from dependencies
+                    "table_name": any_table_name,  # Use any available table name
                     "sql_column": None,  # Will be generated from calculation
                     "field_type": "calculated_field",
                     "role": enhancement.get("role", "measure"),
@@ -446,6 +462,7 @@ class TableauXMLParserV2:
                     "semantic_role": enhancement.get("semantic_role"),
                     "folder": enhancement.get("folder"),
                     "description": enhancement.get("description"),
+                    "datasource_id": datasource_id,
                 }
                 enhanced_fields[field_name] = calculated_field
 
@@ -632,6 +649,7 @@ class TableauXMLParserV2:
                         local_name=field_def["local_name"],
                         remote_alias=field_def.get("label"),
                     ),
+                    "datasource_id": field_def.get("datasource_id"),
                 }
 
                 elements.append({"type": field_type, "data": element_data})
@@ -653,6 +671,7 @@ class TableauXMLParserV2:
                         local_name=field_def["local_name"],
                         remote_alias=field_def.get("label"),
                     ),
+                    "datasource_id": field_def.get("datasource_id"),
                 }
 
                 elements.append({"type": "calculated_field", "data": element_data})
@@ -675,6 +694,7 @@ class TableauXMLParserV2:
                         local_name=field_def["local_name"],
                         remote_alias=field_def.get("label"),
                     ),
+                    "datasource_id": field_def.get("datasource_id"),
                 }
 
                 elements.append({"type": "parameter", "data": element_data})
@@ -1202,8 +1222,14 @@ class TableauXMLParserV2:
         # Process each datasource-dependencies element
         for dependencies in all_dependencies:
             # Extract column instances (actual field usage)
+            datasource_id = None
             for column_instance in dependencies.findall("column-instance"):
+                if not datasource_id:
+                    # <datasource-dependencies datasource='federated.1fc6jd010l1f0m19s90ze0noolhe'>
+                    datasource_id = dependencies.get("datasource")
                 field_data = self._parse_column_instance(column_instance, worksheet)
+                if field_data:
+                    field_data["datasource_id"] = datasource_id
                 if field_data:
                     fields.append(field_data)
 

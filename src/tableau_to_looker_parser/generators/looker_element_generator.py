@@ -36,7 +36,10 @@ class LookerElementGenerator:
         }
 
     def generate_element(
-        self, worksheet: WorksheetSchema, position: Dict[str, Any]
+        self,
+        worksheet: WorksheetSchema,
+        position: Dict[str, Any],
+        view_mappings: Dict = None,
     ) -> Dict[str, Any]:
         """
         Generate a complete Looker-native dashboard element.
@@ -53,15 +56,31 @@ class LookerElementGenerator:
 
         if not worksheet.visualization:
             logger.warning(f"Worksheet {worksheet.name} has no visualization config")
-            return self._create_fallback_element(worksheet, position)
+            return self._create_fallback_element(worksheet, position, view_mappings)
 
         yaml_detection = worksheet.visualization.yaml_detection
         if not yaml_detection:
             logger.warning(f"Worksheet {worksheet.name} has no YAML detection data")
-            return self._create_fallback_element(worksheet, position)
+            return self._create_fallback_element(worksheet, position, view_mappings)
 
         # Get Looker chart type from YAML detection
         looker_chart_type = yaml_detection.get("looker_equivalent", "table")
+        # new function for worksheet.fields to get the correct field name
+        # 1. Take the view mapping  construct the 3 json dimension,measure,calculated_fields
+        # dimension json strcure : [datasource_id]: {"local_name": self.clean_name(name) }
+        # measure json strcure : [datasource_id]: {"local_name": self.clean_name(name),"aggregation": "sum"  }
+        # calculated_fields json strcure : [datasource_id]: {"local_name": self.clean_name(name) }
+
+        # Generate fields using view mappings if available
+        # if view_mappings:
+        field_mappings = self._construct_field_mappings(view_mappings)
+        status = self._update_worksheet_fields_with_view_mappings(
+            worksheet, field_mappings
+        )
+        if status == "Success":
+            logger.debug(
+                f"Updated worksheet fields with view mappings: {worksheet.name}"
+            )
 
         # Build element configuration
         element = {
@@ -89,7 +108,7 @@ class LookerElementGenerator:
         if sorts:
             element["sorts"] = sorts
 
-        filters = self._generate_filters(worksheet)
+        filters = self._generate_filters(worksheet, field_mappings)
         if filters:
             element["filters"] = filters
 
@@ -216,14 +235,20 @@ class LookerElementGenerator:
 
             if field_matches:
                 # Use derived field name for proper view reference
-                derived_field_name = self._get_derived_field_name(field)
+                if self._get_derived_field_name(field):
+                    derived_field_name = self._get_derived_field_name(field)
+                else:
+                    derived_field_name = field.view_mapping_name
+
                 full_field_name = f"{self.explore_name}.{derived_field_name}"
                 if full_field_name not in fields:
                     fields.append(full_field_name)
 
         return fields
 
-    def _get_derived_field_name(self, field: Dict) -> str:
+    def _get_derived_field_name_with_view_mappings(
+        self, field: Dict, view_mappings: Dict = None
+    ) -> str:
         """
         Get the correct derived field name that matches the generated view.
 
@@ -251,6 +276,30 @@ class LookerElementGenerator:
         else:
             # For regular dimensions, use name as-is
             return field_name
+
+    def _get_derived_field_name(self, field: Dict) -> str:
+        """
+        Get the correct derived field name that matches the generated view.
+
+        Maps Tableau field instances to their corresponding view field names:
+        - dimension_group fields: add _date timeframe (rpt_dt -> rpt_dt_date)
+        - measure fields: use total_ prefix (sales -> total_sales)
+        - regular dimensions: use base name as-is
+        """
+        field_name = field.name
+        suggested_type = field.suggested_type
+        aggregation = field.aggregation
+
+        if suggested_type == "dimension_group":
+            # For dimension groups, add appropriate timeframe
+            if aggregation and "day" in aggregation.lower():
+                return f"{field_name}_date"
+            elif aggregation and "hour" in aggregation.lower():
+                return f"{field_name}_hour_formatted"
+            else:
+                return f"{field_name}_date"  # Default to date
+        else:
+            return None
 
     def _generate_pivots(
         self, worksheet: WorksheetSchema, yaml_detection: Dict[str, Any]
@@ -369,13 +418,6 @@ class LookerElementGenerator:
         sorts = []
         processed_fields = set()
 
-        if chart_type == "looker_pie":
-            # Pie charts: sort by first measure descending
-            measure_fields = self._get_measure_fields_from_list(worksheet, fields)
-            if measure_fields:
-                return [f"{measure_fields[0]} desc 0"]
-            return []
-
         # 1. TIME FIELDS (chronological flow) - highest priority
         time_fields = self._get_time_fields_from_list(worksheet, fields)
         for field in time_fields:
@@ -397,13 +439,6 @@ class LookerElementGenerator:
                 sorts.append(field)
                 processed_fields.add(field)
 
-        # 4. MEASURES (value ordering) - lowest priority, descending
-        measure_fields = self._get_measure_fields_from_list(worksheet, fields)
-        for field in measure_fields:
-            if field not in processed_fields:
-                sorts.append(f"{field} desc")
-                processed_fields.add(field)
-
         return sorts
 
     def _get_time_fields_from_list(
@@ -418,8 +453,9 @@ class LookerElementGenerator:
             # Find matching worksheet field
             for worksheet_field in worksheet.fields:
                 if (
-                    hasattr(worksheet_field, "name")
-                    and worksheet_field.name in clean_field_name
+                    hasattr(worksheet_field, "view_mapping_name")
+                    and worksheet_field.view_mapping_name
+                    and worksheet_field.view_mapping_name in clean_field_name
                 ):
                     if (
                         hasattr(worksheet_field, "suggested_type")
@@ -474,8 +510,9 @@ class LookerElementGenerator:
             # Find matching worksheet field
             for worksheet_field in worksheet.fields:
                 if (
-                    hasattr(worksheet_field, "name")
-                    and worksheet_field.name in clean_field_name
+                    hasattr(worksheet_field, "view_mapping_name")
+                    and worksheet_field.view_mapping_name
+                    and worksheet_field.view_mapping_name in clean_field_name
                 ):
                     if (
                         hasattr(worksheet_field, "role")
@@ -492,7 +529,9 @@ class LookerElementGenerator:
 
         return row_dimension_fields
 
-    def _generate_filters(self, worksheet: WorksheetSchema) -> Dict[str, str]:
+    def _generate_filters(
+        self, worksheet: WorksheetSchema, field_mappings: Dict
+    ) -> Dict[str, str]:
         """Generate filters from worksheet filter configuration using clean Pydantic processor."""
         if not hasattr(worksheet, "filters") or not worksheet.filters:
             return {}
@@ -502,7 +541,9 @@ class LookerElementGenerator:
 
         # Convert worksheet filters to LookML element filters, excluding calculated fields
         filters = filter_processor.process_worksheet_filters(
-            worksheet.filters, calculated_fields=worksheet.calculated_fields
+            worksheet.filters,
+            calculated_fields=worksheet.calculated_fields,
+            field_mappings=field_mappings,
         )
 
         # Filter out empty values to avoid validation issues
@@ -531,3 +572,150 @@ class LookerElementGenerator:
         self.model_name = model_name
         self.explore_name = explore_name
         logger.debug(f"Updated element generator context: {model_name}.{explore_name}")
+
+    def _construct_field_mappings(self, view_mappings: Dict) -> Dict:
+        """
+        Construct structured field mappings from view mappings.
+
+        Creates three JSON structures:
+        - dimensions: {datasource_id: {"local_name": clean_name}}
+        - measures: {datasource_id: {"local_name": clean_name, "aggregation": "sum"}}
+        - calculated_fields: {datasource_id: {"local_name": clean_name}}
+
+        Args:
+            view_mappings: View mappings from generated views
+
+        Returns:
+            Dict with dimensions, measures, and calculated_fields mappings
+        """
+        field_mappings = {"dimensions": {}, "measures": {}, "calculated_fields": {}}
+
+        for each_view in view_mappings:
+            for table_name, table_value in each_view.items():
+                # Process dimensions
+                for each_dimension in table_value.get("dimensions", []):
+                    datasource_id = each_dimension.get("datasource_id")
+                    local_name = each_dimension.get("local_name")
+                    clean_name = each_dimension.get("name")
+                    if datasource_id:
+                        if datasource_id not in field_mappings["dimensions"]:
+                            field_mappings["dimensions"][datasource_id] = {}
+                        field_mappings["dimensions"][datasource_id][local_name] = {
+                            "clean_name": self._clean_name(clean_name)
+                        }
+
+                # Process measures
+                for each_measure in table_value.get("measures", []):
+                    datasource_id = each_measure.get("datasource_id")
+                    local_name = each_measure.get("local_name")
+                    clean_name = each_measure.get("name")
+                    if datasource_id:
+                        if datasource_id not in field_mappings["measures"]:
+                            field_mappings["measures"][datasource_id] = {}
+                        field_mappings["measures"][datasource_id][local_name] = {
+                            "clean_name": self._clean_name(clean_name),
+                            "aggregation": each_measure.get("aggregation"),
+                        }
+
+                # Process calculated fields
+                for each_calculated_field in table_value.get("calculated_fields", []):
+                    datasource_id = each_calculated_field.get("datasource_id")
+                    local_name = each_calculated_field.get("local_name")
+                    clean_name = each_calculated_field.get("name")
+                    if datasource_id:
+                        if datasource_id not in field_mappings["calculated_fields"]:
+                            field_mappings["calculated_fields"][datasource_id] = {}
+                        field_mappings["calculated_fields"][datasource_id][
+                            local_name
+                        ] = {"clean_name": self._clean_name(clean_name)}
+
+        logger.debug(
+            f"Constructed field mappings: {len(field_mappings['dimensions'])} dimension sources, "
+            f"{len(field_mappings['measures'])} measure sources, "
+            f"{len(field_mappings['calculated_fields'])} calculated field sources"
+        )
+
+        return field_mappings
+
+    def _snake_case_filter(self, value: str) -> str:
+        """Convert string to snake_case."""
+        import re
+
+        # Handle brackets and special characters
+        value = re.sub(r"\[([^\]]+)\]", r"\1", value)  # Remove brackets
+        value = re.sub(r"[^\w\s]", "_", value)  # Replace special chars with underscore
+        value = re.sub(r"\s+", "_", value)  # Replace spaces with underscore
+        value = re.sub(r"_+", "_", value)  # Replace multiple underscores with single
+        value = value.strip(
+            "_"
+        ).lower()  # Remove leading/trailing underscores and lowercase
+
+        return value
+
+    def _clean_name(self, value: str) -> str:
+        """Clean field names for LookML."""
+        # Remove brackets and clean up
+        clean_value = value.replace("[", "").replace("]", "")
+        return self._snake_case_filter(clean_value)
+
+    def _update_worksheet_fields_with_view_mappings(
+        self, worksheet: WorksheetSchema, field_mappings: Dict
+    ) -> List[str]:
+        """Merged worksheet fields with view mappings"""
+        dimensions = field_mappings.get("dimensions", {})
+        measures = field_mappings.get("measures", {})
+        calculated_fields = field_mappings.get("calculated_fields", {})
+        for field in worksheet.fields:
+            if field.role == "dimension":
+                datasource_id = field.datasource_id
+                local_name = field.original_name
+                datasource_fields = dimensions.get(datasource_id, {})
+                clean_name = None
+                if datasource_fields:
+                    clean_name = datasource_fields.get(local_name, {}).get("clean_name")
+                    field.view_mapping_name = clean_name
+                if not clean_name:
+                    datasource_fields = calculated_fields.get(datasource_id, {})
+                    if datasource_fields:
+                        clean_name = datasource_fields.get(local_name, {}).get(
+                            "clean_name"
+                        )
+                        field.view_mapping_name = clean_name
+
+            elif field.role == "measure":
+                datasource_id = field.datasource_id
+                local_name = field.original_name
+                datasource_fields = measures.get(datasource_id, {})
+                clean_name = None
+                aggregation = None
+                if datasource_fields:
+                    clean_name = datasource_fields.get(local_name, {}).get("clean_name")
+                    aggregation = datasource_fields.get(local_name, {}).get(
+                        "aggregation"
+                    )
+                if not clean_name:
+                    datasource_fields = calculated_fields.get(datasource_id, {})
+                    if datasource_fields:
+                        clean_name = datasource_fields.get(local_name, {}).get(
+                            "clean_name"
+                        )
+                        aggregation = datasource_fields.get(local_name, {}).get(
+                            "aggregation"
+                        )
+
+                    # Convert both aggregations to comparable format
+                field_agg = field.aggregation
+                if hasattr(field_agg, "value"):
+                    field_agg = field_agg.value.lower()  # enum to string
+                else:
+                    field_agg = str(field_agg).lower() if field_agg else ""
+
+                view_agg = aggregation
+                if hasattr(view_agg, "value"):
+                    view_agg = view_agg.value.lower()  # enum to string
+                else:
+                    view_agg = str(view_agg).lower() if view_agg else ""
+
+                if clean_name and (view_agg == field_agg or not view_agg):
+                    field.view_mapping_name = clean_name
+        return "Success"

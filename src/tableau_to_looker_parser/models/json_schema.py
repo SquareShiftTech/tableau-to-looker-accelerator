@@ -318,6 +318,8 @@ class DimensionSchema(BaseModel):
     # Enhanced calculated field support
     calculated_field: Optional[CalculatedFieldCalculation] = None
     is_calculated: bool = False
+    datasource_id: Optional[str] = None  # datasource_id this dimension belongs to
+    local_name: Optional[str] = None  # local_name this dimension belongs to
 
 
 class AggregationType(str, Enum):

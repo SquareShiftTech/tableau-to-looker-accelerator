@@ -104,6 +104,8 @@ class MeasureHandler(BaseHandler):
                 "sql_column": data.get("raw_name", f"[{base_name.title()}]"),
                 "description": f"Raw field for {base_name}",
                 "label": f"{base_name.replace('_', ' ').title()} (Raw)",
+                "datasource_id": data.get("datasource_id"),
+                "local_name": data.get("raw_name"),
             },
             "measure": {
                 "name": measure_name,  # CR #2 Fix: Proper naming
@@ -114,6 +116,8 @@ class MeasureHandler(BaseHandler):
                 "description": self._build_description(data),
                 "hidden": False,
                 "dimension_reference": f"{base_name}_raw",  # References the raw dimension
+                "datasource_id": data.get("datasource_id"),
+                "local_name": data.get("raw_name"),
             },
         }
 

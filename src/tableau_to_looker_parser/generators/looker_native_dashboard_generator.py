@@ -29,7 +29,9 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         self.element_generator = LookerElementGenerator()
         self.layout_calculator = LayoutCalculator()
 
-    def generate(self, migration_data: Dict, output_dir: str) -> List[str]:
+    def generate(
+        self, migration_data: Dict, output_dir: str, view_mappings: Dict = None
+    ) -> List[str]:
         """
         Generate Looker-native dashboard.lookml files from migration data.
 
@@ -60,7 +62,7 @@ class LookerNativeDashboardGenerator(BaseGenerator):
 
                 # Generate clean dashboard content
                 dashboard_content = self._generate_dashboard_content(
-                    dashboard, migration_data
+                    dashboard, migration_data, view_mappings
                 )
 
                 # Write dashboard file with .dashboard.lookml extension
@@ -126,13 +128,16 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         return "bigquery_super_store_sales_model"
 
     def _generate_dashboard_content(
-        self, dashboard: DashboardSchema, migration_data: Dict
+        self,
+        dashboard: DashboardSchema,
+        migration_data: Dict,
+        view_mappings: Dict = None,
     ) -> str:
         """Generate clean Looker-native dashboard content."""
 
         # Convert dashboard elements to Looker-native format
         elements = self._convert_elements_to_looker_native(
-            dashboard.elements, migration_data
+            dashboard.elements, migration_data, view_mappings
         )
 
         # Debug: Check if any elements have series_colors
@@ -173,7 +178,10 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         )
 
     def _convert_elements_to_looker_native(
-        self, elements: List[DashboardElement], migration_data: Dict
+        self,
+        elements: List[DashboardElement],
+        migration_data: Dict,
+        view_mappings: Dict = None,
     ) -> List[Dict]:
         """Convert dashboard elements to Looker-native format using element generator."""
 
@@ -186,7 +194,7 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             try:
                 if element.element_type == ElementType.WORKSHEET:
                     looker_element = self._convert_worksheet_element(
-                        element, migration_data, height_based_rows
+                        element, migration_data, height_based_rows, view_mappings
                     )
                     if looker_element:
                         looker_elements.append(looker_element)
@@ -211,6 +219,7 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         element: DashboardElement,
         migration_data: Dict,
         height_based_rows: Dict[str, int] = None,
+        view_mappings: Dict = None,
     ) -> Optional[Dict]:
         """Convert worksheet element using the LookerElementGenerator."""
         if not element.worksheet:
@@ -225,7 +234,9 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         )
 
         # Generate element using the dedicated generator
-        looker_element = self.element_generator.generate_element(worksheet, position)
+        looker_element = self.element_generator.generate_element(
+            worksheet, position, view_mappings
+        )
 
         # Add any element-specific overrides
         if hasattr(element, "title_override") and element.title_override:

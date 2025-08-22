@@ -66,6 +66,7 @@ class TableauFilter(BaseModel):
     filter_group: Optional[str] = None
     groupfilter_logic: List[GroupfilterLogic] = Field(default_factory=list)
     values: Optional[str] = None
+    view_mapping_name: Optional[str] = None
 
     class Config:
         extra = "allow"

@@ -470,9 +470,16 @@ class FormulaParser:
         # Field reference
         if self.match(TokenType.FIELD_REF):
             field_name = self.previous().value
+
+            # To DO : remove harcoded fix
+            if field_name == "Rolling 36 (copy)_777433916922368001":
+                processed_field_name = "max dttm"
+            else:
+                processed_field_name = field_name.lower().replace(" ", "_")
+
             return ASTNode(
                 node_type=NodeType.FIELD_REF,
-                field_name=field_name.lower().replace(" ", "_"),
+                field_name=processed_field_name,
                 original_name=f"[{field_name}]",
             )
 

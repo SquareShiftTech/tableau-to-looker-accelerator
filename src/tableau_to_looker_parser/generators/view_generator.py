@@ -34,6 +34,7 @@ class ViewGenerator(BaseGenerator):
         """
         try:
             view_files = []
+            view_mappings = []
             all_dimensions = migration_data.get("dimensions", [])
             all_measures = migration_data.get("measures", [])
             all_calculated_fields = migration_data.get("calculated_fields", [])
@@ -43,7 +44,7 @@ class ViewGenerator(BaseGenerator):
 
             # Generate view file for each needed view
             for view_name in view_names_needed:
-                view_file = self._generate_single_view(
+                view_file, view_mapping = self._generate_single_view(
                     view_name,
                     migration_data,
                     all_dimensions,
@@ -53,9 +54,11 @@ class ViewGenerator(BaseGenerator):
                 )
                 if view_file:
                     view_files.append(view_file)
+                    view_mapping_formmated = {view_name: view_mapping}
+                    view_mappings.append(view_mapping_formmated)
 
             logger.info(f"Generated {len(view_files)} view files")
-            return view_files
+            return view_files, view_mappings
 
         except Exception as e:
             logger.error(f"Failed to generate view files: {str(e)}")
@@ -201,7 +204,7 @@ class ViewGenerator(BaseGenerator):
             "is_derived_table": is_derived_table,  # <-- NEW
         }
 
-        return self._create_view_file(view_data, output_dir)
+        return self._create_view_file(view_data, output_dir), view_data
 
     def _resolve_view_table(self, view_name: str, migration_data: Dict) -> tuple:
         """Resolve view name to actual table and table reference."""
@@ -278,7 +281,7 @@ class ViewGenerator(BaseGenerator):
             lookml_type = self._determine_lookml_type(calc_field, calculation)
 
             # Extract calculation ID from original_name to sync with dashboard references
-            field_name = self._extract_calculation_id(calc_field)
+            field_name = self._extract_calculation_name(calc_field)
 
             # Build LookML field definition
             converted_field = {
@@ -291,6 +294,8 @@ class ViewGenerator(BaseGenerator):
                 "original_formula": calculation.get("original_formula", ""),
                 "description": f"Calculated field: {self._normalize_formula_for_description(calculation.get('original_formula', ''))}",
                 "lookml_type": lookml_type,  # Add LookML type for template
+                "datasource_id": calc_field.get("datasource_id", ""),
+                "local_name": calc_field.get("local_name", ""),
             }
 
             # Add migration metadata for fallback fields
@@ -496,6 +501,18 @@ TODO: Manual migration required - please convert this formula manually""",
             "dimension": dimension_field,
             "measure": measure_field,
         }
+
+    def _extract_calculation_name(self, calc_field: Dict) -> str:
+        """
+        Extract calculation ID from original_name field to sync with dashboard references.
+
+        Args:
+            calc_field: Calculated field data with original_name
+
+        Returns:
+            str: Calculation ID (e.g., 'calculation_1181350527289110528')
+        """
+        return self._clean_name(calc_field.get("name", "unknown_calc"))
 
     def _extract_calculation_id(self, calc_field: Dict) -> str:
         """

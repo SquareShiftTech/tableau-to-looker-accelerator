@@ -310,7 +310,9 @@ class TestBook6CalculatedFields:
             view_gen = ViewGenerator()
             model_gen = ModelGeneratorV2()
 
-            view_files = view_gen.generate_views(result, str(lookml_output_dir))
+            view_files, view_mappings = view_gen.generate_views(
+                result, str(lookml_output_dir)
+            )
             model_file = model_gen.generate(result, str(lookml_output_dir))
 
             print("\nGenerated LookML files:")

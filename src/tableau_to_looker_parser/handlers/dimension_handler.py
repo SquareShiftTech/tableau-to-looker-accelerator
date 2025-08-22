@@ -92,6 +92,8 @@ class DimensionHandler(BaseHandler):
             "calculation": data.get("calculation"),
             "semantic_role": data.get("semantic_role"),
             "sql_column": data.get("sql_column"),  # Include SQL column name
+            "datasource_id": data.get("datasource_id"),
+            "local_name": data.get("raw_name"),
         }
 
         # Add range data if present

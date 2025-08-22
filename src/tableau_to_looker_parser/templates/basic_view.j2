@@ -45,6 +45,7 @@ view: {{ view_name }} {
     sql: FORMAT_TIMESTAMP('%l %p',
       TIMESTAMP_TRUNC(CAST(${{ '{' + (dimension.name | clean_name) + '_raw}' }} AS TIMESTAMP), HOUR)) ;;
     label: "Hour"
+    order_by_field: {{ dimension.name | clean_name }}_raw
   }
 
 

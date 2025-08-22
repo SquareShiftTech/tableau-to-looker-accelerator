@@ -10,7 +10,7 @@ include: "{{ view.name | clean_name }}.view.lkml"
 
 # Include all dashboards
 {% for dashboard in dashboards %}
-{% if dashboard.name | clean_name == "connected_devices_detail" %}
+{% if dashboard.name | clean_name != "intraday_sales_home" %}
 include: "{{ dashboard.name | clean_name }}.dashboard.lookml"
 {% endif %}
 {% endfor %}
