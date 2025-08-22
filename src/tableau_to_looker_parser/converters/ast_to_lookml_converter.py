@@ -248,7 +248,7 @@ class ASTToLookMLConverter:
         # Flatten all digits into one string
         total_digits = "".join(numbers_after_underscore)
 
-        if len(total_digits) >= 10:
+        if len(total_digits) >= 10 or clean_field_name == "max_dttm":
             # Treat it as a global field reference
             lookml_ref = f"${{{clean_field_name}}}"
         else:
