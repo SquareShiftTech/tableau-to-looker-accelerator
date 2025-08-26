@@ -13,6 +13,7 @@ class NodeType(str, Enum):
 
     # Leaf nodes
     FIELD_REF = "field_ref"  # [Field Name]
+    PARAMETER_REF = "parameter_ref"  # [Parameters].[Parameter Name]
     LITERAL = "literal"  # "string", 123, true, null
 
     # Binary operations

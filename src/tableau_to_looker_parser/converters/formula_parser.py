@@ -64,6 +64,7 @@ class FormulaLexer:
         (r"\{", TokenType.LEFT_BRACE),
         (r"\}", TokenType.RIGHT_BRACE),
         (r":", TokenType.COLON),
+        (r"\.", TokenType.PERIOD),
         # Keywords and identifiers (case insensitive)
         (r"(?i)\bIF\b", TokenType.IF),
         (r"(?i)\bTHEN\b", TokenType.THEN),
@@ -471,6 +472,30 @@ class FormulaParser:
         if self.match(TokenType.FIELD_REF):
             field_name = self.previous().value
 
+            # Check if this is part of a parameter reference: [Parameters].[Parameter Name]
+            if field_name.lower() == "parameters" and self.check(TokenType.PERIOD):
+                # This is a parameter reference
+                self.advance()  # Consume the period
+                if self.check(TokenType.FIELD_REF):
+                    param_name = self.advance().value
+                    return ASTNode(
+                        node_type=NodeType.PARAMETER_REF,
+                        field_name=f"parameters.{param_name}",
+                        original_name=f"[Parameters].[{param_name}]",
+                    )
+                else:
+                    # Malformed parameter reference
+                    self.errors.append(
+                        ParserError(
+                            message="Expected parameter name after [Parameters].",
+                            position=self.peek().position,
+                            severity="error",
+                        )
+                    )
+                    return ASTNode(
+                        node_type=NodeType.LITERAL, value=None, data_type=DataType.NULL
+                    )
+
             # To DO : remove harcoded fix
             if field_name == "Rolling 36 (copy)_777433916922368001":
                 processed_field_name = "max dttm"
@@ -564,21 +589,34 @@ class FormulaParser:
             # CASE [expression] WHEN... format
             case_expression = self.parse_expression()
 
-        # Parse WHEN clauses
-        while self.match(TokenType.WHEN):
+        # Parse WHEN clauses - handle both "WHEN" and "When" (case insensitive)
+        while self.match(TokenType.WHEN) or self.match_any_identifier(
+            ["when", "When", "WHEN"]
+        ):
             when_condition = self.parse_expression()
-            self.consume(TokenType.THEN, "Expected 'THEN' after WHEN condition")
+
+            # Handle both "THEN" and "Then" (case insensitive)
+            if not self.match(TokenType.THEN):
+                # Try to match case-insensitive THEN
+                if not self.match_any_identifier(["then", "Then", "THEN"]):
+                    self.consume(TokenType.THEN, "Expected 'THEN' after WHEN condition")
+
             when_result = self.parse_expression()
 
             when_clauses.append(
                 WhenClause(condition=when_condition, result=when_result)
             )
 
-        # Parse optional ELSE clause
-        if self.match(TokenType.ELSE):
+        # Parse optional ELSE clause - handle both "ELSE" and "Else" (case insensitive)
+        if self.match(TokenType.ELSE) or self.match_any_identifier(
+            ["else", "Else", "ELSE"]
+        ):
             else_branch = self.parse_expression()
 
-        self.consume(TokenType.END, "Expected 'END' to close CASE statement")
+        # Handle both "END" and "End" (case insensitive)
+        if not self.match(TokenType.END):
+            if not self.match_any_identifier(["end", "End", "END"]):
+                self.consume(TokenType.END, "Expected 'END' to close CASE statement")
 
         return ASTNode(
             node_type=NodeType.CASE,
@@ -737,6 +775,22 @@ class FormulaParser:
         """Check if current token matches any of the given types."""
         for token_type in types:
             if self.check(token_type):
+                self.advance()
+                return True
+        return False
+
+    def match_any_identifier(self, identifiers: List[str]) -> bool:
+        """Check if current token is an identifier matching any of the given strings (case insensitive)."""
+        if self.is_at_end():
+            return False
+
+        current_token = self.peek()
+        if current_token.type != TokenType.IDENTIFIER:
+            return False
+
+        current_value = current_token.value.lower()
+        for identifier in identifiers:
+            if current_value == identifier.lower():
                 self.advance()
                 return True
         return False

@@ -13,6 +13,51 @@ view: {{ view_name }} {
   description: "{{ view.description }}"
   {% endif %}
 
+  # Parameters (from Tableau parameters)
+  {% if has_parameters %}
+  {% for param in parameters %}
+  {% if param.param_domain_type == 'list' %}
+  parameter: {{ param.name }} {
+    label: "{{ param.caption if param.caption else param.name | replace('_', ' ') | title }}"
+    type: {{ param.datatype | lower }}
+    {% if param.default_value %}
+    default_value: "{{ param.default_value | replace('"', '\\"') }}"
+    {% endif %}
+    {% if param.members %}
+    {% for member in param.members %}
+    allowed_value: {
+      label: "{{ (member.alias if member.alias else member.value) | replace('"', '\\"') }}"
+      value: "{{ member.value | replace('"', '\\"') }}"
+    }
+    {% endfor %}
+    {% endif %}
+  }
+  {% elif param.param_domain_type == 'range' and param.datatype | lower != 'date' %}
+  parameter: {{ param.name }} {
+    label: "{{ param.caption if param.caption else param.name | replace('_', ' ') | title }}"
+    type: {{ param.datatype | lower }}
+    {% if param.default_value %}
+    default_value: "{{ param.default_value | replace('"', '\\"') }}"
+    {% endif %}
+    {% if param.range and param.range.min %}
+    min_value: {{ param.range.min }}
+    {% endif %}
+    {% if param.range and param.range.max %}
+    max_value: {{ param.range.max }}
+    {% endif %}
+  }
+  {% else %}
+  parameter: {{ param.name }} {
+    label: "{{ param.caption if param.caption else param.name | replace('_', ' ') | title }}"
+    type: {{ param.datatype | lower }}
+    {% if param.default_value %}
+    default_value: "{{ param.default_value | replace('"', '\\"') }}"
+    {% endif %}
+  }
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
   # Date dimension groups
   {% if has_dimensions %}
   {% for dimension in dimensions %}

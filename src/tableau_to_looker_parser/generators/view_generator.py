@@ -7,6 +7,8 @@ import logging
 from types import SimpleNamespace
 
 from .base_generator import BaseGenerator
+
+# from .parameter_generator import generate_looker_parameters
 from ..converters.ast_to_lookml_converter import ASTToLookMLConverter
 from ..models.ast_schema import ASTNode, NodeType
 
@@ -193,6 +195,11 @@ class ViewGenerator(BaseGenerator):
             + table_calculated_dimensions  # Hidden dimensions from calculated field two-step pattern
         )
 
+        # Extract parameters for this view
+        view_parameters = []
+        if "parameters" in migration_data:
+            view_parameters = migration_data["parameters"]
+
         view_data = {
             "name": view_name,
             "table_name": table_ref,
@@ -202,6 +209,7 @@ class ViewGenerator(BaseGenerator):
             "calculated_dimensions": table_calculated_dimensions,
             "derived_table_sql": derived_table_sql,  # <-- NEW
             "is_derived_table": is_derived_table,  # <-- NEW
+            "parameters": view_parameters,  # <-- NEW: Add parameters
         }
 
         return self._create_view_file(view_data, output_dir), view_data
@@ -587,6 +595,11 @@ TODO: Manual migration required - please convert this formula manually""",
                 > 0,
                 "derived_table_sql": view_data.get("derived_table_sql"),  # <-- NEW
                 "is_derived_table": view_data.get("is_derived_table", False),  # <-- NEW
+                "parameters": view_data.get(
+                    "parameters", []
+                ),  # <-- NEW: Add parameters
+                "has_parameters": len(view_data.get("parameters", []))
+                > 0,  # <-- NEW: Check if parameters exist
             }
 
             content = self.template_engine.render_template("basic_view.j2", context)

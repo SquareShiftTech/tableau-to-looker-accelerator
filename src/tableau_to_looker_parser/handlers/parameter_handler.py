@@ -43,7 +43,7 @@ class ParameterHandler(BaseHandler):
             float: Confidence score between 0.0 and 1.0
         """
         # Must have param_domain_type
-        if not data.get("param_domain_type"):
+        if not data.get("param-domain-type"):
             return 0.0
 
         # Must have datatype
@@ -66,7 +66,7 @@ class ParameterHandler(BaseHandler):
         name = self._clean_field_name(data["raw_name"])
 
         param_type = self._get_parameter_type(
-            data["param_domain_type"], data["datatype"]
+            data["param-domain-type"], data["datatype"]
         )
 
         # Build parameter settings

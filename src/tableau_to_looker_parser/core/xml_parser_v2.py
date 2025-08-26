@@ -137,9 +137,18 @@ class TableauXMLParserV2:
 
         # Process each datasource
         for datasource in root.findall(".//datasource"):
-            self.logger.info(
-                f"Processing datasource: {datasource.get('name', 'unnamed')}"
-            )
+            datasource_name = datasource.get("name", "unnamed")
+            self.logger.info(f"Processing datasource: {datasource_name}")
+
+            # Special handling for Parameters datasource
+            if datasource_name == "Parameters":
+                self.logger.info(
+                    "Found Parameters datasource, extracting parameters..."
+                )
+                parameters = self._extract_parameters_datasource(datasource)
+                elements.extend(parameters)
+                self.logger.info(f"Extracted {len(parameters)} parameters")
+                continue
 
             datasource_id = datasource.get("name")
 
@@ -170,11 +179,11 @@ class TableauXMLParserV2:
             # Phase 5: Convert to element format for handlers
             elements.extend(
                 self._convert_fields_to_elements(
-                    enhanced_fields, table_mapping, alias_mapping
+                    enhanced_fields, table_mapping, alias_mapping, datasource_id
                 )
             )
 
-            # Phase 6: Add other element types (connections, relationships, parameters)
+            # Phase 6: Add other element types (connections, relationships)
             elements.extend(self._extract_other_elements(datasource))
 
         self.logger.info(f"Total elements extracted: {len(elements)}")
@@ -605,6 +614,7 @@ class TableauXMLParserV2:
         enhanced_fields: Dict[str, Dict],
         table_mapping: Dict[str, str],
         alias_mapping: Dict[str, str],
+        datasource_id: str,
     ) -> List[Dict]:
         """Convert enhanced field definitions to element format for handlers.
 
@@ -612,6 +622,7 @@ class TableauXMLParserV2:
             enhanced_fields: Enhanced field definitions
             table_mapping: Field to table mapping
             alias_mapping: Table alias mapping
+            datasource_id: Datasource ID
 
         Returns:
             List of element dictionaries for handler processing
@@ -2307,3 +2318,281 @@ class TableauXMLParserV2:
         except Exception as e:
             self.logger.warning(f"Failed to extract pane styling: {str(e)}")
             return {}
+
+    # def get_organized_elements_by_datasource(self, root: Element) -> Dict:
+    #     """Get elements organized by datasource with parameters as a separate datasource.
+
+    #     Args:
+    #         root: Root element of workbook
+
+    #     Returns:
+    #         Dict organized by datasource:
+    #         {
+    #             "workbook": {
+    #                 "name": str,
+    #                 "datasources": [
+    #                     {
+    #                         "name": "Parameters",
+    #                         "type": "inline",
+    #                         "parameters": [...]
+    #                     },
+    #                     {
+    #                         "name": "datasource_name",
+    #                         "type": "federated",
+    #                         "measures": [...],
+    #                         "dimensions": [...]
+    #                     }
+    #                 ]
+    #             }
+    #         }
+    #     """
+    #     # Get all elements
+    #     all_elements = self.get_all_elements_enhanced(root)
+
+    #     # Organize by datasource
+    #     organized_data = {
+    #         "workbook": {
+    #             "name": self._extract_workbook_name(root),
+    #             "datasources": []
+    #         }
+    #     }
+
+    #     # Extract parameters first
+    #     parameters = []
+    #     for elem in all_elements:
+    #         if elem["type"] == "parameter":
+    #             parameters.append(elem["data"])
+
+    #     # Add Parameters datasource
+    #     if parameters:
+    #         organized_data["workbook"]["datasources"].append({
+    #             "name": "Parameters",
+    #             "type": "inline",
+    #             "parameters": parameters
+    #         })
+
+    #     # Group other elements by datasource
+    #     datasource_groups = {}
+    #     for elem in all_elements:
+    #         if elem["type"] == "parameter":
+    #             continue  # Skip parameters as they're handled above
+
+    #         datasource_name = elem.get("datasource", "unknown")
+    #         if datasource_name not in datasource_groups:
+    #             datasource_groups[datasource_name] = {
+    #                 "measures": [],
+    #                 "dimensions": [],
+    #                 "connections": [],
+    #                 "relationships": []
+    #             }
+
+    #         if elem["type"] == "measure":
+    #             datasource_groups[datasource_name]["measures"].append(elem["data"])
+    #         elif elem["type"] == "dimension":
+    #             datasource_groups[datasource_name]["dimensions"].append(elem["data"])
+    #         elif elem["type"] == "connection":
+    #             datasource_groups[datasource_name]["connections"].append(elem["data"])
+    #         elif elem["type"] == "relationships":
+    #             datasource_groups[datasource_name]["relationships"].append(elem["data"])
+
+    #     # Add other datasources
+    #     for datasource_name, elements in datasource_groups.items():
+    #         if datasource_name != "Parameters":  # Skip parameters as they're handled above
+    #             datasource_data = {
+    #                 "name": datasource_name,
+    #                 "type": "federated"
+    #             }
+
+    #             # Add measures and dimensions if they exist
+    #             if elements["measures"]:
+    #                 datasource_data["measures"] = elements["measures"]
+    #             if elements["dimensions"]:
+    #                 datasource_data["dimensions"] = elements["dimensions"]
+    #             if elements["connections"]:
+    #                 datasource_data["connections"] = elements["connections"]
+    #             if elements["relationships"]:
+    #                 datasource_data["relationships"] = elements["relationships"]
+
+    #             organized_data["workbook"]["datasources"].append(datasource_data)
+
+    #     return organized_data
+
+    # def _extract_workbook_name(self, root: Element) -> str:
+    #     """Extract workbook name from root element.
+
+    #     Args:
+    #         root: Root element of workbook
+
+    #     Returns:
+    #         Workbook name or default name
+    #     """
+    #     # Try to get workbook name from various sources
+    #     workbook_name = root.get("name")
+    #     if workbook_name:
+    #         return workbook_name
+
+    #     # Try to get from datasource names
+    #     datasources = root.findall(".//datasource")
+    #     if datasources:
+    #         # Use first non-Parameters datasource name
+    #         for ds in datasources:
+    #             ds_name = ds.get("name")
+    #             if ds_name and ds_name != "Parameters":
+    #                 return ds_name
+
+    #     return "Tableau_Workbook"
+
+    def extract_parameter(self, element: Element) -> Dict:
+        """Extract parameter data from column element following the provided schema.
+
+        Args:
+            element: Column element with param-domain-type
+
+        Returns:
+            Dict containing parameter data following the schema:
+            {
+                "type": "parameter",
+                "name": str,
+                "caption": str,
+                "datatype": str,
+                "default": str,
+                "param-domain-type": "list" | "range",
+                "members": [...],  # Actual members with values and aliases
+                "range": {...}     # Actual range data
+            }
+        """
+        # Get basic attributes
+        name = element.get("name", "")
+        caption = element.get("caption", "")
+        datatype = element.get("datatype", "string")
+        default_value = element.get("value", "")
+        param_domain_type = element.get("param-domain-type", "list")
+
+        # Clean name to lowercase with underscores
+        clean_name = self._clean_parameter_name(name)
+
+        # Clean escaped quotes from caption and default value
+        clean_caption = caption.replace('\\"', "").replace('"', "") if caption else ""
+        clean_default = (
+            default_value.replace('\\"', "").replace('"', "") if default_value else ""
+        )
+
+        # Clean date values by removing # symbols from default value
+        if (
+            clean_default
+            and clean_default.startswith("#")
+            and clean_default.endswith("#")
+        ):
+            clean_default = clean_default.strip("#")
+
+        param = {
+            "type": "parameter",
+            "name": clean_name,
+            "caption": clean_caption,
+            "datatype": datatype,
+            "default": clean_default,
+            "param-domain-type": param_domain_type,
+        }
+
+        # Handle list type parameters with actual data
+        if param_domain_type == "list":
+            members = []
+
+            # Get members with aliases
+            for member in element.findall(".//member"):
+                value = member.get("value")
+                alias = member.get("alias")
+                if value:
+                    # Clean escaped quotes from value
+                    clean_value = value.replace('\\"', "").replace('"', "")
+                    member_data = {"value": clean_value}
+                    # Always include alias field - null if not present, clean escaped quotes
+                    if alias:
+                        clean_alias = alias.replace('\\"', "").replace('"', "")
+                        member_data["alias"] = clean_alias
+                    else:
+                        member_data["alias"] = None
+                    members.append(member_data)
+
+            param["members"] = members
+            # Remove aliases field - not needed in output
+
+        # Handle range type parameters with actual data
+        elif param_domain_type == "range":
+            # For date parameters, don't add range field
+            if datatype.lower() != "date":
+                range_data = {}
+                range_element = element.find("range")
+                if range_element is not None:
+                    min_val = range_element.get("min")
+                    max_val = range_element.get("max")
+                    granularity_val = range_element.get("granularity")
+
+                    # Clean date values by removing # symbols
+                    if min_val and min_val.startswith("#") and min_val.endswith("#"):
+                        min_val = min_val.strip("#")
+                    if max_val and max_val.startswith("#") and max_val.endswith("#"):
+                        max_val = max_val.strip("#")
+
+                    range_data["min"] = min_val
+                    range_data["max"] = max_val
+                    range_data["granularity"] = granularity_val
+                else:
+                    range_data = {"min": None, "max": None, "granularity": None}
+                param["range"] = range_data
+
+        return param
+
+    def _extract_parameters_datasource(self, datasource: Element) -> List[Dict]:
+        """Extract parameters from the Parameters datasource.
+
+        Args:
+            datasource: Parameters datasource element
+
+        Returns:
+            List of parameter elements
+        """
+        parameters = []
+
+        # Extract all parameters from the Parameters datasource
+        for col in datasource.findall(".//column[@param-domain-type]"):
+            param_data = self.extract_parameter(col)
+            parameters.append(
+                {
+                    "type": "parameter",
+                    "data": param_data,
+                    "datasource": "Parameters",  # Mark as coming from Parameters datasource
+                    "original_element": col,  # Include the original XML element for direct extraction
+                }
+            )
+
+        return parameters
+
+    def _clean_parameter_name(self, name: str) -> str:
+        """Clean parameter name to lowercase with underscores.
+
+        Args:
+            name: Raw parameter name like "[Agent Parameter]"
+
+        Returns:
+            str: Clean name like "agent_parameter"
+        """
+        # Remove brackets
+        name = name.strip("[]")
+
+        # Convert to lowercase
+        name = name.lower()
+
+        # Replace spaces and special chars with underscore
+        import re
+
+        name = re.sub(r"[^a-z0-9]+", "_", name)
+
+        # Remove duplicate underscores
+        while "__" in name:
+            name = name.replace("__", "_")
+
+        # Remove leading/trailing underscores
+        name = name.strip("_")
+
+        return name

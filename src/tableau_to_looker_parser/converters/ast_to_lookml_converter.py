@@ -88,6 +88,8 @@ class ASTToLookMLConverter:
             return self._convert_conditional(node, table_context)
         elif node.node_type == NodeType.CASE:
             return self._convert_case(node, table_context)
+        elif node.node_type == NodeType.PARAMETER_REF:
+            return self._convert_parameter_ref(node, table_context)
         elif node.node_type == NodeType.LOD_EXPRESSION:
             return self._convert_lod_expression(node, table_context)
         elif node.node_type == NodeType.DERIVED_TABLE:
@@ -1018,3 +1020,55 @@ class ASTToLookMLConverter:
         logger.warning(f"Parse error: {parse_error}")
 
         return fallback_sql
+
+    def _convert_parameter_ref(self, node: ASTNode, table_context: str) -> str:
+        """
+        Convert Tableau parameter reference to LookML parameter.
+
+        Args:
+            node: Parameter reference AST node
+            table_context: Table context (not used for parameters)
+
+        Returns:
+            LookML parameter reference in format {% parameter name %}
+        """
+        if not node.field_name:
+            logger.warning("Parameter reference node missing field_name")
+            return "/* Invalid parameter reference */"
+
+        # Extract parameter name from field_name (e.g., "parameters.Parameter 10" -> "Parameter 10")
+        if "." in node.field_name:
+            param_name = node.field_name.split(".", 1)[1]
+        else:
+            param_name = node.field_name
+
+        # Convert to LookML parameter format: {% parameter name %}
+        param_name = self._clean_parameter_name(param_name)
+
+        logger.debug(
+            f"Converting parameter reference: {node.field_name} -> {{% parameter {param_name} %}}"
+        )
+        return f"{{% parameter {param_name} %}}"
+
+    def _clean_parameter_name(self, param_name: str) -> str:
+        """
+        Clean parameter name to be a valid LookML identifier.
+
+        Args:
+            param_name: Raw parameter name from Tableau
+
+        Returns:
+            Cleaned parameter name suitable for LookML
+        """
+
+        # Replace spaces and special characters with underscores
+        clean_name = re.sub(r"[^a-zA-Z0-9_-]", "_", param_name)
+
+        # Remove leading/trailing underscores
+        clean_name = clean_name.strip("_")
+
+        # If empty after cleaning, provide a default
+        if not clean_name:
+            clean_name = "unknown_parameter"
+
+        return clean_name.lower()

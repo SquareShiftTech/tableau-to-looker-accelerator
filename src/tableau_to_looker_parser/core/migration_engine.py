@@ -160,6 +160,37 @@ class MigrationEngine:
                             json_data = handler.convert_to_json(
                                 element_data, field_table_mapping
                             )
+                        elif element["type"] == "parameter":
+                            # Use the new extract_parameter method directly for better parameter structure
+                            if hasattr(parser, "extract_parameter") and element.get(
+                                "data"
+                            ):
+                                # Extract the original XML element from the data
+                                original_element = element.get("original_element")
+                                if original_element:
+                                    # Use the new extract_parameter method
+                                    param_data = parser.extract_parameter(
+                                        original_element
+                                    )
+                                    # Convert to the format expected by the system
+                                    json_data = {
+                                        "name": param_data["name"],
+                                        "caption": param_data["caption"],
+                                        "datatype": param_data["datatype"],
+                                        "default_value": param_data["default"],
+                                        "param_domain_type": param_data[
+                                            "param-domain-type"
+                                        ],
+                                        "members": param_data.get("members", []),
+                                        "range": param_data.get("range", {}),
+                                    }
+                                else:
+                                    # Fallback to handler if no original element
+                                    json_data = handler.convert_to_json(element_data)
+                            else:
+                                # Fallback to handler
+                                json_data = handler.convert_to_json(element_data)
+                            result["parameters"].append(json_data)
                         else:
                             json_data = handler.convert_to_json(element_data)
 
