@@ -190,7 +190,7 @@ class MigrationEngine:
                             else:
                                 # Fallback to handler
                                 json_data = handler.convert_to_json(element_data)
-                            result["parameters"].append(json_data)
+
                         else:
                             json_data = handler.convert_to_json(element_data)
 

@@ -18,7 +18,11 @@ view: {{ view_name }} {
   {% for param in parameters %}
   {% if param.param_domain_type == 'list' %}
   parameter: {{ param.name }} {
-    label: "{{ param.caption if param.caption else param.name | replace('_', ' ') | title }}"
+    {% if param.caption %}
+    label: "{{ param.caption | replace('"', '\\"') }}"
+    {% elif param.label %}
+    label: "{{ param.label | replace('"', '\\"') }}"
+    {% endif %}
     type: {{ param.datatype | lower }}
     {% if param.default_value %}
     default_value: "{{ param.default_value | replace('"', '\\"') }}"
@@ -26,7 +30,9 @@ view: {{ view_name }} {
     {% if param.members %}
     {% for member in param.members %}
     allowed_value: {
-      label: "{{ (member.alias if member.alias else member.value) | replace('"', '\\"') }}"
+      {% if member.alias %}
+      label: "{{ member.alias | replace('"', '\\"') }}"
+      {% endif %}
       value: "{{ member.value | replace('"', '\\"') }}"
     }
     {% endfor %}
@@ -34,7 +40,11 @@ view: {{ view_name }} {
   }
   {% elif param.param_domain_type == 'range' and param.datatype | lower != 'date' %}
   parameter: {{ param.name }} {
-    label: "{{ param.caption if param.caption else param.name | replace('_', ' ') | title }}"
+    {% if param.caption %}
+    label: "{{ param.caption | replace('"', '\\"') }}"
+    {% elif param.label %}
+    label: "{{ param.label | replace('"', '\\"') }}"
+    {% endif %}
     type: {{ param.datatype | lower }}
     {% if param.default_value %}
     default_value: "{{ param.default_value | replace('"', '\\"') }}"
@@ -48,7 +58,11 @@ view: {{ view_name }} {
   }
   {% else %}
   parameter: {{ param.name }} {
-    label: "{{ param.caption if param.caption else param.name | replace('_', ' ') | title }}"
+    {% if param.caption %}
+    label: "{{ param.caption | replace('"', '\\"') }}"
+    {% elif param.label %}
+    label: "{{ param.label | replace('"', '\\"') }}"
+    {% endif %}
     type: {{ param.datatype | lower }}
     {% if param.default_value %}
     default_value: "{{ param.default_value | replace('"', '\\"') }}"

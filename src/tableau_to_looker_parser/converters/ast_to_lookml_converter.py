@@ -1061,8 +1061,11 @@ class ASTToLookMLConverter:
             Cleaned parameter name suitable for LookML
         """
 
-        # Replace spaces and special characters with underscores
+        # Replace spaces and special characters (but NOT underscores) with underscores
         clean_name = re.sub(r"[^a-zA-Z0-9_-]", "_", param_name)
+
+        # Replace multiple consecutive underscores with single underscore (but preserve existing single underscores)
+        clean_name = re.sub(r"_+", "_", clean_name)
 
         # Remove leading/trailing underscores
         clean_name = clean_name.strip("_")
