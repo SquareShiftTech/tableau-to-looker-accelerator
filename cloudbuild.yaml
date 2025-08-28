@@ -86,7 +86,6 @@ substitutions:
   _REGION: us-central1
   _REPO_NAME: Packages for tableau-to-looker-parser
   VERSION: "0.0.0"
-  PATH: "${PATH}"  # Empty string - let shell use actual PATH env var
   PROJECT_ID: "${PROJECT_ID}"  # Built-in substitution
   TAG_NAME: "${TAG_NAME}"  # Built-in substitution for tag triggers
 timeout: 1200s
