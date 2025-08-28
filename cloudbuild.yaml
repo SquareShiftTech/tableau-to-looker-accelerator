@@ -15,8 +15,8 @@ steps:
           PACKAGE_VERSION=$(git describe --tags --dirty --always)
         fi
 
-        echo "Using version: $PACKAGE_VERSION"
-        echo $PACKAGE_VERSION > /workspace/version.txt
+        echo "Using version: $$PACKAGE_VERSION"
+        echo $$PACKAGE_VERSION > /workspace/version.txt
   - name: python:3.11-slim
     entrypoint: bash
     args:
@@ -31,10 +31,10 @@ steps:
         if grep -q 'dynamic = \["version"\]' pyproject.toml; then
           # If using dynamic versioning, create a simple version file
           mkdir -p src/your_package
-          echo "__version__ = '$PACKAGE_VERSION'" > src/your_package/_version.py
+          echo "__version__ = '$$PACKAGE_VERSION'" > src/your_package/_version.py
         else
           # Update static version in pyproject.toml
-          sed -i "s/version = .*/version = \"$PACKAGE_VERSION\"/" pyproject.toml
+          sed -i "s/version = .*/version = \"$$PACKAGE_VERSION\"/" pyproject.toml
         fi
 
         echo "Updated version to: $PACKAGE_VERSION"
