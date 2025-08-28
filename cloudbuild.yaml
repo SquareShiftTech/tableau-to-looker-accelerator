@@ -46,7 +46,7 @@ steps:
       - |
         # Install UV
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="/root/.cargo/bin:$PATH"
+        # export PATH="/root/.cargo/bin:$PATH"
 
         # Build the package
         uv sync
