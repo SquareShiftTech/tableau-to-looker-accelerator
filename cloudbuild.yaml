@@ -8,21 +8,21 @@ steps:
         # Get version from git tag
         if [ -n "${TAG_NAME}" ]; then
           # If triggered by a tag, use tag name (remove 'v' prefix if present)
-          PACKAGE_VERSION=$(echo "${TAG_NAME}" | sed 's/^v//')
+          VERSION=$(echo "${TAG_NAME}" | sed 's/^v//')
         else
           # If not triggered by tag, use git describe
           git fetch --unshallow --tags || git fetch --tags
-          PACKAGE_VERSION=$(git describe --tags --dirty --always)
+          VERSION=$(git describe --tags --dirty --always)
         fi
 
-        echo "Using version: $$PACKAGE_VERSION"
-        echo $$PACKAGE_VERSION > /workspace/version.txt
+        echo "Using version: $VERSION"
+        echo $VERSION > /workspace/version.txt
   - name: python:3.11-slim
     entrypoint: bash
     args:
       - -c
       - |
-        PACKAGE_VERSION=$(cat /workspace/version.txt)
+        VERSION=$(cat /workspace/version.txt)
 
         # Install dependencies for file manipulation
         apt-get update && apt-get install -y sed
@@ -31,13 +31,13 @@ steps:
         if grep -q 'dynamic = \["version"\]' pyproject.toml; then
           # If using dynamic versioning, create a simple version file
           mkdir -p src/your_package
-          echo "__version__ = '$$PACKAGE_VERSION'" > src/your_package/_version.py
+          echo "__version__ = '$VERSION'" > src/your_package/_version.py
         else
           # Update static version in pyproject.toml
-          sed -i "s/version = .*/version = \"$$PACKAGE_VERSION\"/" pyproject.toml
+          sed -i "s/version = .*/version = \"$VERSION\"/" pyproject.toml
         fi
 
-        echo "Updated version to: $PACKAGE_VERSION"
+        echo "Updated version to: $VERSION"
         grep -A5 -B5 "version" pyproject.toml || echo "Version file created"
   - name: python:3.11-slim
     entrypoint: bash
