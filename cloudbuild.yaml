@@ -85,6 +85,7 @@ steps:
 substitutions:
   _REGION: us-central1
   _REPO_NAME: Packages for tableau-to-looker-parser
+  VERSION: "0.0.0"
 timeout: 1200s
 options:
   logging: CLOUD_LOGGING_ONLY
