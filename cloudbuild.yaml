@@ -61,7 +61,7 @@ steps:
 
         echo "=== Building package ==="
         uv sync --frozen --python $(which python3.11)
-        uv build
+        uv build --python $(which python3.11)
 
         echo "=== Build results ==="
         ls -la dist/
