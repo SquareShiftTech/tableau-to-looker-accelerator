@@ -73,20 +73,19 @@ steps:
       - -c
       - >
         set -e
-        echo "=== Publishing to Artifact Registry ==="
-
         echo "=== Installing system dependencies ==="
-        apt-get update && apt-get install -y curl gnupg lsb-release wget
+        apt-get update && apt-get install -y curl
 
-        echo "=== Installing Google Cloud SDK ==="
-        # Add Google Cloud SDK repository and key
-        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-        echo "deb https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
-        apt-get update && apt-get install -y google-cloud-cli
+        echo "=== Installing Google Cloud SDK (direct download) ==="
+        curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz
+        tar -xf google-cloud-cli-linux-x86_64.tar.gz
+        ./google-cloud-sdk/install.sh --quiet --path-update=false
+
 
 
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$$HOME/.local/bin:/root/.cargo/bin:$$PATH"
+        export PATH="$$PWD/google-cloud-sdk/bin:$$HOME/.local/bin:/root/.cargo/bin:$$PATH"
+
 
         echo "=== Verifying installations ==="
         gcloud version
