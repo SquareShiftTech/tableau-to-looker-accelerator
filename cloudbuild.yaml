@@ -47,8 +47,8 @@ steps:
         # Install UV
         curl -LsSf https://astral.sh/uv/install.sh | sh
         # Build the package
-        uv sync
-        uv build
+         /root/.cargo/bin/uv sync --frozen
+        /root/.cargo/bin/uv build
 
         # Show built files with version
         ls -la dist/
