@@ -53,7 +53,7 @@ steps:
 
         echo "=== Setting up UV path ==="
         # Add UV to PATH (works regardless of where it installs)
-        export PATH="$HOME/.local/bin:/root/.cargo/bin:$PATH"
+        export PATH="$$HOME/.local/bin:/root/.cargo/bin:$$PATH"
 
         echo "=== Verifying UV installation ==="
         which uv
