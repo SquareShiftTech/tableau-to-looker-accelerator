@@ -15,8 +15,8 @@ steps:
           VERSION_FROM_TAG=$(git describe --tags --dirty --always)
         fi
 
-        echo "Using version: $VERSION_FROM_TAG"
-        echo $VERSION_FROM_TAG > /workspace/version.txt
+        echo "Using version: $$VERSION_FROM_TAG"
+        echo $$VERSION_FROM_TAG > /workspace/version.txt
   - name: python:3.11-slim
     entrypoint: bash
     args:
