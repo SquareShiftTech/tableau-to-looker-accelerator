@@ -60,7 +60,7 @@ steps:
         uv --version
 
         echo "=== Building package ==="
-        uv sync --frozen
+        uv sync --frozen --python $(which python3.11)
         uv build
 
         echo "=== Build results ==="
