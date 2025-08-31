@@ -85,7 +85,7 @@ steps:
         echo "=== Installing uv (Python package manager) ==="
         curl -LsSf https://astral.sh/uv/install.sh | sh
 
-        export PATH="$$PWD/google-cloud-sdk/bin:$$HOME/.local/bin:/root/.cargo/bin:$PATH"
+        export PATH="$$PWD/google-cloud-sdk/bin:$$HOME/.local/bin:/root/.cargo/bin:$$PATH"
 
         echo "=== Verifying installations ==="
         gcloud version
