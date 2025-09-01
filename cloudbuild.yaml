@@ -44,20 +44,72 @@ steps:
     args:
       - -c
       - |
-        # Install UV
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        # Build the package
-        uv sync
-        uv build
+        set -e
+        echo "=== Installing system dependencies ==="
+        apt-get update && apt-get install -y curl
 
-        # Show built files with version
+        echo "=== Installing UV ==="
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+
+        echo "=== Setting up UV path ==="
+        # Add UV to PATH (works regardless of where it installs)
+        export PATH="$$HOME/.local/bin:/root/.cargo/bin:$$PATH"
+
+        echo "=== Verifying UV installation ==="
+        which uv
+        uv --version
+
+        echo "=== Building package ==="
+        uv sync --frozen --python $(which python3.11)
+        uv build --python $(which python3.11)
+
+        echo "=== Build results ==="
         ls -la dist/
         echo "Built package with version: $(cat /workspace/version.txt)"
 
+  - name: python:3.11-slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        echo "=== Installing system dependencies ==="
+        apt-get update && apt-get install -y --no-install-recommends \
+            curl ca-certificates gnupg unzip
+
+        echo "=== Installing Google Cloud SDK ==="
+        curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz -o gcloud.tar.gz
+        tar -xf gcloud.tar.gz
+        ./google-cloud-sdk/install.sh --quiet --path-update=false
+
+        echo "=== Installing uv (Python package manager) ==="
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+
+        export PATH="$$PWD/google-cloud-sdk/bin:$$HOME/.local/bin:/root/.cargo/bin:$$PATH"
+
+        echo "=== Verifying installations ==="
+        gcloud version
+        uv --version
+
+        # Install twine
+
+        uv tool install twine
+
+        # Configure twine for GCP Artifact Registry
+
+        export TWINE_USERNAME=oauth2accesstoken
+
+        export TWINE_PASSWORD=$(gcloud auth print-access-token)
+
+        export TWINE_REPOSITORY_URL=https://${_REGION}-python.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/
+
+        # Upload the built package
+
+        ~/.local/bin/twine upload dist/*
 
 substitutions:
   _REGION: us-central1
-  _REPO_NAME: Packages for tableau-to-looker-parser
+  _REPO_NAME: "tableau-to-looker-parser"
 timeout: 1200s
 options:
   logging: CLOUD_LOGGING_ONLY
