@@ -10,10 +10,15 @@ from tableau_to_looker_parser.converters.formula_parser import FormulaParser
 from tableau_to_looker_parser.converters.ast_to_lookml_converter import (
     ASTToLookMLConverter,
 )
+from tableau_to_looker_parser.core.field_name_mapper import field_name_mapper
 
 
 class TestFormulaConversion:
     """Test class for Tableau formula to LookML conversion."""
+
+    def setup_method(self):
+        """Clear the field name mapper before each test to ensure clean state."""
+        field_name_mapper.clear()
 
     @pytest.fixture
     def formula_parser(self):

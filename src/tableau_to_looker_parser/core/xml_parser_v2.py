@@ -208,6 +208,9 @@ class TableauXMLParserV2:
             aggregation_elem = metadata.find("aggregation")
             contains_null_elem = metadata.find("contains-null")
 
+            if parent_name_elem.text.strip("[]") == "Extract":
+                continue
+
             # Skip if missing essential elements
             if not (local_name_elem is not None and remote_name_elem is not None):
                 continue
