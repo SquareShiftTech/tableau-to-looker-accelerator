@@ -1057,7 +1057,7 @@ class TableauXMLParserV2:
         for worksheet in root.findall(".//worksheet"):
             worksheet_name = worksheet.get("name")
 
-            if worksheet_name == "byTypeS apple":
+            if worksheet_name == "Sales By Region":
                 print(f"Worksheet {worksheet_name} has data: {worksheet}")
 
             if not worksheet_name:
@@ -1413,12 +1413,14 @@ class TableauXMLParserV2:
                             encodings_list.append(child.tag)
 
         # Set shelf based on primary encoding if found
+        """
         if "color" in encodings_list:
             shelf = "color"
         elif "size" in encodings_list:
             shelf = "size"
         elif "text" in encodings_list:
             shelf = "text"
+        """
 
         return {"shelf": shelf, "encodings": encodings_list}
 
