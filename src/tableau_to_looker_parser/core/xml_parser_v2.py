@@ -1392,10 +1392,55 @@ class TableauXMLParserV2:
             }
 
         # Extract mark type (chart type) - RAW DATA ONLY
-        mark = pane.find("mark")
-        chart_type = (
-            mark.get("class", "automatic").lower() if mark is not None else "automatic"
-        )
+        # mark = pane.find("mark")
+        # chart_type = (
+        #     mark.get("class", "automatic").lower() if mark is not None else "automatic"
+        # )
+        marks = worksheet.findall(".//mark")
+        chart_type_dict = {}
+
+        for idx, mark_elem in enumerate(marks, start=1):
+            mark_class = mark_elem.get("class", "automatic")
+            # Normalize to lowercase (optional, depends on your needs)
+            chart_type = mark_class.lower() if mark_class else "automatic"
+            chart_type_dict[f"mark_{idx}"] = chart_type
+
+        chart_values = list(chart_type_dict.values())
+
+        if not chart_values:
+            chart_type_extracted = "automatic"
+        elif len(chart_values) == 1:
+            # Case 1: only one mark
+            chart_type_extracted = chart_values[0]
+        else:
+            # multiple marks present
+            # lower-casing already applied to chart_type_dict values in your loop above;
+            # check if all values are the same
+            unique_vals = set(chart_values)
+            if len(unique_vals) == 1:
+                # Case 3: all same — take any (choose last)
+                 if "pie" in unique_vals:
+                    chart_type_extracted = "pie"
+            else:
+                # Case 2: multiple different marks — choose mark_2 where present
+                # chart_values preserve insertion order (mark_1, mark_2, ...)
+                chart_type_extracted = chart_values[1] if len(chart_values) > 1 else chart_values[0]
+        
+        if len(chart_values) > 1 and len(set(chart_values)) > 1:
+            series_type = True
+            series_field_source = []   # placeholder until you give me the logic
+            # Use 3rd mark's value if available
+            series_field_chart_type = chart_type_dict.get("mark_3", [])
+        else:
+            series_type = False
+            series_field_source = []
+            series_field_chart_type = []
+        
+        # Debug print
+        worksheet_name = worksheet.get("name", "")
+        if worksheet_name == "Device TR Ranking":
+            print(f"[DEBUG] Worksheet '{worksheet_name}' chart_type_dict: {chart_type_dict}")
+            # print(f"[DEBUG] Extracted chart_type: {chart_type}")
 
         # Extract encodings - RAW DATA ONLY
         encodings_info = self._extract_pane_encodings(pane)
@@ -1412,7 +1457,11 @@ class TableauXMLParserV2:
 
         # Extract field mappings
         viz_config = {
-            "chart_type": chart_type,  # Raw chart type from XML
+            "chart_type": chart_type_dict,  # Raw chart type from XML
+            "chart_type_extracted": chart_type_extracted,
+            "series_type": series_type,
+            "series_field_source": series_field_source,
+            "series_field_chart_type": series_field_chart_type,
             "x_axis": self._extract_shelf_fields(worksheet, "cols"),
             "y_axis": self._extract_shelf_fields(worksheet, "rows"),
             "color": None,
@@ -1423,8 +1472,9 @@ class TableauXMLParserV2:
             "show_labels": self._extract_show_labels(pane),
             "show_totals": self._extract_show_totals(worksheet),
             "raw_config": {
-                "chart_type": chart_type,
-                "mark_class": chart_type,
+                 "chart_type": chart_type_dict,
+                # "mark_class": chart_type,
+                "chart_type_extracted": chart_type_extracted,
                 "encodings": encodings_info,  # Raw encoding data for handler
                 "pane_styling": pane_styling,  # NEW: Pane-specific styling
             },

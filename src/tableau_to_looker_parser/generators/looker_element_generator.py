@@ -35,6 +35,10 @@ class LookerElementGenerator:
             "size_marks": {"encodings_contains": "size"},
         }
 
+        self.combo_chart_type_mapping ={
+            "shape": "scatter"
+        }
+
     def generate_element(
         self,
         worksheet: WorksheetSchema,
@@ -59,12 +63,18 @@ class LookerElementGenerator:
             return self._create_fallback_element(worksheet, position, view_mappings)
 
         yaml_detection = worksheet.visualization.yaml_detection
+        raw_config = worksheet.visualization.raw_config
         if not yaml_detection:
             logger.warning(f"Worksheet {worksheet.name} has no YAML detection data")
             return self._create_fallback_element(worksheet, position, view_mappings)
 
         # Get Looker chart type from YAML detection
         looker_chart_type = yaml_detection.get("looker_equivalent", "table")
+        series_type = raw_config.get("series_type")
+        series_field_source = raw_config.get("series_field_source")
+        series_chart_type = raw_config.get("series_field_chart_type")
+        if series_chart_type:
+            series_chart_type = self.combo_chart_type_mapping.get(series_chart_type.lower(), series_chart_type)
         # new function for worksheet.fields to get the correct field name
         # 1. Take the view mapping  construct the 3 json dimension,measure,calculated_fields
         # dimension json strcure : [datasource_id]: {"local_name": self.clean_name(name) }
@@ -92,6 +102,9 @@ class LookerElementGenerator:
             "fields": self._generate_fields(worksheet),
             "limit": 500,
             "column_limit": 50,
+            "series_type": series_type,
+            # "series": series_field_source,
+            "series_chart_type": series_chart_type,
         }
 
         if worksheet.name == "CD detail":
@@ -132,6 +145,7 @@ class LookerElementGenerator:
         logger.debug(
             f"Generated {looker_chart_type} element for worksheet {worksheet.name}"
         )
+        print(f"Generated element for worksheet {worksheet.name}: {element}")
         return element
 
     def _generate_title(self, worksheet: WorksheetSchema) -> str:
