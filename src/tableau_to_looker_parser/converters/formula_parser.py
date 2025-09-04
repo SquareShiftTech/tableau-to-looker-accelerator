@@ -564,7 +564,7 @@ class FormulaParser:
 
             # To DO : remove harcoded fix
             if field_name == "Rolling 36 (copy)_777433916922368001":
-                processed_field_name = "max dttm"
+                processed_field_name = "max_dttm"
             else:
                 processed_field_name = field_name.lower().replace(" ", "_")
 
