@@ -5,7 +5,7 @@ basic_chart_detection:
     conditions:
       - mark_type: "Square"
       - has_text_marks: true
-      - columns_shelf_count: ">1"  # day(dt), hour(dt)
+      - columns_shelf_count: ">=1"  # day(dt), hour(dt)
       - rows_shelf_has_string: true
       - text_encoding_has_measure: true  # SUM(Sales) in text
     confidence: 95
