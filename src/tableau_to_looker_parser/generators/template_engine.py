@@ -55,9 +55,7 @@ class TemplateEngine:
         value = re.sub(r"[^\w\s]", "_", value)  # Replace special chars with underscore
         value = re.sub(r"\s+", "_", value)  # Replace spaces with underscore
         value = re.sub(r"_+", "_", value)  # Replace multiple underscores with single
-        value = value.strip(
-            "_"
-        ).lower()  # Remove leading/trailing underscores and lowercase
+        value = value.strip().lower()
 
         return value
 
