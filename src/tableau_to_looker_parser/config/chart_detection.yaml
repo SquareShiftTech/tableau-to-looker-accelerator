@@ -29,11 +29,12 @@ basic_chart_detection:
 
   stacked_1dim_bar_chart:
     conditions:
-      - mark_type: ["Automatic"]
+      - mark_type: ["Bar", "Automatic"]
       - has_color_encoding: true
       - columns_shelf_count: ">0"
       - x_encoding: "measure"
-      - has_text_marks: true
+      - y_encoding: "none"
+      - has_text_marks: True
     confidence: 100
     stacked_type: true
     pivot_required: true
@@ -43,7 +44,7 @@ basic_chart_detection:
 
   stacked_2dim_column_chart:
     conditions:
-      - mark_type: ["Automatic"]
+      - mark_type: ["Bar", "Automatic"]
       - has_color_encoding: true
       - columns_shelf_count: ">0"
       - x_encoding: ["categorical", "string"]
@@ -57,7 +58,7 @@ basic_chart_detection:
 
   stacked_2dim_bar_chart:
     conditions:
-      - mark_type: ["Automatic"]
+      - mark_type: [Bar"","Automatic"]
       - has_color_encoding: true
       - columns_shelf_count: ">0"
       - x_encoding: "measure"
@@ -72,7 +73,7 @@ basic_chart_detection:
   # Column Chart (Vertical Bars)
   column_chart:
     conditions:
-      - mark_type: "Bar"
+      - mark_type: ["Automatic","Bar"]
       - x_encoding: ["categorical", "string", "temporal"]
       - y_encoding: "measure"
       - orientation: "vertical"
@@ -250,15 +251,27 @@ basic_chart_detection:
     looker_equivalent: "looker_grid"  # Limited support
 
   # Text Table (Simple)
-  text_table:
+  text_table_without_pivot:
     conditions:
       - mark_type: "Text"
       - has_text_marks: true
-      - has_no_color_size_encoding: true
-    confidence: 90
+      - columns_shelf_count: ">0"
+      - rows_shelf_has_string: true
+    confidence: 100
     looker_equivalent: "looker_grid"
-    pivot_required: true
-    pivot_type: "simple_table"
+    fields_sources: ["rows_shelf","column_shelf", "text_marks"]
+
+  # text_table_with_pivot:
+  #   conditions:
+  #     - mark_type: "Text"
+  #     - has_text_marks: true
+  #     - columns_shelf_count: ">1"
+  #     - rows_shelf_has_string: true
+  #   confidence: 100
+  #   looker_equivalent: "looker_grid"
+  #   pivot_required: true
+  #   pivot_field_source: column_shelf_second_value
+  #   fields_sources: ["rows_shelf","column_shelf", "text_marks"]
 
   # Map Charts
   symbol_map:

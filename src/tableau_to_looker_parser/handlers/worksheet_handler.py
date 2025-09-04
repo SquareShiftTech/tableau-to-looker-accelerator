@@ -293,7 +293,7 @@ class WorksheetHandler(BaseHandler):
         """Process raw visualization data into VisualizationConfig format (basic detection)."""
 
         # Map chart type to enum
-        chart_type_str = raw_viz.get("chart_type", "").lower()
+        chart_type_str = raw_viz.get("chart_type_extracted", "").lower()
         chart_type = self._map_chart_type(chart_type_str)
 
         # Extract axis information
@@ -308,6 +308,7 @@ class WorksheetHandler(BaseHandler):
 
         viz_config = {
             "chart_type": chart_type.value,
+            "chart_type_extracted": chart_type_str,
             "x_axis": x_axis,
             "y_axis": y_axis,
             "color": raw_viz.get("color"),
