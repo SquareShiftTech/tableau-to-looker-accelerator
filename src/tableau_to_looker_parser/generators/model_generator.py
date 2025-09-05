@@ -8,7 +8,7 @@ while adding support for complex relationship patterns like many-to-many bridges
 from typing import Dict, List, Set, Tuple, Optional
 import logging
 from collections import defaultdict
-
+from datetime import datetime
 from .base_generator import BaseGenerator
 
 logger = logging.getLogger(__name__)
@@ -51,12 +51,14 @@ class ModelGenerator(BaseGenerator):
 
             # Write to file (same logic as original)
             output_path = self._ensure_output_dir(output_dir)
+            # file_name = f"{connection_name}_model{self.model_extension}{self.lookml_extension}"
+            file_name = f"{connection_name}_model_generated_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             file_path = (
                 output_path
-                / f"{connection_name}_model{self.model_extension}{self.lookml_extension}"
+                / f"{file_name}{self.model_extension}{self.lookml_extension}"
             )
 
-            return self._write_file(content, file_path)
+            return self._write_file(content, file_path), file_name
 
         except Exception as e:
             logger.error(f"Failed to generate model file: {str(e)}")

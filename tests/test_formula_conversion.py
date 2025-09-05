@@ -15,7 +15,6 @@ from tableau_to_looker_parser.converters.ast_to_lookml_converter import (
 class TestFormulaConversion:
     """Test class for Tableau formula to LookML conversion."""
 
-
     @pytest.fixture
     def formula_parser(self):
         """Create a formula parser instance."""

@@ -62,11 +62,15 @@ class ProjectGenerator(BaseGenerator):
             generated_files["view_mappings"] = view_mappings
 
             # Generate model file
-            generated_files["model"] = self._generate_model(migration_data, output_dir)
+            model_file, model_file_name = self._generate_model(
+                migration_data, output_dir
+            )
+            generated_files["model"] = model_file
+            # generated_files["model_file_name"] = model_file_name
 
             # Generate dashboard files
             generated_files["dashboards"] = self._generate_dashboards(
-                migration_data, output_dir, view_mappings
+                migration_data, output_dir, view_mappings, model_file_name
             )
 
             logger.info(f"Generated {len(generated_files)} file types in {output_dir}")
@@ -94,7 +98,11 @@ class ProjectGenerator(BaseGenerator):
         return self.model_generator.generate(migration_data, output_dir)
 
     def _generate_dashboards(
-        self, migration_data: Dict, output_dir: str, view_mappings: Dict
+        self,
+        migration_data: Dict,
+        output_dir: str,
+        view_mappings: Dict,
+        model_file_name: str = None,
     ) -> list:
         """Generate dashboard files if dashboards exist."""
         dashboards = migration_data.get("dashboards")
@@ -103,7 +111,7 @@ class ProjectGenerator(BaseGenerator):
             return []
 
         dashboard_files = self.dashboard_generator.generate(
-            migration_data, output_dir, view_mappings
+            migration_data, output_dir, view_mappings, model_file_name
         )
         logger.info(f"Generated {len(dashboard_files)} dashboard files")
         return dashboard_files

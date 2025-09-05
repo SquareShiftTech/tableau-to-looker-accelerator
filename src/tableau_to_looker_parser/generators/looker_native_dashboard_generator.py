@@ -30,7 +30,11 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         self.layout_calculator = LayoutCalculator()
 
     def generate(
-        self, migration_data: Dict, output_dir: str, view_mappings: Dict = None
+        self,
+        migration_data: Dict,
+        output_dir: str,
+        view_mappings: Dict = None,
+        model_file_name: str = None,
     ) -> List[str]:
         """
         Generate Looker-native dashboard.lookml files from migration data.
@@ -50,7 +54,7 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             return generated_files
 
         # Set up model and explore context for element generation
-        self._setup_element_generator_context(migration_data)
+        self._setup_element_generator_context(migration_data, model_file_name)
 
         for dashboard_data in dashboards:
             try:
@@ -91,10 +95,15 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         logger.info(f"Generated {len(generated_files)} Looker-native dashboard files")
         return generated_files
 
-    def _setup_element_generator_context(self, migration_data: Dict):
+    def _setup_element_generator_context(
+        self, migration_data: Dict, model_file_name: str = None
+    ):
         """Set up model and explore names for element generation."""
         # Get model name using same logic as model generator
-        model_name = self._get_model_name(migration_data)
+        if model_file_name:
+            model_name = model_file_name
+        else:
+            model_name = self._get_model_name(migration_data)
 
         # Use main table as explore name (following existing pattern)
         tables = migration_data.get("tables", [])
