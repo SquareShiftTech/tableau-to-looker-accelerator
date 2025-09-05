@@ -121,6 +121,9 @@ class FilterProcessor:
         # Clean field name
 
         clean_field = tableau_filter.view_mapping_name
+        clean_field = self._apply_fallback_timeframe_mapping(
+            clean_field or tableau_filter.field_name, tableau_filter
+        )
         if not clean_field:
             logger.warning(f"Invalid field name: {tableau_filter.field_name}")
             return None
@@ -207,3 +210,49 @@ class FilterProcessor:
                 values.extend(nested_values)
 
         return values
+
+    def _apply_fallback_timeframe_mapping(
+        self, field_name: str, tableau_filter=None
+    ) -> str:
+        """
+
+        Args:
+            field_name: Original field name from filter
+            tableau_filter: The full tableau filter object for additional context
+
+        Returns:
+            Field name with appropriate timeframe suffix for date fields
+
+        """
+
+        if tableau_filter:
+            # Try to get field_info from extra fields
+            field_info = getattr(tableau_filter, "field_info", None)
+            if not field_info:
+                # Try to get it from the raw data
+                field_info = tableau_filter.__dict__.get("field_info", {})
+            if field_info and isinstance(field_info, dict):
+                field_type = field_info.get("field_type", "")
+                if field_type:
+                    # Map Tableau field types to LookML timeframe suffixes
+                    timeframe_mapping = {
+                        "yr": "year",
+                        "tyr": "year",
+                        "mn": "month",
+                        "tmn": "month",
+                        "dy": "date",
+                        "tdy": "date",
+                        "qr": "quarter",
+                        "tqr": "quarter",
+                        "wk": "week",
+                        "twk": "week",
+                    }
+                    timeframe_suffix = timeframe_mapping.get(field_type)
+                    if timeframe_suffix:
+                        result = f"{field_name}_{timeframe_suffix}"
+                        logger.debug(
+                            f"Using field type {field_type}, mapping to: {result}"
+                        )
+                        return result
+
+        return field_name

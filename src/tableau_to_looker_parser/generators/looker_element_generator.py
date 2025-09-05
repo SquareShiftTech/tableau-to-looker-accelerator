@@ -271,6 +271,10 @@ class LookerElementGenerator:
             # For dimension groups, add appropriate timeframe
             if aggregation and "day" in aggregation.lower():
                 return f"{field_name}_date"
+            elif aggregation and "month" in aggregation.lower():
+                return f"{field_name}_month"
+            elif aggregation and "year" in aggregation.lower():
+                return f"{field_name}_year"
             elif aggregation and "hour" in aggregation.lower():
                 return f"{field_name}_hour_formatted"
             else:
@@ -299,6 +303,10 @@ class LookerElementGenerator:
             # For dimension groups, add appropriate timeframe
             if aggregation and "day" in aggregation.lower():
                 return f"{field_name}_date"
+            elif aggregation and "month" in aggregation.lower():
+                return f"{field_name}_month"
+            elif aggregation and "year" in aggregation.lower():
+                return f"{field_name}_year"
             elif aggregation and "hour" in aggregation.lower():
                 return f"{field_name}_hour_formatted"
             else:
@@ -602,9 +610,11 @@ class LookerElementGenerator:
                     datasource_id = each_dimension.get("datasource_id")
                     local_name = each_dimension.get("local_name")
                     clean_name = each_dimension.get("name")
+
                     if datasource_id:
                         if datasource_id not in field_mappings["dimensions"]:
                             field_mappings["dimensions"][datasource_id] = {}
+
                         field_mappings["dimensions"][datasource_id][local_name] = {
                             "clean_name": self._clean_name(clean_name)
                         }
