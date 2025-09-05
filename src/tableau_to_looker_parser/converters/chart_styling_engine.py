@@ -95,6 +95,15 @@ class ChartStylingEngine:
         chart_properties = chart_config.get("properties", {})
         for prop, value in chart_properties.items():
             if value and prop not in styled_element:  # Don't override existing values
+                # Don't apply table_theme if we have custom header styling
+                if (
+                    prop == "table_theme"
+                    and "header_background_color" in styled_element
+                ):
+                    logger.debug(
+                        "Skipping table_theme due to custom header_background_color"
+                    )
+                    continue
                 styled_element[prop] = value
 
         logger.debug(
@@ -188,6 +197,8 @@ class ChartStylingEngine:
         header_styles = table_style_data.get("header", {})
         if header_styles:
             # Header background colors
+            if "header_bg" in header_styles:
+                table_config["header_background_color"] = header_styles["header_bg"]
             if "column_header_bg" in header_styles:
                 table_config["header_background_color"] = header_styles[
                     "column_header_bg"
@@ -232,6 +243,13 @@ class ChartStylingEngine:
                 #    "value_color_palette"
                 # ]
                 pass  # TODO: implement this
+
+        # If we have a custom header background color, don't apply table_theme
+        # as it would override the custom styling
+        if "header_background_color" in table_config:
+            # Remove table_theme to prevent it from overriding custom header styling
+            table_config.pop("table_theme", None)
+            logger.debug("Removed table_theme due to custom header_background_color")
 
         if table_config:
             logger.debug(f"Applied table styling: {list(table_config.keys())}")
