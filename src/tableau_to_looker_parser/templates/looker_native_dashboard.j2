@@ -18,7 +18,7 @@
 {% if element.stacking %}    stacking: {{ element.stacking }}
 {% endif %}
 {% if element.filters and element.filters|length > 0 %}    filters:
-{% for filter_key, filter_value in element.filters.items() %}      {{ filter_key }}: {{ filter_value }}
+{% for filter_key, filter_value in element.filters.items() %}      {{ filter_key }}: "{{ filter_value }}"
 {% endfor %}{% endif %}
 {% if element.sorts and element.sorts|length > 0 %}    sorts: [{% for sort in element.sorts %}{% if not loop.first %},
       {% endif %}{{ sort }}{% endfor %}]
@@ -27,6 +27,7 @@
 {% endfor %}{% endif %}{% if element.show_value_labels is defined %}    show_value_labels: {{ element.show_value_labels|lower }}
 {% endif %}{% if element.value_labels %}    value_labels: "{{ element.value_labels }}"
 {% endif %}{% if element.show_legend is defined %}    show_legend: {{ element.show_legend|lower }}
+{% endif %}{% if element.hide_legend is defined %}    hide_legend: {{ element.hide_legend|lower }}
 {% endif %}{% if element.legend_position %}    legend_position: "{{ element.legend_position }}"
 {% endif %}{% if element.x_axis_label is defined %}    x_axis_label: {{ element.x_axis_label|lower }}
 {% endif %}{% if element.y_axis_label is defined %}    y_axis_label: {{ element.y_axis_label|lower }}
