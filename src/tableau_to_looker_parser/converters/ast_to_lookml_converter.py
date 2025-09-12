@@ -99,6 +99,8 @@ class ASTToLookMLConverter:
             return self._convert_window_function(node, table_context)
         elif node.node_type == NodeType.UNARY:
             return self._convert_unary(node, table_context)
+        elif node.node_type == NodeType.LIST:
+            return self._convert_list(node, table_context)
         else:
             # Check if this is a fallback node with migration metadata
             if (
@@ -334,8 +336,17 @@ class ASTToLookMLConverter:
         elif operator == "%":
             # Modulo operator
             return f"MOD({left_expr}, {right_expr})"
+
+        elif operator == "+":
+            # Check if this is string concatenation by examining the operands
+            if self._is_string_concatenation(node.left, node.right):
+                # Use || for string concatenation in SQL
+                return f"({left_expr} || {right_expr})"
+            else:
+                # Use + for numeric addition
+                return f"({left_expr} + {right_expr})"
         else:
-            # Standard operators: +, -, *, /
+            # Standard operators: -, *, /
             # Wrap in parentheses to preserve precedence
             return f"({left_expr} {operator} {right_expr})"
 
@@ -363,6 +374,9 @@ class ASTToLookMLConverter:
         if operator == "<>" or operator == "!=":
             # Both Tableau <> and != map to SQL !=
             operator = "!="
+        elif operator.upper() == "IN":
+            # For IN operator, right side should be a list
+            return f"({left_expr} IN {right_expr})"
 
         return f"({left_expr} {operator} {right_expr})"
 
@@ -1026,6 +1040,30 @@ class ASTToLookMLConverter:
 
         return fallback_sql
 
+    def _convert_list(self, node: ASTNode, table_context: str) -> str:
+        """
+        Convert LIST node to SQL IN clause values.
+
+        Args:
+            node: LIST AST node containing items
+            table_context: Table context (not used for lists)
+
+        Returns:
+            SQL-formatted list of values for IN clause
+        """
+        if not node.items:
+            logger.warning("List node has no items")
+            return "()"
+
+        # Convert each item in the list
+        converted_items = []
+        for item in node.items:
+            converted_item = self._convert_node(item, table_context)
+            converted_items.append(converted_item)
+
+        # Join with commas and wrap in parentheses
+        return f"({', '.join(converted_items)})"
+
     def _convert_parameter_ref(self, node: ASTNode, table_context: str) -> str:
         """
         Convert Tableau parameter reference to LookML parameter.
@@ -1080,3 +1118,39 @@ class ASTToLookMLConverter:
             clean_name = "unknown_parameter"
 
         return clean_name.lower()
+
+    def _is_string_concatenation(self, left_node: ASTNode, right_node: ASTNode) -> bool:
+        """
+        Determine if a + operation is string concatenation based on operand types.
+
+        This method examines the AST nodes to determine if the + operator
+        should be treated as string concatenation (using ||) or numeric addition (using +).
+
+        Args:
+            left_node: Left operand AST node
+            right_node: Right operand AST node
+
+        Returns:
+            bool: True if this should be string concatenation, False for numeric addition
+        """
+        # Check if either operand is a string literal
+        if (
+            left_node.node_type == NodeType.LITERAL
+            and left_node.data_type == DataType.STRING
+        ) or (
+            right_node.node_type == NodeType.LITERAL
+            and right_node.data_type == DataType.STRING
+        ):
+            return True
+
+        # Check if either operand is an arithmetic operation that results in string concatenation
+        if (
+            left_node.node_type == NodeType.ARITHMETIC and left_node.operator == "+"
+        ) or (
+            right_node.node_type == NodeType.ARITHMETIC and right_node.operator == "+"
+        ):
+            # If either operand is already a string concatenation, this is likely string concatenation too
+            return True
+
+        # Default to numeric addition if we can't determine
+        return False

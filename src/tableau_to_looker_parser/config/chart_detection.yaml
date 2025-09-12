@@ -1,14 +1,30 @@
 basic_chart_detection:
 
   # Table/Crosstab Detection (Your Favorite)
+  scorecard_table:
+    conditions:
+      - has_color_encoding: true
+      - has_text_marks: true
+      - rows_shelf_count: "1"
+      - columns_shelf_count: "1"
+    confidence: 100
+    looker_equivalent: "looker_column"
+    fields_sources: ["rows_shelf", "columns_shelf"]
+    pivot_field_source: ["columns_shelf"]
+    pivot_required: true
+    pivot_type: "crosstab"
   table_chart:
     conditions:
-      - mark_type: "Square"
+      - mark_type: ["Square", "Automatic"]
+      # - has_text_marks: true
+      # - columns_shelf_count: ">0"  # day(dt), hour(dt)
+      # - rows_shelf_has_string: true
+      # - text_encoding_has_measure: true  # SUM(Sales) in text
+      - has_color_encoding: true
       - has_text_marks: true
-      - columns_shelf_count: ">0"  # day(dt), hour(dt)
-      - rows_shelf_has_string: true
-      - text_encoding_has_measure: true  # SUM(Sales) in text
-    confidence: 95
+      - rows_shelf_count: ">0"
+      - columns_shelf_count: ">0"
+    confidence: 100
     variants:
       - crosstab_table:
           conditions:
@@ -22,7 +38,8 @@ basic_chart_detection:
     pivot_required: true
     pivot_type: "crosstab"
     looker_equivalent: "looker_grid"
-    fields_sources: ["rows_shelf","column_shelf", "text_marks"]
+    # fields_sources: ["rows_shelf","column_shelf", "text_marks"]
+    fields_sources: ["rows_shelf","column_shelf"]
     pivot_field_source: ["columns_shelf"]
 
   # Bar Chart Detection (Your Favorite)

@@ -42,6 +42,7 @@ class TokenType(Enum):
     AND = "AND"
     OR = "OR"
     NOT = "NOT"
+    IN = "IN"
 
     # Punctuation
     LEFT_PAREN = "LEFT_PAREN"  # (

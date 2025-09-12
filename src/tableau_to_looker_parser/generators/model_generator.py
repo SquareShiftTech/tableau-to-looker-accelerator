@@ -70,25 +70,27 @@ class ModelGenerator(BaseGenerator):
         if not tables:
             raise ValueError("No tables found in migration data")
 
-        # Use the first table as the primary explore (same as original)
-        primary_table = tables[0]
-        explore = {
-            "name": primary_table["name"],
-            "description": f"Explore for {primary_table['name']} with related tables",
-            "joins": [],
-        }
+        explores = []
 
-        # Enhanced logical joins that handle complex patterns
-        logical_joins = self._build_enhanced_logical_joins(
-            migration_data, primary_table
-        )
-        explore["joins"].extend(logical_joins)
+        # Create an explore for each table/view
+        for table in tables:
+            explore = {
+                "name": table["name"],
+                "description": f"Explore for {table['name']} with related tables",
+                "joins": [],
+            }
 
-        # Physical joins (same logic as original for backward compatibility)
-        physical_joins = self._build_physical_joins(migration_data, primary_table)
-        explore["joins"].extend(physical_joins)
+            # Enhanced logical joins that handle complex patterns
+            logical_joins = self._build_enhanced_logical_joins(migration_data, table)
+            explore["joins"].extend(logical_joins)
 
-        return [explore]
+            # Physical joins (same logic as original for backward compatibility)
+            physical_joins = self._build_physical_joins(migration_data, table)
+            explore["joins"].extend(physical_joins)
+
+            explores.append(explore)
+
+        return explores
 
     def _build_enhanced_logical_joins(
         self, migration_data: Dict, primary_table: Dict
