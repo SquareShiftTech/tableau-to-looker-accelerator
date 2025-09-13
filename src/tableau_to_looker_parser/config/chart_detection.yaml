@@ -50,7 +50,7 @@ basic_chart_detection:
       - x_encoding: ["categorical", "string"]
       # - y_encoding: "measure"
     confidence: 100
-    stacked_type: true
+    # stacked_type: true
     pivot_required: true
     looker_equivalent: "looker_column"
     fields_sources: ["color_marks", "rows_shelf", "columns_shelf"]
