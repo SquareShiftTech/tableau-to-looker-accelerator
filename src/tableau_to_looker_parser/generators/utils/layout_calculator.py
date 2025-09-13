@@ -272,23 +272,23 @@ class LayoutCalculator:
         else:
             calculated_row = max(0, int(element.position.y * 20))
 
+        # Calculate base position from normalized coordinates
+        base_col = max(0, int(element.position.x * self.grid_columns))
+        base_width = max(1, int(element.position.width * self.grid_columns))
+
         position = {
             "row": calculated_row,
-            "col": max(0, int(element.position.x * self.grid_columns)),
-            "width": max(1, int(element.position.width * self.grid_columns)),
+            "col": base_col,
+            "width": base_width,
             "height": max(1, int(element.position.height * 20)),
         }
 
-        # Apply manual dashboard minimum sizes: width=6, height=5 for donut charts
-        position["width"] = max(6, position["width"])  # Match manual dashboard minimum
+        # Apply minimum sizes for readability
+        position["width"] = max(6, position["width"])
+        position["height"] = max(5, position["height"])
 
-        position["height"] = max(
-            5, position["height"]
-        )  # Match manual dashboard minimum
-
-        # Fix collision issue: ensure no overlap with existing elements
-        if existing_elements:
-            position = self._resolve_collisions(position, existing_elements)
+        # Note: Column positioning will be normalized later by normalize_element_widths
+        # This ensures equal spacing and proper alignment across rows
 
         return position
 
@@ -401,52 +401,46 @@ class LayoutCalculator:
         Returns:
             Dict containing complete dashboard element configuration with normalized widths
         """
-        # Step 2: Group elements by row
+        # Group elements by row
         row_groups = defaultdict(list)
 
-        # Step 1: Group elements by row
         for elem in looker_elements:
             row = elem.get("row")
             if row is not None:
                 row_groups[row].append(elem)
 
-        # Step 2: Compute max row width across the dashboard
-        row_widths = {}
+        # Sort elements within each row by their original column position
         for row, elems in row_groups.items():
-            row_widths[row] = sum(e.get("width", 0) for e in elems)
-        max_row_width = max(row_widths.values())
+            elems.sort(key=lambda e: e.get("col", 0))
 
-        logger.info(f"Max row width across dashboard = {max_row_width}")
+        logger.info(f"Processing {len(row_groups)} rows for width normalization")
 
-        # Step 3: Apply logic to each row
+        # Apply logic to each row
         for row, elems in row_groups.items():
             if len(elems) == 1:
-                # Single element row → set to dashboard-wide max
-                old_width = elems[0].get("width", 0)
-                elems[0]["width"] = max_row_width
+                # Single element row → set to full width (24 columns)
+                elems[0]["width"] = 24
                 elems[0]["col"] = 0
-                logger.info(
-                    f"Row {row}: single element adjusted from {old_width} → {max_row_width}"
-                )
+                logger.info(f"Row {row}: single element set to full width (24 columns)")
             else:
-                # Multi-element rows → keep original widths
-                logger.info(
-                    f"Row {row}: multi-element row, widths unchanged = {[e.get('width', 0) for e in elems]}"
-                )
-                # # Multi-element row → distribute remaining space
-                # row_sum_width = sum([e.get("width", 0) for e in elems])
-                # extra_space = max_row_width - row_sum_width
-                # add_per_element = extra_space // len(elems) if elems else 0
+                # Multi-element rows → distribute equally across 24 columns
+                num_elements = len(elems)
+                width_per_element = 24 // num_elements
+                remaining_width = 24 % num_elements
 
-                # col = 0
-                # for e in elems:
-                #     old_width = e.get("width", 0)
-                #     e["width"] = old_width + add_per_element
-                #     e["col"] = col
-                #     col += e["width"]
-                #     logger.info(
-                #         f"Row {row}: element {e.get('title', e.get('name'))} width {old_width} → {e['width']}"
-                #     )
+                col = 0
+                for i, elem in enumerate(elems):
+                    # Distribute remaining width to first few elements
+                    extra_width = 1 if i < remaining_width else 0
+                    elem["width"] = width_per_element + extra_width
+                    elem["col"] = col
+                    col += elem["width"]
+
+                    logger.info(
+                        f"Row {row}: element {elem.get('title', elem.get('name', 'unnamed'))} "
+                        f"positioned at col {elem['col']} with width {elem['width']}"
+                    )
+
         return looker_elements
 
     def calculate_standardized_widths(self, elements: list) -> Dict[str, int]:

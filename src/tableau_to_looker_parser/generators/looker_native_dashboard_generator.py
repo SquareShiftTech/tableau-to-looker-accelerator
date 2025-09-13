@@ -105,17 +105,24 @@ class LookerNativeDashboardGenerator(BaseGenerator):
         else:
             model_name = self._get_model_name(migration_data)
 
-        # Use main table as explore name (following existing pattern)
+        # Set default model and explore - will be overridden per element
+        # Use main table as default explore name (following existing pattern)
         tables = migration_data.get("tables", [])
         if tables:
             # Use same cleaning logic as model template: clean_name filter
             raw_table_name = tables[0].get("name", "main_table")
-            explore_name = self._clean_name(raw_table_name)
+            default_explore_name = self._clean_name(raw_table_name)
         else:
-            explore_name = "main_table"
+            default_explore_name = "main_table"
 
-        self.element_generator.set_model_explore(model_name, explore_name)
-        logger.debug(f"Set element generator context: {model_name}.{explore_name}")
+        # Store migration data for per-element explore determination
+        self.migration_data = migration_data
+        self.default_explore_name = default_explore_name
+
+        self.element_generator.set_model_explore(model_name, default_explore_name)
+        logger.debug(
+            f"Set default element generator context: {model_name}.{default_explore_name}"
+        )
 
     def _get_model_name(self, migration_data: Dict) -> str:
         """Get model name using same logic as model generator."""
@@ -242,10 +249,22 @@ class LookerNativeDashboardGenerator(BaseGenerator):
 
         worksheet = element.worksheet
 
+        # Block specific elements that should not be generated
+        if self._should_block_element(worksheet):
+            logger.info(f"Blocking element: {worksheet.name} - {worksheet.title}")
+            return None
+
         # Calculate position using existing layout calculator with height-based rows and standardized widths
         position = self.layout_calculator.calculate_looker_position(
             element, migration_data, height_based_rows, existing_elements
         )
+
+        # Determine correct explore for this worksheet
+        explore_name = self._determine_explore_from_worksheet(worksheet, migration_data)
+
+        # Update element generator with correct explore for this element
+        model_name = self.element_generator.model_name  # Keep existing model name
+        self.element_generator.set_model_explore(model_name, explore_name)
 
         # Generate element using the dedicated generator
         looker_element = self.element_generator.generate_element(
@@ -262,6 +281,23 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             looker_element.setdefault("filters", {}).update(element_filters)
 
         return looker_element
+
+    def _should_block_element(self, worksheet) -> bool:
+        """
+        Check if a worksheet element should be blocked from generation.
+
+        """
+
+        # Block elements with specific names that should not be generated
+        blocked_names = ["Download Office Data"]
+
+        if worksheet.name and any(
+            blocked_name.lower() in worksheet.name.lower()
+            for blocked_name in blocked_names
+        ):
+            return True
+
+        return False
 
     def _extract_element_filters(
         self, element: DashboardElement, migration_data: Dict
@@ -289,6 +325,96 @@ class LookerNativeDashboardGenerator(BaseGenerator):
             looker_filters.append(filter_config)
 
         return looker_filters
+
+    def _determine_explore_from_worksheet(self, worksheet, migration_data: Dict) -> str:
+        tables = migration_data.get("tables", [])
+        if not tables:
+            logger.warning("No tables found in migration data, using default explore")
+            return self.default_explore_name
+
+        # Create mapping from table name to explore name (cleaned)
+        table_to_explore = {}
+        for table in tables:
+            table_name = table.get("name", "")
+            if table_name:
+                # Use the same cleaning logic as the model template
+                explore_name = self._clean_name(table_name)
+                table_to_explore[table_name] = explore_name
+
+        # First, check if worksheet has a direct datasource_id
+        worksheet_datasource_id = None
+        if hasattr(worksheet, "datasource_id"):
+            worksheet_datasource_id = worksheet.datasource_id
+        elif hasattr(worksheet, "get"):
+            worksheet_datasource_id = worksheet.get("datasource_id", "")
+
+        if worksheet_datasource_id:
+            logger.debug(
+                f"Worksheet '{worksheet.name}' has direct datasource_id: '{worksheet_datasource_id}'"
+            )
+            # Map datasource_id to table name using migration data
+            datasource_to_table = self._build_datasource_to_table_mapping(
+                migration_data
+            )
+            if worksheet_datasource_id in datasource_to_table:
+                table_name = datasource_to_table[worksheet_datasource_id]
+                explore_name = table_to_explore.get(table_name)
+                if explore_name:
+                    logger.info(
+                        f"Worksheet '{worksheet.name}' mapped to explore '{explore_name}' via datasource_id '{worksheet_datasource_id}' -> table '{table_name}'"
+                    )
+                    return explore_name
+
+        # Fallback: use default explore
+        logger.debug(
+            f"Using default explore '{self.default_explore_name}' for worksheet '{worksheet.name}'"
+        )
+        return self.default_explore_name
+
+    def _build_datasource_to_table_mapping(
+        self, migration_data: Dict
+    ) -> Dict[str, str]:
+        """
+        Build mapping from datasource_id to table_name using dimensions/measures data.
+
+        Args:
+            migration_data: Migration data containing dimensions and measures
+
+        Returns:
+            Dictionary mapping datasource_id to table_name
+        """
+        datasource_to_table = {}
+
+        # Check dimensions
+        dimensions = migration_data.get("dimensions", [])
+        for dimension in dimensions:
+            datasource_id = dimension.get("datasource_id", "")
+            table_name = dimension.get("table_name", "")
+            if datasource_id and table_name:
+                datasource_to_table[datasource_id] = table_name
+
+        # Check measures
+        measures = migration_data.get("measures", [])
+        for measure in measures:
+            datasource_id = measure.get("datasource_id", "")
+            table_name = measure.get("table_name", "")
+            if datasource_id and table_name:
+                datasource_to_table[datasource_id] = table_name
+
+        logger.debug(f"Built datasource to table mapping: {datasource_to_table}")
+        return datasource_to_table
+
+    def _clean_name(self, name: str) -> str:
+        """Clean name using same logic as model template."""
+        import re
+
+        # Convert to lowercase and replace spaces/special chars with underscores
+        cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", name.lower())
+        # Remove multiple consecutive underscores
+        cleaned = re.sub(r"_+", "_", cleaned)
+        # Remove leading/trailing underscores
+        cleaned = cleaned.strip("_")
+        return cleaned
 
     def _write_dashboard_file(
         self, dashboard_name: str, content: str, output_dir: str
