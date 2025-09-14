@@ -54,6 +54,23 @@ chart_styling_config:
       - chart_detection          # Chart type detection metadata
       - table_style              # Table-specific styling (headers, cells)
 
+  # Column Chart Styling
+  looker_column:
+    properties:
+      series_colors: true        # Apply color mappings
+      show_value_labels: true    # Hide value labels for cleaner look
+      x_axis_label: true         # Show X-axis labels
+      y_axis_label: true         # Show Y-axis labels
+      show_legend: true          # Display legend
+      column_spacing_ratio: 0.3
+    title_style:
+      font_weight: "bold"        # Bold titles
+      font_size: 11              # Title font size
+      text_align: "left"         # Left align titles
+    supported_styling:
+      - color_mappings           # Categorical color mappings
+      - title_style              # Title formatting
+      - custom_tooltip           # Custom tooltip formatting
   # Line Chart Styling
   looker_line:
     properties:

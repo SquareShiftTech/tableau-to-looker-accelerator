@@ -36,6 +36,7 @@
 {% endif %}{% if element.show_totals is defined %}    show_totals: {{ element.show_totals|lower }}
 {% endif %}{% if element.table_theme %}    table_theme: "{{ element.table_theme }}"
 {% endif %}{% if element.line_width %}    line_width: {{ element.line_width }}
+{% endif %}{% if element.column_spacing_ratio is defined %}    column_spacing_ratio: {{ element.column_spacing_ratio }}
 {% endif %}{% if element.header_background_color %}    header_background_color: "{{ element.header_background_color }}"
 {% endif %}{% if element.header_font_color %}    header_font_color: "{{ element.header_font_color }}"
 {% endif %}{% if element.cell_background_color %}    cell_background_color: "{{ element.cell_background_color }}"
