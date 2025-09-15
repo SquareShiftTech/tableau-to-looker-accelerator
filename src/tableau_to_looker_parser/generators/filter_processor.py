@@ -66,18 +66,22 @@ class FilterProcessor:
                             f"Skipping calculated field filter: {tableau_filter.field_name}"
                         )
                         continue
+
                 dimensions = field_mappings.get("dimensions", {})
                 # measures = field_mappings.get("measures", {})
                 calculated_fields_mappings = field_mappings.get("calculated_fields", {})
 
                 datasource_id = tableau_filter.datasource_id
                 local_name = f"[{tableau_filter.field_name}]"
+
                 datasource_fields = dimensions.get(datasource_id, {})
 
                 clean_name = None
+
                 if datasource_fields:
                     clean_name = datasource_fields.get(local_name, {}).get("clean_name")
                     tableau_filter.view_mapping_name = clean_name
+
                 if not clean_name:
                     datasource_fields = calculated_fields_mappings.get(
                         datasource_id, {}
@@ -193,15 +197,15 @@ class FilterProcessor:
             # Functions like level-members don't extract specific values
             return [rule.default_value] if rule.default_value else []
 
-        if (
-            rule.value_source == "member"
-            and logic.member
-            and logic.member not in ["%null%"]
-        ):
+        if rule.value_source == "member" and logic.member:
             # Extract direct member value
             clean_value = logic.member.strip("\"'")
             if clean_value:
-                values.append(clean_value)
+                # Convert %null% to -NULL for LookML exclusion
+                if clean_value in ["%null%"]:
+                    values.append("-NULL")
+                else:
+                    values.append(clean_value)
 
         elif rule.value_source == "nested_members" and logic.nested_filters:
             # Extract from nested filters (union, etc.)
