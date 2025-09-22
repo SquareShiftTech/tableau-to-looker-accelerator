@@ -522,11 +522,11 @@ TODO: Manual migration required - please convert this formula manually""",
         if calc_field.get("role") != "measure":
             return False
 
-        dependencies = calculation.get("dependencies", [])
+        # dependencies = calculation.get("dependencies", [])
 
         # If no field references, no need for two-step pattern
-        if not dependencies:
-            return False
+        # if not dependencies:
+        # return False
 
         # If formula already contains aggregation, no need for two-step pattern
         # agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
