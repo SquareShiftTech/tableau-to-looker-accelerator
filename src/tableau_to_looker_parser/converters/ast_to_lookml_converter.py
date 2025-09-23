@@ -194,6 +194,7 @@ class ASTToLookMLConverter:
             "DATEDIFF": "DATEDIFF_SPECIAL",  # Special handling for unit parameter
             "DATETRUNC": "DATETRUNC_SPECIAL",  # Special handling for unit parameter
             "DATEPART": "DATEPART_SPECIAL",
+            "DATENAME": "DATENAME_SPECIAL",
             "PARSE_DATE": "PARSE_DATE('%Y-%m-%d', {0})",  # PARSE_DATE format
             # Type conversion functions from Excel mapping
             "FLOAT": "CAST({0} AS FLOAT64)",  # Convert to float
@@ -207,6 +208,9 @@ class ASTToLookMLConverter:
             "ZN": "IFNULL({0}, 0)",  # Zero if null: ZN([field]) -> IFNULL(field, 0)
             "MAKEPOINT": "MAKEPOINT_SPECIAL",
             "MAKELINE": "MAKELINE_SPECIAL",
+            "INDEX": "row_number() over (order by 1 desc)",  # INDEX() → row_number() with dummy sort
+            "SIZE": "count(*) over ()",  # SIZE() → count(*) over window
+            "ATTR": "ANY_VALUE({0})",
         }
 
     # CONVERSION METHODS - Each handles a specific AST node type
@@ -526,8 +530,23 @@ class ASTToLookMLConverter:
                         "'\""
                     )  # Remove quotes from unit
                     return f"DATE_TRUNC({unit_expr}, {date_expr})"
+                elif len(converted_args) == 3:
+                    date_expr = converted_args[0]
+                    date_expr = date_expr.strip("'\"")
+                    unit_expr = converted_args[1].strip("'\"")
+                    week_start_expr = converted_args[2].strip("'\"")
+                    return f"DATE_TRUNC({unit_expr}, {date_expr}({week_start_expr}))"
                 else:
-                    return f"/* DATETRUNC: expects 2 arguments, got {len(converted_args)} */"
+                    return f"/* DATETRUNC: expects 2 or 3 arguments, got {len(converted_args)} */"
+            elif lookml_function == "DATENAME_SPECIAL":
+                if len(converted_args) == 2:
+                    date_expr = converted_args[0]
+                    date_expr = date_expr.strip("'\"").upper()
+                    unit_expr = converted_args[1].strip("'\"")
+                    return f"EXTRACT({date_expr} FROM {unit_expr})"
+                else:
+                    return f"/* DATENAME: expects 2 arguments, got {len(converted_args)} */"
+
             elif lookml_function == "DATEPART_SPECIAL":
                 if len(converted_args) == 2:
                     date_expr = converted_args[0]
@@ -603,7 +622,19 @@ class ASTToLookMLConverter:
             # Function not in registry - use as-is with warning
             logger.warning(f"Unknown function: {function_name}")
             args_str = ", ".join(converted_args)
-            return f"{function_name}({args_str})"
+            # Create fallback node that will be handled by _convert_fallback_node
+            fallback_node = ASTNode(
+                node_type=NodeType.LITERAL,
+                value="MIGRATION_REQUIRED",
+                data_type=DataType.STRING,
+                properties={
+                    "original_formula": f"{function_name}({args_str})",
+                    "parse_error": f"Function {function_name} not supported in LookML",
+                    "migration_status": "MANUAL_REQUIRED",
+                    "migration_comment": f"Original Tableau function: {function_name}({args_str})",
+                },
+            )
+            return self._convert_fallback_node(fallback_node, table_context)
 
     def _convert_conditional(self, node: ASTNode, table_context: str) -> str:
         """

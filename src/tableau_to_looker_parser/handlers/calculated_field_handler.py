@@ -42,6 +42,7 @@ class CalculatedFieldHandler(BaseHandler):
         """
         super().__init__()
         self.parser = FormulaParser(function_registry, operator_registry)
+        self.used_field_names = set()  # Track used field names to avoid duplicates
 
         logger.info("CalculatedFieldHandler initialized with formula parser")
 
@@ -122,6 +123,20 @@ class CalculatedFieldHandler(BaseHandler):
             display_name = field_name
 
         original_name = data.get("name", "")  # Always preserve Tableau's internal ID
+
+        if field_name in self.used_field_names:
+            # Field name already exists, add a suffix
+            counter = 2
+            original_field_name = field_name
+            while field_name in self.used_field_names:
+                field_name = f"{original_field_name}_{counter}"
+                counter += 1
+            logger.warning(
+                f"Duplicate field name detected. Renamed '{original_field_name}' to '{field_name}'"
+            )
+
+        # Add the field name to our tracking set
+        self.used_field_names.add(field_name)
 
         if field_name == "om_credit_app_numeric":
             print("here")

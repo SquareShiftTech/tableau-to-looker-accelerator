@@ -22,9 +22,9 @@ def test_dashboard_pipeline(test_file=None):
 
     # Test configuration - use command line arg or default
     if not test_file:
-        test_file = "connected_devices_dashboard/Balanced_Scorecard_Dashboard_BQ.twb"
+        test_file = "connected_devices_dashboard/setup_and_go.twb"
 
-    output_dir = "comprehensive_dashboard_test_output"
+    output_dir = "verizon_test_output"
 
     if not os.path.exists(test_file):
         print(f"❌ Test file not found: {test_file}")

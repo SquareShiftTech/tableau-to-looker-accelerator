@@ -206,7 +206,7 @@ view: {{ view_name }} {
   measure: {{ calc_field.name }} {
     description: "{{ calc_field.description | escape_quotes }}"
     {% if calc_field.is_two_step_measure %}
-    type: number
+    type: {{ calc_field.lookml_type }}
     sql: ${{ '{' + (calc_field.references_dimension | clean_name) + '}' }} ;;
     {% elif calc_field.lookml_type %}
     type: number

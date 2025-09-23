@@ -859,6 +859,26 @@ class TableauXMLParserV2:
 
         return {"connection": connection, "name": name, "table": table}
 
+    def extract_custom_sql_info(self, element: Element) -> Optional[Dict]:
+        """Extract custom SQL information from a relation element."""
+        if element.get("type") != "text":
+            return None
+
+        connection = element.get("connection")
+        name = element.get("name")
+        sql_query = element.text  # The actual SQL query
+
+        if not (connection and sql_query):
+            return None
+
+        return {
+            "connection": connection,
+            "name": name,
+            "table": "NULL",  # Store SQL as table content
+            "relation_type": "Custom_Sql",
+            "sql_query": sql_query,
+        }
+
     def extract_physical_join(self, element: Element) -> Optional[Dict]:
         """Extract physical join information from a relation element."""
         if element.get("type") != "join":
@@ -1001,6 +1021,10 @@ class TableauXMLParserV2:
                 table_info = self.extract_table_info(relation)
                 if table_info and table_info not in tables:
                     tables.append(table_info)
+
+                sql_info = self.extract_custom_sql_info(relation)
+                if sql_info and sql_info not in tables:
+                    tables.append(sql_info)
 
         # Extract physical joins
         for join_rel in datasource.findall(".//relation[@type='join']"):

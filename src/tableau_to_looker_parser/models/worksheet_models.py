@@ -41,6 +41,11 @@ class ChartType(str, Enum):
     # Other variations
     CIRCLE = "circle"
     UNKNOWN = "unknown"
+    SYMBOL_MAP = "symbol_map"
+    FILLED_MAP = "filled_map"
+    HISTOGRAM = "histogram"
+    BOX_PLOT = "box_plot"
+    TREEMAP = "treemap"
 
 
 class FieldReference(BaseModel):

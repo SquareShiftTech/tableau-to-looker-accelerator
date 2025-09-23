@@ -195,10 +195,10 @@ class DashboardHandler(BaseHandler):
     def _process_position(self, raw_position: Dict) -> Dict:
         """Process raw position data into Position format."""
         return {
-            "x": float(raw_position.get("x", 0.0)),
-            "y": float(raw_position.get("y", 0.0)),
-            "width": float(raw_position.get("width", 0.1)),
-            "height": float(raw_position.get("height", 0.1)),
+            "x": max(0.0, min(1.0, float(raw_position.get("x", 0.0)))),
+            "y": max(0.0, min(1.0, float(raw_position.get("y", 0.0)))),
+            "width": max(0.0, min(1.0, float(raw_position.get("width", 0.1)))),
+            "height": max(0.0, min(1.0, float(raw_position.get("height", 0.1)))),
             "z_index": int(raw_position.get("z_index", 0)),
         }
 

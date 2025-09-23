@@ -615,9 +615,11 @@ class TestFormulaConversion:
             # Error cases should contain either error text or valid LookML
             if "ERROR" not in result:
                 # If no error, should be valid LookML (contains ${TABLE} or simple values)
-                assert "${TABLE}" in result or result in ["NULL", "''"], (
-                    f"Unexpected result for {invalid_formula}: {result}"
-                )
+                assert "${TABLE}" in result or result in [
+                    "NULL",
+                    "''",
+                    "'MIGRATION_REQUIRED'",
+                ], f"Unexpected result for {invalid_formula}: {result}"
 
 
 # ============================================================================

@@ -156,6 +156,10 @@ class ViewGenerator(BaseGenerator):
         derived_table_sql = None
         is_derived_table = False
 
+        if actual_table.get("relation_type") in ["custom_sql", "Custom_Sql"]:
+            derived_table_sql = actual_table.get("sql_query")  # The SQL query
+            is_derived_table = True
+
         for calc_field in all_calculated_fields:
             # Include calculated fields with matching table_name or with placeholder "__UNASSIGNED_TABLE__"
             if (
@@ -163,8 +167,19 @@ class ViewGenerator(BaseGenerator):
                 or calc_field.get("table_name") == "__UNASSIGNED_TABLE__"
             ):
                 # Convert AST to LookML SQL using our converter
+                if calc_field.get("name") == "suag_ris_percent":
+                    print("here")
 
-                converted_field = self._convert_calculated_field(calc_field, view_name)
+                # Build dictionary lookup for all calculated fields
+                all_calculated_fields_dict = {}
+                for field in all_calculated_fields:
+                    field_name = field.get("original_name", "")
+                    if field_name:
+                        all_calculated_fields_dict[field_name] = field
+
+                converted_field = self._convert_calculated_field(
+                    calc_field, view_name, all_calculated_fields_dict
+                )
                 if converted_field.get("name") == "rptmth_copy":
                     print("here")
                 if converted_field:
@@ -241,7 +256,12 @@ class ViewGenerator(BaseGenerator):
 
         return None, None
 
-    def _convert_calculated_field(self, calc_field: Dict, table_context: str) -> Dict:
+    def _convert_calculated_field(
+        self,
+        calc_field: Dict,
+        table_context: str,
+        all_calculated_fields_dict: Dict[str, Dict] = None,
+    ) -> Dict:
         """
         Convert a calculated field with AST to LookML format.
 
@@ -295,12 +315,14 @@ class ViewGenerator(BaseGenerator):
                 calc_field, calculation
             ):
                 return self._create_two_step_pattern(
-                    calc_field, lookml_sql, calculation
+                    calc_field, lookml_sql, calculation, all_calculated_fields_dict
                 )
 
             # Standard single field conversion for dimensions and simple measures
             # Determine LookML type for measures with aggregation
-            lookml_type = self._determine_lookml_type(calc_field, calculation)
+            lookml_type = self._determine_lookml_type(
+                calc_field, calculation, all_calculated_fields_dict
+            )
 
             # Extract calculation ID from original_name to sync with dashboard references
             field_name = self._extract_calculation_name(calc_field)
@@ -379,16 +401,25 @@ TODO: Manual migration required - please convert this formula manually""",
         logger.warning(f"Created fallback LookML field for: {field_name}")
         return fallback_field
 
-    def _determine_lookml_type(self, calc_field: Dict, calculation: Dict) -> str:
+    def _determine_lookml_type(
+        self,
+        calc_field: Dict,
+        calculation: Dict,
+        all_calculated_fields_dict: Dict[str, Dict] = None,
+    ) -> str:
         """
         Determine the appropriate LookML type for a calculated field.
 
-        For measures, this detects if the formula already contains aggregation
-        and returns 'number' instead of 'sum' to avoid double aggregation.
+        Rules:
+        1. Has explicit aggregation attribute → return that aggregation
+        2. Formula contains aggregation functions → number
+        3. References fields that contain aggregation → number
+        4. Default case → sum
 
         Args:
             calc_field: Calculated field data
             calculation: Calculation metadata
+            all_calculated_fields_dict: Dictionary lookup of all calculated fields by name
 
         Returns:
             str: LookML type ('sum', 'number', 'string', 'yesno')
@@ -405,22 +436,71 @@ TODO: Manual migration required - please convert this formula manually""",
             else:
                 return "string"
         else:
-            # For measures, check if formula already contains aggregation
-            original_formula = calculation.get("original_formula", "")
-            requires_aggregation = calculation.get("requires_aggregation", False)
+            # For measures, check aggregation logic
+            aggregation = calc_field.get("aggregation")
+            original_formula = calculation.get("original_formula", {})
 
-            # Check if formula contains aggregation functions
+            # Rule 1: Has explicit aggregation attribute → return that aggregation
+            if aggregation:
+                return aggregation.lower()
+
+            # Rule 2: Formula contains aggregation functions → number
             agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
             has_aggregation = any(
                 func in original_formula.upper() for func in agg_functions
             )
 
-            if has_aggregation or requires_aggregation:
-                # Already aggregated - use number type to avoid double aggregation
+            if has_aggregation:
                 return "number"
-            else:
-                # Not aggregated - use sum type
-                return "sum"
+
+            # Rule 3: References fields that contain aggregation → number
+            if all_calculated_fields_dict and self._references_aggregated_fields(
+                original_formula, all_calculated_fields_dict
+            ):
+                return "number"
+
+            # Rule 4: Default case → sum
+            return "sum"
+
+    def _references_aggregated_fields(
+        self, formula: str, all_calculated_fields_dict: Dict[str, Dict]
+    ) -> bool:
+        """
+        Check if formula references fields that contain aggregation.
+
+        Args:
+            formula: The formula to check
+            all_calculated_fields_dict: Dictionary lookup of all calculated fields by name
+
+        Returns:
+            bool: True if formula references fields containing aggregation
+        """
+        import re
+
+        # Extract field references from square brackets
+        field_refs = re.findall(r"\[([^\]]+)\]", formula)
+
+        # Check if any referenced field contains aggregation
+        agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
+
+        for field_ref in field_refs:
+            # Clean the field reference (remove brackets)
+            # clean_field_name = field_ref.strip("[]")
+
+            # Look up the field in our dictionary
+            referenced_field = all_calculated_fields_dict.get(f"[{field_ref}]")
+
+            if referenced_field:
+                # Get the referenced field's formula
+                referenced_formula = referenced_field.get("calculation", {}).get(
+                    "original_formula", ""
+                )
+
+                # Check if the referenced field contains aggregation
+                if any(func in referenced_formula.upper() for func in agg_functions):
+                    return True
+
+        return False
 
     def _needs_two_step_pattern(self, calc_field: Dict, calculation: Dict) -> bool:
         """
@@ -442,11 +522,11 @@ TODO: Manual migration required - please convert this formula manually""",
         if calc_field.get("role") != "measure":
             return False
 
-        dependencies = calculation.get("dependencies", [])
+        # dependencies = calculation.get("dependencies", [])
 
         # If no field references, no need for two-step pattern
-        if not dependencies:
-            return False
+        # if not dependencies:
+        # return False
 
         # If formula already contains aggregation, no need for two-step pattern
         # agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
@@ -465,7 +545,11 @@ TODO: Manual migration required - please convert this formula manually""",
         return True
 
     def _create_two_step_pattern(
-        self, calc_field: Dict, lookml_sql: str, calculation: Dict
+        self,
+        calc_field: Dict,
+        lookml_sql: str,
+        calculation: Dict,
+        all_calculated_fields_dict: Dict[str, Dict] = None,
     ) -> Dict:
         """
         Create two-step pattern: hidden dimension + aggregated measure.
@@ -509,7 +593,9 @@ TODO: Manual migration required - please convert this formula manually""",
             "sql": f"${{{calc_name}_calc}}",  # Reference the hidden dimension
             "original_formula": original_formula,
             "description": f"Calculated field: {self._normalize_formula_for_description(original_formula)}",
-            "lookml_type": "sum",  # Aggregate the dimension values
+            "lookml_type": self._determine_lookml_type(
+                calc_field, calculation, all_calculated_fields_dict
+            ),
             "is_two_step_measure": True,  # Flag for template
             "references_dimension": f"{calc_name}_calc",  # Reference to dimension
         }
