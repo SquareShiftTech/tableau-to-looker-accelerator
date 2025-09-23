@@ -5,7 +5,7 @@ Creates clean dashboard elements using YAML detection metadata and worksheet dat
 Focuses on essential properties without ECharts complexity.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import logging
 from ..models.worksheet_models import WorksheetSchema, FieldReference
 from .filter_processor import FilterProcessor
@@ -123,11 +123,11 @@ class LookerElementGenerator:
         # Add position information
         element.update(position)
 
-        try:
-            if bool(getattr(worksheet.visualization, "stacked", False)):
-                element["stacking"] = "normal"
-        except Exception:
-            pass
+        # Apply stacking logic for all chart types
+        if pivots:
+            stacking_value = self._determine_stacking_value(worksheet, pivots)
+            if stacking_value is not None:
+                element["stacking"] = stacking_value
 
         logger.debug(
             f"Generated {looker_chart_type} element for worksheet {worksheet.name}"
@@ -734,3 +734,55 @@ class LookerElementGenerator:
                 if clean_name and (view_agg == field_agg or not view_agg):
                     field.view_mapping_name = clean_name
         return "Success"
+
+    def _determine_stacking_value(
+        self, worksheet: WorksheetSchema, pivots: List[str]
+    ) -> Optional[str]:
+        """
+        Determine stacking value for looker_bar charts based on pivot field comparison.
+
+        Logic:
+        - If row or column shelf has same field as pivot: stacking = '' (empty string)
+        - If row or column shelf does not have same field as pivot: stacking = 'normal'
+
+        Args:
+            worksheet: Worksheet schema containing field information
+            pivots: List of pivot field names
+
+        Returns:
+            Stacking value: '' or 'normal' or None
+        """
+        if not pivots or not worksheet.fields:
+            return None
+
+        # Extract field names from pivots (remove explore prefix if present)
+        pivot_field_names = set()
+        for pivot in pivots:
+            if "." in pivot:
+                # Remove explore prefix: "explore.field_name" -> "field_name"
+                pivot_field_names.add(pivot.split(".", 1)[1])
+            else:
+                pivot_field_names.add(pivot)
+
+        # Get row and column shelf field names
+        row_shelf_fields = set()
+        column_shelf_fields = set()
+
+        for field in worksheet.fields:
+            if field.shelf == "rows":
+                row_shelf_fields.add(field.name)
+            elif field.shelf == "columns":
+                column_shelf_fields.add(field.name)
+
+        # Check if any row or column shelf field matches any pivot field
+        row_has_pivot_match = bool(row_shelf_fields.intersection(pivot_field_names))
+        column_has_pivot_match = bool(
+            column_shelf_fields.intersection(pivot_field_names)
+        )
+
+        if row_has_pivot_match or column_has_pivot_match:
+            # Row or column shelf has same field as pivot
+            return ""
+        else:
+            # Row or column shelf does not have same field as pivot
+            return "normal"
