@@ -1,5 +1,20 @@
 basic_chart_detection:
 
+  hierarchical_table_chart:
+    conditions:
+      - mark_type: ["Square","Shape","Text"]
+      - has_text_marks: true
+      - columns_shelf_count: ">=1"
+      # - rows_shelf_count: ">=3"  # Multiple hierarchy levels
+      #- text_encoding_has_measure: true
+      - text_encoding_has_measure_group: True  # Measure Names
+    confidence: 95
+    pivot_required: false
+    pivot_type: "crosstab"
+    looker_equivalent: "looker_grid"
+    fields_sources: ["rows_shelf", "measure_group"]
+    pivot_field_source: []
+
   # Table/Crosstab Detection (Your Favorite)
   table_chart:
     conditions:
@@ -271,7 +286,7 @@ basic_chart_detection:
       - has_text_marks: true
       - columns_shelf_count: ">0"
       - rows_shelf_has_string: true
-    confidence: 100
+    confidence: 70
     looker_equivalent: "looker_grid"
     fields_sources: ["rows_shelf","column_shelf", "text_marks"]
 

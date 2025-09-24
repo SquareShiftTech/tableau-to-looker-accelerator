@@ -13,6 +13,7 @@ Key improvements over v1:
 """
 
 import zipfile
+import html
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Union, Any
 from lxml import etree as ET
@@ -2354,12 +2355,23 @@ class TableauXMLParserV2:
             level = groupfilter.get("level", "")
             member = groupfilter.get("member", "")
 
+            # Decode XML/HTML entities in member value
+            if member:
+                # First decode HTML entities like &quot; to "
+                member = html.unescape(member)
+                # Then handle escaped backslashes in field names
+                member = member.replace("\\%", "%").replace("\\", "")
+
             # Generic extraction of ALL groupfilter attributes
             groupfilter_data = {"function": function, "level": level, "member": member}
 
             # Extract all attributes generically
             for attr, value in groupfilter.attrib.items():
                 if attr not in groupfilter_data:
+                    if isinstance(value, str) and ("&" in value or "\\" in value):
+                        value = (
+                            html.unescape(value).replace("\\%", "%").replace("\\", "")
+                        )
                     groupfilter_data[attr] = value
 
             # Handle nested groupfilters (for crossjoin, union, etc.)

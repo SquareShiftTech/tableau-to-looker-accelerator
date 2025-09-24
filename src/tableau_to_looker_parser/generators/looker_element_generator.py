@@ -33,6 +33,7 @@ class LookerElementGenerator:
             "text_marks": {"encodings_contains": "text"},
             "color_marks": {"encodings_contains": "color"},
             "size_marks": {"encodings_contains": "size"},
+            "measure_group": {"is_measure_group": True},
         }
 
     def generate_element(
@@ -51,8 +52,8 @@ class LookerElementGenerator:
         Returns:
             Dict containing complete dashboard element configuration
         """
-        if worksheet.name == "byTypeS apple":
-            print(f"Worksheet {worksheet.name} has data: {worksheet}")
+        # if worksheet.name == "Channel Outlier Report":
+        #     print(f"Worksheet {worksheet.name} has data: {worksheet}")
 
         if not worksheet.visualization:
             logger.warning(f"Worksheet {worksheet.name} has no visualization config")
@@ -233,6 +234,11 @@ class LookerElementGenerator:
                 if "color" in field_encodings:
                     print(f"Color encoding found in {field.name}")
                 if mapping["encodings_contains"] in field_encodings:
+                    field_matches = True
+
+            if "is_measure_group" in mapping:
+                # Check if this field is a measure group
+                if field.is_measure_group == mapping["is_measure_group"]:
                     field_matches = True
 
             if field_matches:
@@ -748,6 +754,7 @@ class LookerElementGenerator:
         - If no pivot_field_source or not stacked: no stacking property
         """
         try:
+
             pivot_field_sources = yaml_detection.get("pivot_field_source", [])
 
             if not pivot_field_sources:
