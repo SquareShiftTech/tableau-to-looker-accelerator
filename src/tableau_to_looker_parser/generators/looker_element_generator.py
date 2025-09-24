@@ -5,7 +5,7 @@ Creates clean dashboard elements using YAML detection metadata and worksheet dat
 Focuses on essential properties without ECharts complexity.
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import logging
 from ..models.worksheet_models import WorksheetSchema, FieldReference
 from .filter_processor import FilterProcessor
@@ -123,11 +123,8 @@ class LookerElementGenerator:
         # Add position information
         element.update(position)
 
-        # Apply stacking logic for all chart types
-        if pivots:
-            stacking_value = self._determine_stacking_value(worksheet, pivots)
-            if stacking_value is not None:
-                element["stacking"] = stacking_value
+        # Apply stacking logic based on pivot field source matching
+        self._apply_stacking_logic(element, worksheet, yaml_detection)
 
         logger.debug(
             f"Generated {looker_chart_type} element for worksheet {worksheet.name}"
@@ -735,54 +732,40 @@ class LookerElementGenerator:
                     field.view_mapping_name = clean_name
         return "Success"
 
-    def _determine_stacking_value(
-        self, worksheet: WorksheetSchema, pivots: List[str]
-    ) -> Optional[str]:
+    def _apply_stacking_logic(
+        self,
+        element: Dict[str, Any],
+        worksheet: WorksheetSchema,
+        yaml_detection: Dict[str, Any],
+    ) -> None:
         """
-        Determine stacking value for looker_bar charts based on pivot field comparison.
+        Apply stacking logic based on pivot field source matching.
 
         Logic:
-        - If row or column shelf has same field as pivot: stacking = '' (empty string)
-        - If row or column shelf does not have same field as pivot: stacking = 'normal'
-
-        Args:
-            worksheet: Worksheet schema containing field information
-            pivots: List of pivot field names
-
-        Returns:
-            Stacking value: '' or 'normal' or None
+        - If pivot_field_source matches either column_shelf or row_shelf: stacking = ""
+        - If pivot_field_source does not match: stacking = "normal"
+        - If no pivot_field_source or not stacked: no stacking property
         """
-        if not pivots or not worksheet.fields:
-            return None
+        try:
+            # Get pivot field sources from YAML detection
+            pivot_field_sources = yaml_detection.get("pivot_field_source", [])
 
-        # Extract field names from pivots (remove explore prefix if present)
-        pivot_field_names = set()
-        for pivot in pivots:
-            if "." in pivot:
-                # Remove explore prefix: "explore.field_name" -> "field_name"
-                pivot_field_names.add(pivot.split(".", 1)[1])
+            if not pivot_field_sources:
+                # No pivot field source, use normal stacking
+                element["stacking"] = "normal"
+                return
+
+            pivot_matches_shelf = False
+            if any(
+                pivot_source in ["columns_shelf", "rows_shelf"]
+                for pivot_source in pivot_field_sources
+            ):
+                pivot_matches_shelf = True
+
+            if pivot_matches_shelf:
+                element["stacking"] = "' '"
             else:
-                pivot_field_names.add(pivot)
+                element["stacking"] = "normal"
 
-        # Get row and column shelf field names
-        row_shelf_fields = set()
-        column_shelf_fields = set()
-
-        for field in worksheet.fields:
-            if field.shelf == "rows":
-                row_shelf_fields.add(field.name)
-            elif field.shelf == "columns":
-                column_shelf_fields.add(field.name)
-
-        # Check if any row or column shelf field matches any pivot field
-        row_has_pivot_match = bool(row_shelf_fields.intersection(pivot_field_names))
-        column_has_pivot_match = bool(
-            column_shelf_fields.intersection(pivot_field_names)
-        )
-
-        if row_has_pivot_match or column_has_pivot_match:
-            # Row or column shelf has same field as pivot
-            return ""
-        else:
-            # Row or column shelf does not have same field as pivot
-            return "normal"
+        except Exception as e:
+            logger.warning(f"Error applying stacking logic for {worksheet.name}: {e}")
