@@ -213,6 +213,7 @@ view: {{ view_name }} {
     sql: {{ calc_field.sql }} ;;
     {% elif calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
     type: number
+    value_format_name: decimal_0
     sql: {{ calc_field.sql }} ;;
     {% else %}
     type: number
@@ -249,9 +250,7 @@ view: {{ view_name }} {
     type: number
     sql: ${TABLE}.{{ (measure.sql_column or measure.name) | sql_column }} ;;
     {% endif %}
-    {% if measure.value_format %}
-    value_format: "{{ measure.value_format }}"
-    {% endif %}
+    value_format_name: decimal_0
     {% if measure.hidden %}
     hidden: yes
     {% endif %}
