@@ -22,7 +22,7 @@ basic_chart_detection:
       - has_text_marks: true
       - columns_shelf_count: ">0"  # day(dt), hour(dt)
       - rows_shelf_has_string: true
-      - text_encoding_has_measure: true  # SUM(Sales) in text
+      # - text_encoding_has_measure: true  # SUM(Sales) in text
     confidence: 95
     variants:
       - crosstab_table:
