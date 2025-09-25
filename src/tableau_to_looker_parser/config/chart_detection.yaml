@@ -293,9 +293,9 @@ basic_chart_detection:
   # Text Table (Simple)
   text_table_without_pivot:
     conditions:
-      - mark_type: "Text"
+      - mark_type: ["Text","Automatic"]
       - has_text_marks: true
-      - columns_shelf_count: ">0"
+      # - columns_shelf_count: ">0"
       - rows_shelf_has_string: true
     confidence: 70
     looker_equivalent: "looker_grid"
