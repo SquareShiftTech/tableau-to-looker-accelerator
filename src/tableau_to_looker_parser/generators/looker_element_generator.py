@@ -83,6 +83,12 @@ class LookerElementGenerator:
                 f"Updated worksheet fields with view mappings: {worksheet.name}"
             )
 
+        # Extract count-based metadata for dynamic properties
+        filter_processor = FilterProcessor(explore_name=self.explore_name)
+        count_metadata = filter_processor.limit_filter(
+            worksheet.filters if hasattr(worksheet, "filters") else []
+        )
+
         # Build element configuration
         element = {
             "title": self._generate_title(worksheet),
@@ -92,7 +98,7 @@ class LookerElementGenerator:
             "type": looker_chart_type,
             "fields": self._generate_fields(worksheet),
             "limit": 500,
-            "column_limit": 50,
+            "column_limit": count_metadata["column_limit"],
         }
 
         if worksheet.name == "CD detail":
@@ -571,6 +577,11 @@ class LookerElementGenerator:
         """Create basic element when YAML detection is missing."""
         logger.warning(f"Creating fallback element for worksheet {worksheet.name}")
 
+        filter_processor = FilterProcessor(explore_name=self.explore_name)
+        count_metadata = filter_processor.limit_filter(
+            worksheet.filters if hasattr(worksheet, "filters") else []
+        )
+
         return {
             "title": self._generate_title(worksheet),
             "name": worksheet.clean_name,
@@ -579,7 +590,7 @@ class LookerElementGenerator:
             "type": "table",  # Safe fallback
             "fields": self._generate_fields(worksheet),
             "limit": 500,
-            "column_limit": 50,
+            "column_limit": count_metadata["column_limit"],
             **position,
         }
 
@@ -754,7 +765,6 @@ class LookerElementGenerator:
         - If no pivot_field_source or not stacked: no stacking property
         """
         try:
-
             pivot_field_sources = yaml_detection.get("pivot_field_source", [])
 
             if not pivot_field_sources:

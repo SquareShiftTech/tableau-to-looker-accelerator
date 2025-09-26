@@ -4,7 +4,7 @@ Filter Processor - Convert Tableau filters to LookML using Pydantic models.
 Clean, type-safe filter conversion with configurable mapping rules.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
 from ..models.filter_mapping_models import (
     FilterMappingConfig,
@@ -42,14 +42,9 @@ class FilterProcessor:
         """
         lookml_filters = {}
         calculated_fields = calculated_fields or []
-        ignored_fields = ["Measure Names", "Measure Values"]
+
         for filter_data in worksheet_filters:
             try:
-                if filter_data.get("field_name") in ignored_fields:
-                    logger.debug(
-                        f"Ignoring filter for field: {filter_data.get('field_name')}"
-                    )
-                    continue
                 # Parse Tableau filter with Pydantic validation
                 tableau_filter = TableauFilter(**filter_data)
 
@@ -265,3 +260,30 @@ class FilterProcessor:
                         return result
 
         return field_name
+
+    def limit_filter(self, worksheet_filters: List[Dict]) -> Dict[str, Any]:
+        metadata = {"column_limit": 50}
+
+        if not worksheet_filters:
+            return metadata
+
+        try:
+            for filter_data in worksheet_filters:
+                groupfilter_logic = filter_data.get("groupfilter_logic", [])
+                if not groupfilter_logic:
+                    continue
+
+                # Look for count-based top N pattern
+                count_value = None
+                for value in groupfilter_logic:
+                    if value.get("function") == "end" and "count" in value:
+                        count_value = value["count"]
+                if count_value is not None:
+                    metadata["column_limit"] = count_value
+
+                    break
+
+        except Exception as e:
+            logger.warning(f"Error extracting count-based metadata: {e}")
+
+        return metadata
