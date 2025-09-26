@@ -5,14 +5,14 @@ basic_chart_detection:
       - mark_type: ["Square","Shape","Text"]
       - has_text_marks: true
       - columns_shelf_count: ">=1"
-      - rows_shelf_count: ">=3"  # Multiple hierarchy levels
-      - text_encoding_has_measure: true
+      # - rows_shelf_count: ">=3"  # Multiple hierarchy levels
+      # - text_encoding_has_measure: true
       - text_encoding_has_measure_group: True  # Measure Names
     confidence: 95
     pivot_required: false
     pivot_type: "crosstab"
     looker_equivalent: "looker_grid"
-    fields_sources: ["rows_shelf", "column_shelf"]
+    fields_sources: ["rows_shelf", "column_shelf","measure_group"]
     pivot_field_source: []
 
   # Table/Crosstab Detection (Your Favorite)
