@@ -582,6 +582,7 @@ TODO: Manual migration required - please convert this formula manually""",
             "lookml_type": "number",
             "hidden": True,  # Hide the calculation dimension
             "is_two_step_dimension": True,  # Flag for template
+            "datasource_id": calc_field.get("datasource_id", ""),
         }
 
         # Create measure that aggregates the dimension - use the exact calculation ID to match dashboard
