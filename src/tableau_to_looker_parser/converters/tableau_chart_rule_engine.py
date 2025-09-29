@@ -266,6 +266,7 @@ class TableauChartRuleEngine:
 
         # Also check raw encodings for text columns (for Square/table charts)
         text_columns = []
+        text_encoding_has_measure_group = False
         if raw_config:
             # First check direct encodings
             encodings = raw_config.get("encodings", {})
@@ -279,6 +280,9 @@ class TableauChartRuleEngine:
 
             if text_columns:
                 has_text_marks = True
+            # {'text_columns': ['[federated.02f4wac0scru081cfw4ue1prrmor].[Multiple Values]'], 'color_columns': ['[federated.02f4wac0scru081cfw4ue1prrmor].[Multiple Values]'], 'size_columns': [], 'detail_columns': []}
+            if any("Multiple Values" in col for col in text_columns):
+                text_encoding_has_measure_group = True
 
         # Check if text encoding has measure (for table charts)
         text_encoding_has_measure = False
@@ -338,6 +342,7 @@ class TableauChartRuleEngine:
             # Text and table indicators
             "has_text_marks": has_text_marks,
             "text_encoding_has_measure": text_encoding_has_measure,
+            "text_encoding_has_measure_group": text_encoding_has_measure_group,
             "columns_shelf_count": len(x_axis_fields),
             "rows_shelf_count": len(y_axis_fields),
             "rows_shelf_has_string": any(
@@ -651,6 +656,7 @@ class TableauChartRuleEngine:
             "has_multiple_measures",
             "has_mark_stacking",
             "has_binned_fields",
+            "text_encoding_has_measure_group",
             "has_alternating_square_text",
         ]:
             return bool(actual_value) == bool(expected_value)
@@ -676,19 +682,7 @@ class TableauChartRuleEngine:
     ) -> bool:
         """Evaluate numeric conditions with comparison operators."""
         if isinstance(expected, str):
-            if expected.startswith(">"):
-                try:
-                    threshold = int(expected[1:])
-                    return actual > threshold
-                except ValueError:
-                    return False
-            elif expected.startswith("<"):
-                try:
-                    threshold = int(expected[1:])
-                    return actual < threshold
-                except ValueError:
-                    return False
-            elif expected.startswith(">="):
+            if expected.startswith(">="):
                 try:
                     threshold = int(expected[2:])
                     return actual >= threshold
@@ -698,6 +692,18 @@ class TableauChartRuleEngine:
                 try:
                     threshold = int(expected[2:])
                     return actual <= threshold
+                except ValueError:
+                    return False
+            elif expected.startswith(">"):
+                try:
+                    threshold = int(expected[1:])
+                    return actual > threshold
+                except ValueError:
+                    return False
+            elif expected.startswith("<"):
+                try:
+                    threshold = int(expected[1:])
+                    return actual < threshold
                 except ValueError:
                     return False
 

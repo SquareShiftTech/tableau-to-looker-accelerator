@@ -1,5 +1,20 @@
 basic_chart_detection:
 
+  hierarchical_table_chart:
+    conditions:
+      - mark_type: ["Square","Shape","Text"]
+      - has_text_marks: true
+      - columns_shelf_count: ">=1"
+      # - rows_shelf_count: ">=3"  # Multiple hierarchy levels
+      # - text_encoding_has_measure: true
+      - text_encoding_has_measure_group: True  # Measure Names
+    confidence: 95
+    pivot_required: false
+    pivot_type: "crosstab"
+    looker_equivalent: "looker_grid"
+    fields_sources: ["rows_shelf", "column_shelf","measure_group"]
+    pivot_field_source: []
+
   # Table/Crosstab Detection (Your Favorite)
   table_chart:
     conditions:
@@ -7,7 +22,7 @@ basic_chart_detection:
       - has_text_marks: true
       - columns_shelf_count: ">0"  # day(dt), hour(dt)
       - rows_shelf_has_string: true
-      - text_encoding_has_measure: true  # SUM(Sales) in text
+      # - text_encoding_has_measure: true  # SUM(Sales) in text
     confidence: 95
     variants:
       - crosstab_table:
@@ -24,6 +39,17 @@ basic_chart_detection:
     looker_equivalent: "looker_grid"
     fields_sources: ["rows_shelf","column_shelf", "text_marks"]
     pivot_field_source: ["columns_shelf"]
+
+  single_chart:
+    conditions:
+      - mark_type: ["Automatic"]
+      - has_text_marks: true
+      - columns_shelf_count: ">=0"
+    confidence: 60
+    pivot_required: false
+    pivot_type: "crosstab"
+    looker_equivalent: "single_value"
+    fields_sources: ["text_marks"]
 
   crosstab_table_with_alternating_square_text:
     conditions:
@@ -61,7 +87,7 @@ basic_chart_detection:
       - x_encoding: ["categorical", "string"]
       # - y_encoding: "measure"
     confidence: 100
-    # stacked_type: true
+    stacked_type: true
     pivot_required: true
     looker_equivalent: "looker_column"
     fields_sources: ["color_marks", "rows_shelf", "columns_shelf"]
@@ -104,6 +130,7 @@ basic_chart_detection:
       - y_encoding: "measure"
       - orientation: "vertical"
     confidence: 100
+    stacked_type: true
     variants:
       - simple_column:
           conditions:
@@ -138,6 +165,7 @@ basic_chart_detection:
       - x_encoding: ["temporal", "continuous", "date"]
       - y_encoding: "measure"
     confidence: 100
+    stacked_type: true
     variants:
       - single_line:
           conditions:
@@ -161,6 +189,7 @@ basic_chart_detection:
       - x_encoding: ["temporal", "continuous"]
       - y_encoding: "measure"
     confidence: 100
+    stacked_type: true
     variants:
       - single_area:
           conditions:
@@ -279,11 +308,11 @@ basic_chart_detection:
   # Text Table (Simple)
   text_table_without_pivot:
     conditions:
-      - mark_type: "Text"
+      - mark_type: ["Text","Automatic"]
       - has_text_marks: true
-      - columns_shelf_count: ">0"
+      # - columns_shelf_count: ">0"
       - rows_shelf_has_string: true
-    confidence: 100
+    confidence: 70
     looker_equivalent: "looker_grid"
     fields_sources: ["rows_shelf","column_shelf", "text_marks"]
 

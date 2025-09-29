@@ -91,7 +91,9 @@ class WorksheetHandler(BaseHandler):
         clean_name = data.get("clean_name", self._clean_name(name))
         datasource_id = data["datasource_id"]
 
-        if name == "OM List":
+
+        if name == "Channel Outlier Report":
+
             print(f"Worksheet {name} has data: {data}")
 
         # Process fields
@@ -120,7 +122,41 @@ class WorksheetHandler(BaseHandler):
         logger.debug(
             f"WORKSHEET HANDLER: {name} has {len(derived_fields)} derived fields"
         )
+        measure_names = []
 
+        # Step 1: Find the dict with field_name "Measure Names"
+        measure_names_dict = None
+        for item in filters:
+            if item.get("field_name") == "Measure Names":
+                measure_names_dict = item
+                break
+
+        if measure_names_dict:
+            # Step 2: Access the "groupfilter_logic" list
+            groupfilter_logic = measure_names_dict.get("groupfilter_logic", [])
+
+            # Step 3: Access the first dict in groupfilter_logic
+            first_filter = groupfilter_logic[0]
+
+            # Step 4: Access the "nested_filters" list
+            nested_filters = first_filter.get("nested_filters", [])
+
+            # Step 5: Extract all "member" values from nested_filters
+            for filter_dict in nested_filters:
+                member_value = filter_dict.get("member")
+                if member_value:
+                    cleaned_member = member_value.strip('"')
+                    measure_names.append(cleaned_member)
+
+            print(f"Extracted measure names: {measure_names}")
+
+            for field in fields:
+                tableau_instance = field.get("tableau_instance", "")
+                datasource_id = field.get("datasource_id", "")
+                if f"[{datasource_id}].{tableau_instance}" in measure_names:
+                    field["is_measure_group"] = True
+
+            pass
         # Build WorksheetSchema data
         worksheet_data = {
             "name": name,

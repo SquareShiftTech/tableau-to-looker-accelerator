@@ -13,6 +13,7 @@ Key improvements over v1:
 """
 
 import zipfile
+import html
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Union, Any
 from lxml import etree as ET
@@ -315,6 +316,7 @@ class TableauXMLParserV2:
                 "folder": col.get("folder"),
                 "description": col.get("description"),
                 "number_format": col.get("number-format"),
+                "default_format": col.get("default-format"),
                 "aggregation": col.get("aggregation"),
                 "source": "column_element",
                 "is_internal": self._is_internal_field(col),
@@ -418,6 +420,7 @@ class TableauXMLParserV2:
                 )
                 enhanced_field["drill_down"] = enhancement.get("drill_down")
                 enhanced_field["number_format"] = enhancement.get("number_format")
+                enhanced_field["default_format"] = enhancement.get("default_format")
                 enhanced_field["semantic_role"] = enhancement.get("semantic_role")
                 enhanced_field["folder"] = enhancement.get("folder")
                 enhanced_field["description"] = enhancement.get("description")
@@ -485,6 +488,7 @@ class TableauXMLParserV2:
                     "contains_null": False,
                     "drill_down": enhancement.get("drill_down"),
                     "number_format": enhancement.get("number_format"),
+                    "default_format": enhancement.get("default_format"),
                     "semantic_role": enhancement.get("semantic_role"),
                     "folder": enhancement.get("folder"),
                     "description": enhancement.get("description"),
@@ -677,7 +681,6 @@ class TableauXMLParserV2:
 
             if not field_def.get("datasource_id"):
                 field_def["datasource_id"] = datasource_id
-
             if field_type in ["measure", "dimension"]:
                 # Convert to handler format - use REMOTE-NAME for clean field names
                 element_data = {
@@ -691,6 +694,7 @@ class TableauXMLParserV2:
                     "caption": field_def.get("caption"),
                     "calculation": field_def.get("calculation"),
                     "number_format": field_def.get("number_format"),
+                    "default_format": field_def.get("default_format"),
                     "drill_down": field_def.get("drill_down"),
                     "semantic_role": field_def.get("semantic_role"),
                     "folder": field_def.get("folder"),
@@ -723,6 +727,7 @@ class TableauXMLParserV2:
                         remote_alias=field_def.get("label"),
                     ),
                     "datasource_id": field_def.get("datasource_id"),
+                    "default_format": field_def.get("default_format"),
                 }
 
                 elements.append({"type": "calculated_field", "data": element_data})
@@ -2357,12 +2362,23 @@ class TableauXMLParserV2:
             level = groupfilter.get("level", "")
             member = groupfilter.get("member", "")
 
+            # Decode XML/HTML entities in member value
+            if member:
+                # First decode HTML entities like &quot; to "
+                member = html.unescape(member)
+                # Then handle escaped backslashes in field names
+                member = member.replace("\\%", "%").replace("\\", "")
+
             # Generic extraction of ALL groupfilter attributes
             groupfilter_data = {"function": function, "level": level, "member": member}
 
             # Extract all attributes generically
             for attr, value in groupfilter.attrib.items():
                 if attr not in groupfilter_data:
+                    if isinstance(value, str) and ("&" in value or "\\" in value):
+                        value = (
+                            html.unescape(value).replace("\\%", "%").replace("\\", "")
+                        )
                     groupfilter_data[attr] = value
 
             # Handle nested groupfilters (for crossjoin, union, etc.)

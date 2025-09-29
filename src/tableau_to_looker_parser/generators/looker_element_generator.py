@@ -33,6 +33,7 @@ class LookerElementGenerator:
             "text_marks": {"encodings_contains": "text"},
             "color_marks": {"encodings_contains": "color"},
             "size_marks": {"encodings_contains": "size"},
+            "measure_group": {"is_measure_group": True},
         }
 
     def generate_element(
@@ -51,7 +52,7 @@ class LookerElementGenerator:
         Returns:
             Dict containing complete dashboard element configuration
         """
-        if worksheet.name == "byTypeS apple":
+        if worksheet.name == "Channel Outlier Report":
             print(f"Worksheet {worksheet.name} has data: {worksheet}")
 
         if not worksheet.visualization:
@@ -123,11 +124,8 @@ class LookerElementGenerator:
         # Add position information
         element.update(position)
 
-        try:
-            if bool(getattr(worksheet.visualization, "stacked", False)):
-                element["stacking"] = "normal"
-        except Exception:
-            pass
+        # Apply stacking logic based on pivot field source matching
+        self._apply_stacking_logic(element, worksheet, yaml_detection)
 
         logger.debug(
             f"Generated {looker_chart_type} element for worksheet {worksheet.name}"
@@ -236,6 +234,11 @@ class LookerElementGenerator:
                 if "color" in field_encodings:
                     print(f"Color encoding found in {field.name}")
                 if mapping["encodings_contains"] in field_encodings:
+                    field_matches = True
+
+            if "is_measure_group" in mapping:
+                # Check if this field is a measure group
+                if field.is_measure_group == mapping["is_measure_group"]:
                     field_matches = True
 
             if field_matches:
@@ -734,3 +737,50 @@ class LookerElementGenerator:
                 if clean_name and (view_agg == field_agg or not view_agg):
                     field.view_mapping_name = clean_name
         return "Success"
+
+    def _apply_stacking_logic(
+        self,
+        element: Dict[str, Any],
+        worksheet: WorksheetSchema,
+        yaml_detection: Dict[str, Any],
+    ) -> None:
+        """
+        Apply stacking logic based on pivot field source matching.
+
+        Logic:
+        - If pivot_field_source is column_shelf but NOT in color_marks: no stacking property
+        - If pivot_field_source matches either column_shelf or row_shelf AND includes color_marks: stacking = ""
+        - If pivot_field_source does not match: stacking = "normal"
+        - If no pivot_field_source or not stacked: no stacking property
+        """
+        try:
+            pivot_field_sources = yaml_detection.get("pivot_field_source", [])
+
+            if not pivot_field_sources:
+                return
+
+            has_shelf = any(
+                pivot_source in ["columns_shelf", "rows_shelf"]
+                for pivot_source in pivot_field_sources
+            )
+            has_color_marks = any(
+                pivot_source == "color_marks" for pivot_source in pivot_field_sources
+            )
+
+            if has_shelf and not has_color_marks:
+                return
+
+            pivot_matches_shelf = False
+            if any(
+                pivot_source in ["columns_shelf", "rows_shelf"]
+                for pivot_source in pivot_field_sources
+            ):
+                pivot_matches_shelf = True
+
+            if pivot_matches_shelf and has_color_marks:
+                element["stacking"] = "' '"
+            else:
+                element["stacking"] = "normal"
+
+        except Exception as e:
+            logger.warning(f"Error applying stacking logic for {worksheet.name}: {e}")

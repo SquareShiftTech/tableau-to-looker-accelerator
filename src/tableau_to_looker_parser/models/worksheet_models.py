@@ -95,6 +95,10 @@ class FieldReference(BaseModel):
     )
     datasource_id: str = Field(..., description="ID of the connected datasource")
     view_mapping_name: Optional[str] = Field(None, description="View mapping name")
+    is_measure_group: bool = Field(
+        default=False,
+        description="Whether this field is part of a measure group (e.g., 'Measure Names')",
+    )
 
 
 class VisualizationConfig(BaseModel):

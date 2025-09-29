@@ -194,6 +194,7 @@ class CalculatedFieldHandler(BaseHandler):
             "role": role,
             "field_type": role,  # For compatibility
             "datatype": self._map_data_type(data.get("datatype", "string")),
+            "default_format": data.get("default_format"),
             # Core calculated field data
             "calculation": {
                 "original_formula": calculation,
