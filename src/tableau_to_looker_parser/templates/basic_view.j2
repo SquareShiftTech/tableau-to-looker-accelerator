@@ -209,7 +209,7 @@ measure: {{ calc_field.name }} {
     type: {{ calc_field.lookml_type }}
     sql: ${{ '{' + (calc_field.references_dimension | clean_name) + '}' }} ;;
     {% if calc_field.default_format == 'p0.0%' %}
-    value_format_name: percent_0
+    value_format_name: percent_1
     {% elif calc_field.default_format == 'p0.00%' %}
     value_format_name: percent_2
     {% elif calc_field.default_format == 'n#,##0.00;-#,##0.00' %}
@@ -222,7 +222,7 @@ measure: {{ calc_field.name }} {
     type: number
     sql: {{ calc_field.sql }} ;;
     {% if calc_field.default_format == 'p0.0%' %}
-    value_format_name: percent_0
+    value_format_name: percent_1
     {% elif calc_field.default_format == 'p0.00%' %}
     value_format_name: percent_2
     {% elif calc_field.default_format == 'n#,##0.00;-#,##0.00' %}
@@ -234,7 +234,7 @@ measure: {{ calc_field.name }} {
     {% elif calc_field.default_format in ['p0.0%', 'p0.00%', 'n#,##0.00;-#,##0.00', 'n#,##0;-#,##0', 'N'] %}
     type: number
     {% if calc_field.default_format == 'p0.0%' %}
-    value_format_name: percent_0
+    value_format_name: percent_1
     {% elif calc_field.default_format == 'p0.00%' %}
     value_format_name: percent_2
     {% elif calc_field.default_format == 'n#,##0.00;-#,##0.00' %}
