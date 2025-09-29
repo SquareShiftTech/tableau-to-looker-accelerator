@@ -203,32 +203,57 @@ view: {{ view_name }} {
     {% endif %}
   }
   {% else %}
-  measure: {{ calc_field.name }} {
+measure: {{ calc_field.name }} {
     description: "{{ calc_field.description | escape_quotes }}"
     {% if calc_field.is_two_step_measure %}
     type: {{ calc_field.lookml_type }}
     sql: ${{ '{' + (calc_field.references_dimension | clean_name) + '}' }} ;;
     {% if calc_field.default_format == 'p0.0%' %}
     value_format_name: percent_0
+    {% elif calc_field.default_format == 'p0.00%' %}
+    value_format_name: percent_2
+    {% elif calc_field.default_format == 'n#,##0.00;-#,##0.00' %}
+    value_format_name: decimal_2
+    {% elif calc_field.default_format == 'n#,##0;-#,##0' or calc_field.default_format == 'N' %}
+    value_format_name: decimal_0
     {% endif %}
+
     {% elif calc_field.lookml_type %}
     type: number
     sql: {{ calc_field.sql }} ;;
     {% if calc_field.default_format == 'p0.0%' %}
     value_format_name: percent_0
+    {% elif calc_field.default_format == 'p0.00%' %}
+    value_format_name: percent_2
+    {% elif calc_field.default_format == 'n#,##0.00;-#,##0.00' %}
+    value_format_name: decimal_2
+    {% elif calc_field.default_format == 'n#,##0;-#,##0' or calc_field.default_format == 'N' %}
+    value_format_name: decimal_0
     {% endif %}
-    {% elif calc_field.default_format == 'p0.0%' %}
+
+    {% elif calc_field.default_format in ['p0.0%', 'p0.00%', 'n#,##0.00;-#,##0.00', 'n#,##0;-#,##0', 'N'] %}
     type: number
+    {% if calc_field.default_format == 'p0.0%' %}
     value_format_name: percent_0
+    {% elif calc_field.default_format == 'p0.00%' %}
+    value_format_name: percent_2
+    {% elif calc_field.default_format == 'n#,##0.00;-#,##0.00' %}
+    value_format_name: decimal_2
+    {% elif calc_field.default_format == 'n#,##0;-#,##0' or calc_field.default_format == 'N' %}
+    value_format_name: decimal_0
+    {% endif %}
     sql: {{ calc_field.sql }} ;;
+
     {% elif calc_field.datatype == 'integer' or calc_field.datatype == 'real' %}
     type: number
     value_format_name: decimal_0
     sql: {{ calc_field.sql }} ;;
+
     {% else %}
     type: number
     sql: {{ calc_field.sql }} ;;
     {% endif %}
+
     {% if calc_field.migration_error %}
     # {{ calc_field.migration_comment | single_line_comment }}
     {% elif calc_field.original_formula %}
