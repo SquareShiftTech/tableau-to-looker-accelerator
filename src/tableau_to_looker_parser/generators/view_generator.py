@@ -2,6 +2,7 @@
 View LookML generator.
 """
 
+import re
 from typing import Dict, List, Set
 import logging
 from types import SimpleNamespace
@@ -744,12 +745,8 @@ TODO: Manual migration required - please convert this formula manually""",
                                 expression
                             )
                             if field_name:
-                                #     # Clean the field name
-                                # clean_field_name = self._clean_name(field_name)
-
-                                # Create count measure with _1 suffix to avoid redefinition
                                 count_measure = {
-                                    "name": f"{field_name}_count_function",  # Use field name with _count_function suffix
+                                    "name": f"{field_name}_count_function",
                                     "field_type": "measure",
                                     "role": "measure",
                                     "lookml_type": "count",
@@ -765,29 +762,14 @@ TODO: Manual migration required - please convert this formula manually""",
         return count_measures
 
     def _extract_field_from_count_expression(self, expression: str) -> str:
-        """
-        Extract field name from COUNT expression.
-
-        Args:
-            expression: Tableau expression like "COUNT([Field Name])"
-
-        Returns:
-            Field name or None if not found
-        """
-        import re
-
-        # Pattern to match COUNT([Field Name]) or COUNT([Field Name (copy)_123456])
         pattern = r"COUNT\(\s*\[([^\]]+)\]\s*\)"
         match = re.search(pattern, expression, re.IGNORECASE)
 
         if match:
             field_name = match.group(1).strip()
-            # Clean the field name to match dimension names
-            # Remove Tableau suffixes like (copy)_2681330689597788160
-            pattern3 = r"_\d{9,}$"
-            field_name = re.sub(pattern3, "", field_name)
+            pattern = r"_\d{9,}$"
+            field_name = re.sub(pattern, "", field_name)
 
-            # field_name = self._clean_tableau_field_name(field_name)
             return field_name
 
         return None
