@@ -31,7 +31,11 @@ class ASTToLookMLConverter:
         """Initialize the converter with function mappings."""
         self.function_registry = self._build_function_registry()
         self.all_calculated_fields = all_calculated_fields
+        self.references_aggregated_fields = False
         logger.debug("AST to LookML converter initialized")
+
+    def set_references_aggregated_fields(self, references_aggregated_fields: bool):
+        self.references_aggregated_fields = references_aggregated_fields
 
     def convert_to_lookml(
         self,
@@ -271,7 +275,11 @@ class ASTToLookMLConverter:
                         "role": calculated_field.get("role"),
                     }
                     break
-        if field_details and field_details.get("role") == "measure":
+        if (
+            field_details
+            and field_details.get("role") == "measure"
+            and not self.references_aggregated_fields
+        ):
             lookml_ref = f"${{{clean_field_name}_calc}}"
         elif field_name_mapper.is_calculated_field(node.field_name):
             # For calculated fields, use global reference without table context

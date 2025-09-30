@@ -92,6 +92,9 @@ class CalculatedFieldHandler(BaseHandler):
         if data.get("datatype") and data.get("aggregation"):
             confidence = 1.0
 
+        if data.get("is_derived"):
+            confidence = 1.0
+
         logger.debug(f"Calculated field confidence for '{name}': {confidence}")
         return confidence
 
