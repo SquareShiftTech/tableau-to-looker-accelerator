@@ -4,8 +4,9 @@ Filter Processor - Convert Tableau filters to LookML using Pydantic models.
 Clean, type-safe filter conversion with configurable mapping rules.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
+import re
 from ..models.filter_mapping_models import (
     FilterMappingConfig,
     TableauFilter,
@@ -42,9 +43,10 @@ class FilterProcessor:
         """
         lookml_filters = {}
         calculated_fields = calculated_fields or []
-        ignored_fields = ["Measure Names", "Measure Values"]
+
         for filter_data in worksheet_filters:
             try:
+
                 if filter_data.get("field_name") in ignored_fields:
                     logger.debug(
                         f"Ignoring filter for field: {filter_data.get('field_name')}"
@@ -65,6 +67,7 @@ class FilterProcessor:
                         f"Ignoring filter for field: {filter_data.get('field_name')} because it is an except or nested union"
                     )
                     continue
+
                 # Parse Tableau filter with Pydantic validation
                 tableau_filter = TableauFilter(**filter_data)
 
@@ -290,3 +293,52 @@ class FilterProcessor:
                         return result
 
         return field_name
+
+    def limit_filter(self, worksheet_filters: List[Dict]) -> Dict[str, Any]:
+        metadata = {"column_limit": 50, "sorts": []}
+
+        if not worksheet_filters:
+            return metadata
+
+        try:
+            for filter_data in worksheet_filters:
+                groupfilter_logic = filter_data.get("groupfilter_logic", [])
+                if not groupfilter_logic:
+                    continue
+
+                # Look for count-based top N pattern
+                count_value = None
+                direction = None
+                sort_field = None
+                for value in groupfilter_logic:
+                    if value.get("function") == "end" and "count" in value:
+                        count_value = value["count"]
+                        direction = value.get("end", "top")
+                        sort_field = self._remove_special_chars((filter_data))
+                        break
+                if count_value is not None:
+                    metadata["column_limit"] = count_value
+                    if sort_field:
+                        if direction == "top":
+                            metadata["sorts"] = [f"{sort_field} desc"]
+                        elif direction == "bottom":
+                            metadata["sorts"] = [f"{sort_field} asc"]
+
+                    break
+
+        except Exception as e:
+            logger.warning(f"Error extracting count-based metadata: {e}")
+
+        return metadata
+
+    def _remove_special_chars(self, filter_data):
+        field_name = filter_data.get("field_name", "")
+
+        if not field_name:
+            return None
+
+        field_name = self.config.clean_field_name(field_name)
+
+        sort_field = r"_\d{3,}$"  # Underscore followed by 3+ digits at end
+        field_name = re.sub(sort_field, "", field_name)
+        return f"{self.explore_name}.{field_name}"

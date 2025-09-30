@@ -196,6 +196,9 @@ view: {{ view_name }} {
     type: string
     {% endif %}
     sql: {{ calc_field.sql }} ;;
+    {% if calc_field.order_by_field %}
+    order_by_field: {{ calc_field.order_by_field | clean_name }}
+    {% endif %}
     {% if calc_field.migration_error %}
     # {{ calc_field.migration_comment | single_line_comment }}
     {% elif calc_field.original_formula %}
@@ -276,6 +279,8 @@ measure: {{ calc_field.name }} {
     {# Two-step pattern: measure references hidden dimension #}
     type: {{ measure.aggregation.value if measure.aggregation.value else 'sum' }}
     sql: ${ {{- measure.dimension_reference | clean_name -}} } ;;
+    {% elif measure.lookml_type == 'count' %}
+    type: count
     {% elif measure.lookml_type %}
     {# Derived measure with specific type #}
     type: {{ measure.lookml_type }}
