@@ -20,7 +20,7 @@ xml_parser_phase3_sample_output.json
 test_output/processed_pipeline_output.json
 sample_twb_files/Bar_charts.twb
 verizon_test_output/
-
+*.twbr
 # Test output directories
 test_output/
 temp_output/
@@ -44,4 +44,6 @@ connected_devices_dashboard/Balanced_Scorecard_Dashboard_BQ.twb
 connected_devices_dashboard/setup_and_go.twbx
 connected_devices_dashboard/setup_and_go.twb
 connected_devices_dashboard/~setup_and_go__21780.twbr
-
+Verizon_workbooks/setup_and_go.twb
+Verizon_workbooks/Center & Employee Statistics Modified.twb
+Verizon_workbooks/Center & Employee Statistics Modified.twb

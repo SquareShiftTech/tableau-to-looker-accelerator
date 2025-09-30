@@ -22,7 +22,7 @@ def test_dashboard_pipeline(test_file=None):
 
     # Test configuration - use command line arg or default
     if not test_file:
-        test_file = "Verizon_workbooks/Intraday_Sales.twb"
+        test_file = "Verizon_workbooks\setup_and_go.twb"
 
     output_dir = "verizon_test_output"
 
