@@ -1,0 +1,239 @@
+{
+  "test_cases": [
+    {
+      "name": "case_empty_sql",
+      "description": "Handles an empty SQL string without placeholders",
+      "input_sql": "",
+      "expected_placeholder_map": {}
+    },
+    {
+      "name": "case_simple_table_field",
+      "description": "Replaces a single ${TABLE}.`field` placeholder",
+      "input_sql": "${TABLE}.`user_id`",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`user_id`"
+      }
+    },
+    {
+      "name": "case_multiple_table_fields",
+      "description": "Replaces multiple ${TABLE}.`field` placeholders in SELECT and WHERE clauses",
+      "input_sql": "SELECT ${TABLE}.`first_name`, ${TABLE}.`last_name`, ${TABLE}.`email` FROM ${TABLE} WHERE ${TABLE}.`active` = 1",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`first_name`",
+        "__PH_1__": "${TABLE}.`last_name`",
+        "__PH_2__": "${TABLE}.`email`",
+        "__PH_3__": "${TABLE}.`active`",
+        "__PH_4__": "${TABLE}"
+      }
+    },
+    {
+      "name": "case_simple_fields",
+      "description": "Replaces multiple ${field_name} placeholders in an expression",
+      "input_sql": "${user_id} + ${user_name}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${user_id}",
+        "__PH_1__": "${user_name}"
+      }
+    },
+    {
+      "name": "case_multiple_fields",
+      "description": "Replaces both ${field_name} and ${TABLE} placeholders in SELECT and WHERE clauses",
+      "input_sql": "SELECT ${first_name}, ${last_name}, ${email} FROM ${TABLE} WHERE ${active} = 1",
+      "expected_placeholder_map": {
+        "__PH_0__": "${first_name}",
+        "__PH_1__": "${last_name}",
+        "__PH_2__": "${email}",
+        "__PH_3__": "${TABLE}",
+        "__PH_4__": "${active}"
+      }
+    },
+    {
+      "name": "case_mixed_table_and_simple_fields",
+      "description": "Replaces a mix of ${TABLE}.`field` and ${field_name} placeholders, prioritizing ${TABLE}.`field` first",
+      "input_sql": "SELECT ${TABLE}.`id`, ${user_name}, ${TABLE}.`created_date`, ${status} FROM ${TABLE} WHERE ${TABLE}.`active` = 1",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`id`",
+        "__PH_1__": "${TABLE}.`created_date`",
+        "__PH_2__": "${TABLE}.`active`",
+        "__PH_3__": "${user_name}",
+        "__PH_4__": "${status}",
+        "__PH_5__": "${TABLE}"
+      }
+    },
+    {
+      "name": "case_parameter",
+      "description": "Replaces {% parameter %} blocks with placeholders",
+      "input_sql": "{% parameter start_date %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "{% parameter start_date %}"
+      }
+    },
+    {
+      "name": "parameter_with_table",
+      "description": "Replaces {% parameter %} blocks together with ${TABLE} placeholders",
+      "input_sql": "SELECT * FROM ${TABLE} WHERE date >= {% parameter start_date %} AND status = {% parameter user_status %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}",
+        "__PH_1__": "{% parameter start_date %}",
+        "__PH_2__": "{% parameter user_status %}"
+      }
+    },
+    {
+      "name": "parameter_with_spaces",
+      "description": "Test {% parameter %} with various spacing",
+      "input_sql": "SELECT * FROM ${TABLE} WHERE date >= {%parameter start_date%} AND status = {% parameter user_status   %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}",
+        "__PH_1__": "{%parameter start_date%}",
+        "__PH_2__": "{% parameter user_status   %}"
+      }
+    },
+    {
+      "name": "case_table_field_with_parameter",
+      "description": "Combines ${TABLE}.`field` with a single {% parameter %} in WHERE clause",
+      "input_sql": "SELECT ${TABLE}.`id`, ${TABLE}.`name` FROM ${TABLE} WHERE ${TABLE}.`created_at` >= {% parameter start_date %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`id`",
+        "__PH_1__": "${TABLE}.`name`",
+        "__PH_2__": "${TABLE}.`created_at`",
+        "__PH_3__": "${TABLE}",
+        "__PH_4__": "{% parameter start_date %}"
+      }
+    },
+    {
+      "name": "case_fields_with_parameter",
+      "description": "Combines simple ${field_name} placeholders with {% parameter %} for filtering",
+      "input_sql": "SELECT ${user_id}, ${user_name}, ${email} FROM ${TABLE} WHERE ${signup_date} >= {% parameter start_date %} AND ${status} = {% parameter user_status %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${user_id}",
+        "__PH_1__": "${user_name}",
+        "__PH_2__": "${email}",
+        "__PH_3__": "${TABLE}",
+        "__PH_4__": "${signup_date}",
+        "__PH_5__": "${status}",
+        "__PH_6__": "{% parameter start_date %}",
+        "__PH_7__": "{% parameter user_status %}"
+      }
+    },
+    {
+      "name": "case_mixed_table_fields_and_simple_fields_with_parameters",
+      "description": "Mix of ${TABLE}.`field`, ${field_name}, and {% parameter %} in SELECT and WHERE",
+      "input_sql": "SELECT ${TABLE}.`id`, ${first_name}, ${last_name}, ${TABLE}.`email` FROM ${TABLE} WHERE ${TABLE}.`active` = 1 AND ${signup_date} >= {% parameter start_date %} AND ${status} = {% parameter user_status %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`id`",
+        "__PH_1__": "${TABLE}.`email`",
+        "__PH_2__": "${TABLE}.`active`",
+        "__PH_3__": "${first_name}",
+        "__PH_4__": "${last_name}",
+        "__PH_5__": "${TABLE}",
+        "__PH_6__": "${signup_date}",
+        "__PH_7__": "${status}",
+        "__PH_8__": "{% parameter start_date %}",
+        "__PH_9__": "{% parameter user_status %}"
+      }
+    },
+    {
+      "name": "lookml_conditional_blocks",
+      "description": "Test {% if %} and other LookML syntax blocks",
+      "input_sql": "SELECT * FROM ${TABLE} WHERE 1=1 {% if order_details.region._in_query %} AND status = 'active' {% endif %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}",
+        "__COMMENTED_BLOCK_1__": "{% if order_details.region._in_query %}",
+        "__COMMENTED_BLOCK_2__": "{% endif %}"
+      }
+    },
+
+
+
+
+
+
+
+
+
+
+
+    {
+      "name": "complex_lookml_blocks",
+      "description": "Test various LookML blocks like {% case %}, {% unless %}, etc.",
+      "input_sql": "SELECT {% case when status %} WHEN 'A' THEN 'Active' {% endcase %} FROM ${TABLE} {% unless hide_inactive %} WHERE status != 'inactive' {% endunless %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}",
+        "__COMMENTED_BLOCK_1__": "{% case when status %}",
+        "__COMMENTED_BLOCK_2__": "{% endcase %}",
+        "__COMMENTED_BLOCK_3__": "{% unless hide_inactive %}",
+        "__COMMENTED_BLOCK_4__": "{% endunless %}"
+      }
+    },
+    {
+      "name": "mixed_all_types",
+      "description": "Test combination of all placeholder types - exact match with sample output",
+      "input_sql": "SELECT ${dimension_name} as dimension, ${TABLE}.`CHECK1` as dimension1, COUNT(*) as count, {% parameter date_filter %} as filter_param FROM ${TABLE} WHERE date >= '2023-01-01' {% if condition %} AND status = 'active' {% endif %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`CHECK1`",
+        "__PH_1__": "${dimension_name}",
+        "__PH_2__": "${TABLE}",
+        "__PH_3__": "{% parameter date_filter %}",
+        "__COMMENTED_BLOCK_4__": "{% if condition %}",
+        "__COMMENTED_BLOCK_5__": "{% endif %}"
+      }
+    },
+    {
+      "name": "field_with_dots_and_underscores",
+      "description": "Test field names with dots and underscores",
+      "input_sql": "SELECT ${user.first_name}, ${user_profile.settings}, ${TABLE}.`user.email` FROM users",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`user.email`",
+        "__PH_1__": "${user.first_name}",
+        "__PH_2__": "${user_profile.settings}"
+      }
+    },
+    {
+      "name": "parameter_with_dots_underscores",
+      "description": "Test parameters with dots and underscores in names",
+      "input_sql": "SELECT * FROM users WHERE date >= {% parameter date_range.start %} AND region = {% parameter user_region %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "{% parameter date_range.start %}",
+        "__PH_1__": "{% parameter user_region %}"
+      }
+    },
+    {
+      "name": "nested_complex_sql",
+      "description": "Test complex SQL with multiple nested patterns - corrected processing order",
+      "input_sql": "WITH user_data AS (SELECT ${TABLE}.`id`, ${user_name} FROM users {% if include_inactive %} WHERE status IN ('active', 'inactive') {% else %} WHERE status = 'active' {% endif %}) SELECT ud.*, {% parameter additional_field %} FROM user_data ud WHERE ud.created_date >= {% parameter start_date %}",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`id`",
+        "__PH_1__": "${user_name}",
+        "__PH_2__": "{% parameter additional_field %}",
+        "__PH_3__": "{% parameter start_date %}",
+        "__COMMENTED_BLOCK_4__": "{% if include_inactive %}",
+        "__COMMENTED_BLOCK_5__": "{% else %}",
+        "__COMMENTED_BLOCK_6__": "{% endif %}"
+      }
+    },
+    {
+      "name": "sql_without_lookml",
+      "description": "Test regular SQL without any LookML syntax",
+      "input_sql": "SELECT id, name, email FROM users WHERE active = 1 ORDER BY name",
+      "expected_placeholder_map": {}
+    },
+    {
+      "name": "only_regular_braces",
+      "description": "Test SQL with regular braces that should not be converted",
+      "input_sql": "SELECT JSON_EXTRACT(data, '$.user.name') as user_name FROM users",
+      "expected_placeholder_map": {}
+    },
+    {
+      "name": "actual_sample_from_output",
+      "description": "Test case matching the actual sample output exactly",
+      "input_sql": "\n    SELECT \n        ${dimension_name} as dimension,\n        ${TABLE}.`CHECK1` as dimension1,\n        COUNT(*) as count,\n        {% parameter date_filter %} as filter_param\n    FROM table_name\n    WHERE date >= '2023-01-01'\n    {% if condition %}\n        AND status = 'active'\n    {% endif %}\n    ",
+      "expected_placeholder_map": {
+        "__PH_0__": "${TABLE}.`CHECK1`",
+        "__PH_1__": "${dimension_name}",
+        "__PH_2__": "{% parameter date_filter %}",
+        "__COMMENTED_BLOCK_3__": "{% if condition %}",
+        "__COMMENTED_BLOCK_4__": "{% endif %}"
+      }
+    }
+  ]
+}

@@ -986,17 +986,36 @@ class TableauXMLParserV2:
             List of other element types
         """
         elements = []
+        connection_map = {}
 
-        # Add connections
-        for conn in datasource.findall(".//connection"):
-            elements.append(
-                {"type": "connection", "data": self.extract_connection(conn)}
-            )
+        # Process connections
+        for connection in datasource.findall("connection"):
+            if connection.get("class") == "federated":
+                data_list = self.extract_named_connection(connection)
 
-        # Add relationships
-        rel_data = self.extract_relationships(datasource)
-        if rel_data["tables"] or rel_data["relationships"]:
-            elements.append({"type": "relationships", "data": rel_data})
+                for data in data_list:
+                    if not data:
+                        continue
+
+                    name, cls = data.get("name"), data.get("class")
+                    if name and cls:
+                        connection_map[name] = cls
+
+                    elements.append({"type": "connection", "data": data})
+
+        # Process relationships
+        relationship_data = self.extract_relationships(datasource)
+        if relationship_data.get("tables") or relationship_data.get("relationships"):
+            tables = []
+            for table in relationship_data.get("tables", []):
+                conn_name = table.get("connection")
+                conn_class = connection_map.get(conn_name) if conn_name else None
+                tables.append({"class": conn_class, **table})
+
+            if tables:
+                relationship_data["tables"] = tables
+
+            elements.append({"type": "relationships", "data": relationship_data})
 
         return elements
 
@@ -1068,6 +1087,49 @@ class TableauXMLParserV2:
                     data["metadata"][key] = value
 
         return data
+
+    def extract_named_connection(self, connection: Element) -> List[Dict]:
+        elements = []
+
+        for named_connection in connection.findall(".//named-connection"):
+            conn = named_connection.find("connection")
+            if conn is None:
+                continue
+
+            # Get basic attributes
+            temp_data = {
+                "name": named_connection.get("name", ""),
+                "caption": named_connection.get("caption", ""),
+                "connection_type": connection.get("class", ""),
+                "type": conn.get("type", ""),
+                "class": conn.get("class", ""),
+                # Authentication
+                "authentication": conn.get("authentication", ""),
+                "server_oauth": conn.get("server-oauth", ""),
+                "odbc_connect_string_extras": conn.get(
+                    "odbc-connect-string-extras", ""
+                ),
+                "server": conn.get("server", ""),
+                "port": conn.get("port"),
+                "username": conn.get("username", ""),
+                "password": conn.get("password", ""),
+                # Excel
+                "filename": conn.get("filename", ""),
+                # BigQuery
+                "project": conn.get("CATALOG", ""),
+                "project_name": conn.get("project", ""),
+                "schema": conn.get("schema"),
+                # PostgreSQL
+                "dbname": conn.get("dbname", ""),
+                "connection_string": conn.get("connection-string"),
+                "workgroup": conn.get("workgroup"),
+                "query_band": conn.get("query-band"),
+                "metadata": {},
+            }
+
+            elements.append(temp_data)
+
+        return elements
 
     def extract_table_info(self, element: Element) -> Optional[Dict]:
         """Extract table information from a relation element."""

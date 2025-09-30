@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 
 [[package]]
@@ -610,6 +610,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sqlglot"
+version = "27.18.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/56/ef3c705c750b262d4cca787982e3b640d46e8b40ba06d1d5577fb1bb4d76/sqlglot-27.18.0.tar.gz", hash = "sha256:6901eb1805226f38852e53c473d67c8e13bacf11ffe5d90170874f3d7b199acf", size = 5478250, upload-time = "2025-09-25T10:31:47.423Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/cc/110103f57c249bed40e85bd069ec3d2c29250ea228c89ed9d161924bb44d/sqlglot-27.18.0-py3-none-any.whl", hash = "sha256:71c122ddc99128347e1cd9ad6ed08b378cdf233e27eb78abce7542f47c723edd", size = 520293, upload-time = "2025-09-25T10:31:44.927Z" },
+]
+
+[[package]]
 name = "tableau-to-looker-parser"
 version = "0.1.0"
 source = { editable = "." }
@@ -620,6 +629,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pytest" },
     { name = "setuptools" },
+    { name = "sqlglot" },
     { name = "wheel" },
 ]
 
@@ -647,6 +657,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0,<6.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0,<1.0.0" },
     { name = "setuptools", specifier = ">=61.0" },
+    { name = "sqlglot", specifier = ">=27.18.0" },
     { name = "wheel" },
 ]
 provides-extras = ["dev"]
