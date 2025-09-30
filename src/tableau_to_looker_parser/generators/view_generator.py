@@ -186,7 +186,7 @@ class ViewGenerator(BaseGenerator):
                         all_calculated_fields_dict[field_name] = field
 
                 converted_field = self._convert_calculated_field(
-                    calc_field, view_name, all_calculated_fields_dict
+                    calc_field, view_name, all_calculated_fields_dict, count_measures
                 )
                 if converted_field.get("name") == "rptmth_copy":
                     print("here")
@@ -267,8 +267,11 @@ class ViewGenerator(BaseGenerator):
     def _convert_calculated_field(
         self,
         calc_field: Dict,
-        table_context: str,
+        view_name: str,
         all_calculated_fields_dict: Dict[str, Dict] = None,
+        count_measures: List[Dict] = None,
+        table_context: str = None,
+        additional_param: str = None,
     ) -> Dict:
         """
         Convert a calculated field with AST to LookML format.
@@ -279,7 +282,11 @@ class ViewGenerator(BaseGenerator):
 
         Args:
             calc_field: Calculated field data with AST
+            view_name: Name of the view being generated
+            all_calculated_fields_dict: Dictionary lookup of all calculated fields by name
+            count_measures: List of count measures for filters
             table_context: Table context for field references
+            additional_param: Additional parameter for future use
 
         Returns:
             Dict with converted LookML field data (may contain both dimension and measure)
