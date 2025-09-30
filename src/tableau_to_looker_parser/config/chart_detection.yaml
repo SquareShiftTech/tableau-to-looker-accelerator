@@ -5,14 +5,14 @@ basic_chart_detection:
       - mark_type: ["Square","Shape","Text"]
       - has_text_marks: true
       - columns_shelf_count: ">=1"
-      - rows_shelf_count: ">=3"  # Multiple hierarchy levels
-      - text_encoding_has_measure: true
+      # - rows_shelf_count: ">=3"  # Multiple hierarchy levels
+      # - text_encoding_has_measure: true
       - text_encoding_has_measure_group: True  # Measure Names
     confidence: 95
     pivot_required: false
     pivot_type: "crosstab"
     looker_equivalent: "looker_grid"
-    fields_sources: ["rows_shelf", "column_shelf"]
+    fields_sources: ["rows_shelf", "column_shelf","measure_group"]
     pivot_field_source: []
 
   # Table/Crosstab Detection (Your Favorite)
@@ -105,6 +105,21 @@ basic_chart_detection:
     pivot_required: true
     looker_equivalent: "looker_bar"
     fields_sources: ["color_marks", rows_shelf, "columns_shelf"]
+    pivot_field_source: ["color_marks"]
+
+  plain_bar_chart_nocolor:
+    conditions:
+      - mark_type: ["Bar", "Automatic"]
+      - has_color_encoding: false
+      - columns_shelf_count: ">0"
+      - x_encoding: "measure"
+      # Allow both categorical and none for Y to cover typical bar setups
+      - y_encoding: ["categorical", "string", "none"]
+    confidence: 100
+    stacked_type: false
+    pivot_required: true
+    looker_equivalent: "looker_bar"
+    fields_sources: ["columns_shelf", "rows_shelf"]
     pivot_field_source: ["color_marks"]
 
   # Column Chart (Vertical Bars)

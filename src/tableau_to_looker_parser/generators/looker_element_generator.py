@@ -52,8 +52,8 @@ class LookerElementGenerator:
         Returns:
             Dict containing complete dashboard element configuration
         """
-        # if worksheet.name == "Channel Outlier Report":
-        #     print(f"Worksheet {worksheet.name} has data: {worksheet}")
+        if worksheet.name == "Channel Outlier Report":
+            print(f"Worksheet {worksheet.name} has data: {worksheet}")
 
         if not worksheet.visualization:
             logger.warning(f"Worksheet {worksheet.name} has no visualization config")
@@ -754,7 +754,6 @@ class LookerElementGenerator:
         - If no pivot_field_source or not stacked: no stacking property
         """
         try:
-
             pivot_field_sources = yaml_detection.get("pivot_field_source", [])
 
             if not pivot_field_sources:

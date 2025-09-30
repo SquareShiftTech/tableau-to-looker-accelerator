@@ -581,6 +581,7 @@ TODO: Manual migration required - please convert this formula manually""",
             "lookml_type": "number",
             "hidden": True,  # Hide the calculation dimension
             "is_two_step_dimension": True,  # Flag for template
+            "datasource_id": calc_field.get("datasource_id", ""),
         }
 
         # Create measure that aggregates the dimension - use the exact calculation ID to match dashboard
@@ -598,6 +599,9 @@ TODO: Manual migration required - please convert this formula manually""",
             ),
             "is_two_step_measure": True,  # Flag for template
             "references_dimension": f"{calc_name}_calc",  # Reference to dimension
+            "datasource_id": calc_field.get("datasource_id", ""),
+            "local_name": calc_field.get("local_name", ""),
+            "default_format": calc_field.get("default_format", ""),
         }
 
         logger.debug(

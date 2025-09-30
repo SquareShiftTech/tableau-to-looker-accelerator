@@ -165,6 +165,12 @@ class FilterMappingConfig(BaseModel):
                 extract_values=False,
                 description="Combined dimension filter",
             ),
+            # GroupfilterMappingRule(
+            #     function=GroupfilterFunction.EXCEPT,
+            #     extract_values=False,
+            #     value_source="excluded_members",
+            #     description="Exclude specific values",
+            # ),
         ]
     )
 
