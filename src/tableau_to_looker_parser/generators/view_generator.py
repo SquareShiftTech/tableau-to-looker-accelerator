@@ -184,8 +184,19 @@ class ViewGenerator(BaseGenerator):
                     if field_name:
                         all_calculated_fields_dict[field_name] = field
 
+                references_aggregated_fields = self._references_aggregated_fields(
+                    calc_field.get("calculation", {}).get("original_formula", ""),
+                    all_calculated_fields_dict,
+                )
+
+                if references_aggregated_fields:
+                    print("references_aggregated_fields")
+
                 converted_field = self._convert_calculated_field(
-                    calc_field, view_name, all_calculated_fields_dict
+                    calc_field,
+                    view_name,
+                    all_calculated_fields_dict,
+                    references_aggregated_fields,
                 )
 
                 # <converted_field>
@@ -275,6 +286,7 @@ class ViewGenerator(BaseGenerator):
         calc_field: Dict,
         table_context: str,
         all_calculated_fields_dict: Dict[str, Dict] = None,
+        references_aggregated_fields: bool = False,
     ) -> Dict:
         """
         Convert a calculated field with AST to LookML format.
@@ -307,6 +319,10 @@ class ViewGenerator(BaseGenerator):
                     "No AST data available - formula parsing may have failed",
                 )
 
+            self.ast_converter.set_references_aggregated_fields(
+                references_aggregated_fields
+            )
+
             # Convert dict to ASTNode object
             ast_node = ASTNode(**ast_data)
             if ast_node.node_type == NodeType.DERIVED_TABLE:
@@ -326,7 +342,7 @@ class ViewGenerator(BaseGenerator):
             # Check if this is a measure that needs two-step pattern
             role = calc_field.get("role", "dimension")
             if role == "measure" and self._needs_two_step_pattern(
-                calc_field, calculation
+                calc_field, calculation, references_aggregated_fields
             ):
                 return self._create_two_step_pattern(
                     calc_field, lookml_sql, calculation, all_calculated_fields_dict
@@ -497,6 +513,9 @@ TODO: Manual migration required - please convert this formula manually""",
         # Check if any referenced field contains aggregation
         agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
 
+        if any(func in formula.upper() for func in agg_functions):
+            return True
+
         for field_ref in field_refs:
             # Clean the field reference (remove brackets)
             # clean_field_name = field_ref.strip("[]")
@@ -516,7 +535,12 @@ TODO: Manual migration required - please convert this formula manually""",
 
         return False
 
-    def _needs_two_step_pattern(self, calc_field: Dict, calculation: Dict) -> bool:
+    def _needs_two_step_pattern(
+        self,
+        calc_field: Dict,
+        calculation: Dict,
+        references_aggregated_fields: bool = False,
+    ) -> bool:
         """
         Determine if a calculated field measure needs the two-step pattern.
 
@@ -543,13 +567,17 @@ TODO: Manual migration required - please convert this formula manually""",
         # return False
 
         # If formula already contains aggregation, no need for two-step pattern
-        # agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
-        # has_aggregation = any(
-        #    func in original_formula.upper() for func in agg_functions
-        # )
-        has_aggregation = False
+        original_formula = calculation.get("original_formula", "")
+        agg_functions = ["SUM(", "COUNT(", "AVG(", "MIN(", "MAX(", "MEDIAN("]
+        has_aggregation = any(
+            func in original_formula.upper() for func in agg_functions
+        )
+        # has_aggregation = False
 
         if has_aggregation:
+            return False
+
+        if references_aggregated_fields:
             return False
 
         # Measure with field references but no aggregation = needs two-step pattern
@@ -595,6 +623,7 @@ TODO: Manual migration required - please convert this formula manually""",
             "lookml_type": "number",
             "hidden": True,  # Hide the calculation dimension
             "is_two_step_dimension": True,  # Flag for template
+            "datasource_id": calc_field.get("datasource_id", ""),
         }
 
         # Create measure that aggregates the dimension - use the exact calculation ID to match dashboard
@@ -612,6 +641,9 @@ TODO: Manual migration required - please convert this formula manually""",
             ),
             "is_two_step_measure": True,  # Flag for template
             "references_dimension": f"{calc_name}_calc",  # Reference to dimension
+            "datasource_id": calc_field.get("datasource_id", ""),
+            "local_name": calc_field.get("local_name", ""),
+            "default_format": calc_field.get("default_format", ""),
         }
 
         logger.debug(

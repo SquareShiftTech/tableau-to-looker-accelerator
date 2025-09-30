@@ -117,6 +117,7 @@ class MeasureHandler(BaseHandler):
                 "hidden": False,
                 "dimension_reference": f"{base_name}_raw",  # References the raw dimension
                 "datasource_id": data.get("datasource_id"),
+                "default_format": data.get("default_format"),
                 "local_name": data.get("raw_name"),
             },
         }

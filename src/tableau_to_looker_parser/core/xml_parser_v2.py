@@ -140,7 +140,7 @@ class TableauXMLParserV2:
         global_processed_parameters = set()
 
         # Process each datasource
-        for datasource in root.findall(".//datasource"):
+        for datasource in root.find("datasources").findall("datasource"):
             datasource_name = datasource.get("name", "unnamed")
             self.logger.info(f"Processing datasource: {datasource_name}")
 
@@ -157,7 +157,7 @@ class TableauXMLParserV2:
             self.logger.info(f"Found {len(column_enhancements)} column enhancements")
 
             # Phase 3: Merge and enhance fields
-            enhanced_fields = self._merge_field_data(
+            enhanced_fields, table_name = self._merge_field_data(
                 metadata_fields,
                 column_enhancements,
                 datasource_id,
@@ -173,6 +173,14 @@ class TableauXMLParserV2:
             )
             alias_mapping = self._build_alias_mapping(datasource)
 
+            # Phase 4a: Extract Worksheet Level Fields
+            self.logger.info(
+                f"Extracting worksheet fields from datasource: {datasource_id}"
+            )
+            worksheet_fields = self._extract_worksheet_fields_from_datasource(
+                root, datasource_id, table_name
+            )
+
             # Phase 5: Convert to element format for handlers
             elements.extend(
                 self._convert_fields_to_elements(
@@ -180,11 +188,217 @@ class TableauXMLParserV2:
                 )
             )
 
+            # elements contains elements.append({"type": "calculated_field", "data": element_data}) how to add worksheet fields to elements?
+            # what would be expected return format for worksheet fields? List of dicts?
+            # yes, List of dicts
+            elements.extend(worksheet_fields)
+
             # Phase 6: Add other element types (connections, relationships)
             elements.extend(self._extract_other_elements(datasource))
 
         self.logger.info(f"Total elements extracted: {len(elements)}")
         return elements
+
+    def _map_worksheet_type_to_datatype(self, worksheet_type):
+        """
+        Map worksheet column-instance type to Tableau datatype
+        """
+        type_mapping = {
+            "nominal": "string",  # Categorical text
+            "ordinal": "date",  # Ordered, often dates
+            "quantitative": "real",  # Numbers/measures
+        }
+        return type_mapping.get(worksheet_type, "string")
+
+    def _build_date_calculation(self, column_ref, derivation):
+        """
+        Build Tableau-style date calculation for the calc handler
+        """
+        date_calc_mapping = {
+            "Day": f"DATEPART('day', {column_ref})",
+            "Month": f"DATEPART('month', {column_ref})",
+            "Year": f"YEAR({column_ref})",
+            "MY": f"STR(DATEPART('month', {column_ref})) + '-' + STR(YEAR({column_ref}))",
+            "Day-Trunc": f"DATETRUNC('day', {column_ref})",
+            "Month-Trunc": f"DATETRUNC('month', {column_ref})",
+            "Year-Trunc": f"DATETRUNC('year', {column_ref})",
+        }
+        return date_calc_mapping.get(derivation, column_ref)
+
+    def _build_calculation_for_derivation(self, column_ref, derivation):
+        """
+        Master function to build calculation based on any derivation type
+        """
+        # Date derivations
+        if derivation in [
+            "Day",
+            "Month",
+            "Year",
+            "MY",
+            "Day-Trunc",
+            "Month-Trunc",
+            "Year-Trunc",
+        ]:
+            return self._build_date_calculation(column_ref, derivation)
+
+        # Aggregation derivations
+        elif derivation in [
+            "Sum",
+            "Avg",
+            "Min",
+            "Max",
+            "Count",
+            "CountD",
+            "Median",
+            "StdDev",
+            "StdDevP",
+            "Var",
+            "VarP",
+            "Attribute",
+            "First",
+            "Last",
+            "Mode",
+            "Any",
+            "All",
+        ]:
+            return self._build_aggregation_calculation(column_ref, derivation)
+
+        # Default - just return the column reference
+        else:
+            return column_ref
+
+    def _build_aggregation_calculation(self, column_ref, derivation):
+        """
+        Build Tableau-style aggregation calculation for the calc handler
+        """
+        # Standard aggregations
+        aggregation_calc_mapping = {
+            "Sum": f"SUM({column_ref})",
+            "Avg": f"AVG({column_ref})",
+            "Min": f"MIN({column_ref})",
+            "Max": f"MAX({column_ref})",
+            "Count": f"COUNT({column_ref})",
+            "CountD": f"COUNTD({column_ref})",  # Count Distinct
+            "Median": f"MEDIAN({column_ref})",
+            "StdDev": f"STDEV({column_ref})",
+            "StdDevP": f"STDEVP({column_ref})",  # Population StdDev
+            "Var": f"VAR({column_ref})",
+            "VarP": f"VARP({column_ref})",  # Population Variance
+            "Attribute": f"ATTR({column_ref})",  # Special aggregation
+            # Percentile aggregations
+            "Percentile": f"PERCENTILE({column_ref}, 0.5)",  # Default to median
+            "Percentile25": f"PERCENTILE({column_ref}, 0.25)",
+            "Percentile75": f"PERCENTILE({column_ref}, 0.75)",
+            "Percentile90": f"PERCENTILE({column_ref}, 0.90)",
+            "Percentile95": f"PERCENTILE({column_ref}, 0.95)",
+            "Percentile99": f"PERCENTILE({column_ref}, 0.99)",
+            # Special aggregations
+            "First": f"FIRST({column_ref})",
+            "Last": f"LAST({column_ref})",
+            "Mode": f"MODE({column_ref})",
+            # Logical aggregations
+            "Any": f"ANY({column_ref})",
+            "All": f"ALL({column_ref})",
+        }
+
+        return aggregation_calc_mapping.get(
+            derivation, f"SUM({column_ref})"
+        )  # Default to SUM
+
+    def _extract_worksheet_fields_from_datasource(
+        self, root: Element, target_datasource_id: str, table_name: str
+    ) -> List[Dict]:
+        """
+        Get unique field names that have derivations for a specific datasource
+
+        Args:
+            root: XML root element
+            target_datasource_id: The datasource ID to filter for (e.g., 'federated.0bzp2u00zw59jl1ai52vq1vcgo27')
+        """
+        fields = set()
+        fields_list = []  # Use dict to ensure uniqueness by name
+
+        for worksheet in root.findall(".//worksheet"):
+            # Look for datasource-dependencies with matching datasource ID
+            for deps in worksheet.findall(".//datasource-dependencies"):
+                datasource_id = deps.get("datasource")
+
+                # Skip if not the target datasource
+                if datasource_id != target_datasource_id:
+                    continue
+
+                # Now process column-instances within this datasource-dependencies
+                column_lookup = {}
+                for column in deps.findall(".//column"):
+                    name = column.get("name")
+                    column_lookup[name] = {
+                        "caption": column.get("caption"),
+                        "datatype": column.get("datatype"),
+                        "role": column.get("role"),
+                        "type": column.get("type"),
+                    }
+
+                # Now process column-instances within this datasource-dependencies
+                for col_instance in deps.findall(".//column-instance"):
+                    derivation = col_instance.get("derivation")
+                    lookup_column = col_instance.get("column")
+                    key_column = col_instance.get("name")
+                    lookup_column_def = column_lookup[lookup_column]
+
+                    column_ref = lookup_column.strip("[]")
+                    name = f"{column_ref}_{derivation}_Derived"
+
+                    aggregation_list = [
+                        "sum",
+                        "avg",
+                        "count",
+                        "min",
+                        "max",
+                        "median",
+                        "countd",
+                    ]
+                    if derivation and derivation not in ["None", "User", ""]:
+                        # Determine role based on type and derivation
+                        if col_instance.get("type") == "quantitative":
+                            role = "measure"
+                        elif derivation.lower() in aggregation_list:
+                            role = "measure"  # Aggregations are always measures
+                        else:
+                            role = "dimension"
+                        # Only add if we haven't seen this field name before
+                        if key_column not in fields:
+                            fields.add(key_column)
+
+                            # this is the format for worksheet fields can u  change it to match the format to append to elements?
+                            field_def = {
+                                "name": f"{name}",
+                                "raw_name": f"{name}",  # The worksheet field name
+                                "role": role,
+                                "datatype": self._map_worksheet_type_to_datatype(
+                                    col_instance.get("type")
+                                ),
+                                "table_name": table_name,  # Will be inferred by handler
+                                "calculation": self._build_calculation_for_derivation(
+                                    lookup_column, derivation
+                                ),
+                                "caption": f"{lookup_column_def['caption']}-{derivation}-derived",  # Worksheet fields typically don't have captions
+                                "aggregation": derivation.lower()
+                                if derivation.lower() in aggregation_list
+                                else None,
+                                "number_format": None,  # Could be extracted if needed
+                                "label": f"{lookup_column_def['caption']} - {derivation} - derived",  # Will be generated by _get_user_friendly_label
+                                "datasource_id": target_datasource_id,
+                                "field_type": "calculated_field",  # All go to calc handler
+                                "is_derived": True,
+                                "tableau_instance": f"{key_column}",
+                            }
+                            fields_list.append(
+                                {"type": "calculated_field", "data": field_def}
+                            )
+                        # fields_list.append(field_def)
+
+            # Convert to list of dicts and return sorted by name
+        return fields_list
 
     def _extract_metadata_fields(self, datasource: Element) -> Dict[str, Dict]:
         """Extract base fields from metadata-records (PRIMARY SOURCE).
@@ -316,6 +530,7 @@ class TableauXMLParserV2:
                 "folder": col.get("folder"),
                 "description": col.get("description"),
                 "number_format": col.get("number-format"),
+                "default_format": col.get("default-format"),
                 "aggregation": col.get("aggregation"),
                 "source": "column_element",
                 "is_internal": self._is_internal_field(col),
@@ -419,6 +634,7 @@ class TableauXMLParserV2:
                 )
                 enhanced_field["drill_down"] = enhancement.get("drill_down")
                 enhanced_field["number_format"] = enhancement.get("number_format")
+                enhanced_field["default_format"] = enhancement.get("default_format")
                 enhanced_field["semantic_role"] = enhancement.get("semantic_role")
                 enhanced_field["folder"] = enhancement.get("folder")
                 enhanced_field["description"] = enhancement.get("description")
@@ -486,6 +702,7 @@ class TableauXMLParserV2:
                     "contains_null": False,
                     "drill_down": enhancement.get("drill_down"),
                     "number_format": enhancement.get("number_format"),
+                    "default_format": enhancement.get("default_format"),
                     "semantic_role": enhancement.get("semantic_role"),
                     "folder": enhancement.get("folder"),
                     "description": enhancement.get("description"),
@@ -513,8 +730,13 @@ class TableauXMLParserV2:
                 enhanced_fields[field_name] = parameter_field
                 global_processed_parameters.add(field_name)
 
+        table_name = None
+        if metadata_fields:
+            first_field = next(iter(metadata_fields.values()))
+            table_name = first_field.get("table_name")
+
         self.logger.info(f"Merged {len(enhanced_fields)} enhanced field definitions")
-        return enhanced_fields
+        return enhanced_fields, table_name
 
     def _is_internal_field(self, col_element: Element) -> bool:
         """Detect internal Tableau fields generically.
@@ -678,7 +900,6 @@ class TableauXMLParserV2:
 
             if not field_def.get("datasource_id"):
                 field_def["datasource_id"] = datasource_id
-
             if field_type in ["measure", "dimension"]:
                 # Convert to handler format - use REMOTE-NAME for clean field names
                 element_data = {
@@ -692,6 +913,7 @@ class TableauXMLParserV2:
                     "caption": field_def.get("caption"),
                     "calculation": field_def.get("calculation"),
                     "number_format": field_def.get("number_format"),
+                    "default_format": field_def.get("default_format"),
                     "drill_down": field_def.get("drill_down"),
                     "semantic_role": field_def.get("semantic_role"),
                     "folder": field_def.get("folder"),
@@ -724,6 +946,7 @@ class TableauXMLParserV2:
                         remote_alias=field_def.get("label"),
                     ),
                     "datasource_id": field_def.get("datasource_id"),
+                    "default_format": field_def.get("default_format"),
                 }
 
                 elements.append({"type": "calculated_field", "data": element_data})
@@ -1561,6 +1784,9 @@ class TableauXMLParserV2:
                 # Case 3: all same — take any (choose last)
                 if "pie" in unique_vals:
                     chart_type_extracted = "pie"
+                elif "bar" in unique_vals:
+                    chart_type_extracted = "bar"
+
             else:
                 # Case 2: multiple different marks — choose mark_2 where present
                 # chart_values preserve insertion order (mark_1, mark_2, ...)

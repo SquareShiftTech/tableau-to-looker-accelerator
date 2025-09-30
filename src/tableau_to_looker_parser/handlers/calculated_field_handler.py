@@ -92,6 +92,9 @@ class CalculatedFieldHandler(BaseHandler):
         if data.get("datatype") and data.get("aggregation"):
             confidence = 1.0
 
+        if data.get("is_derived"):
+            confidence = 1.0
+
         logger.debug(f"Calculated field confidence for '{name}': {confidence}")
         return confidence
 
@@ -194,6 +197,7 @@ class CalculatedFieldHandler(BaseHandler):
             "role": role,
             "field_type": role,  # For compatibility
             "datatype": self._map_data_type(data.get("datatype", "string")),
+            "default_format": data.get("default_format"),
             # Core calculated field data
             "calculation": {
                 "original_formula": calculation,

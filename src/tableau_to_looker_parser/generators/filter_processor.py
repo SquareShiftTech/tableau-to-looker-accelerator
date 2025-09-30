@@ -50,6 +50,21 @@ class FilterProcessor:
                         f"Ignoring filter for field: {filter_data.get('field_name')}"
                     )
                     continue
+                group_except = False
+                group_nested_union = False
+
+                for groupfilter_logic in filter_data.get("groupfilter_logic", []):
+                    if groupfilter_logic.get("function") == "except":
+                        group_except = True
+                    for nested_fields in groupfilter_logic.get("nested_filters", []):
+                        if nested_fields.get("function") == "union":
+                            group_nested_union = True
+
+                if group_except or group_nested_union:
+                    logger.debug(
+                        f"Ignoring filter for field: {filter_data.get('field_name')} because it is an except or nested union"
+                    )
+                    continue
                 # Parse Tableau filter with Pydantic validation
                 tableau_filter = TableauFilter(**filter_data)
 
@@ -169,6 +184,12 @@ class FilterProcessor:
         if not tableau_filter.groupfilter_logic:
             return ""
 
+        # Check if any of the top-level filters use "except" function
+        # has_except = any(logic.function == "except" for logic in tableau_filter.groupfilter_logic)
+        # if has_except:
+        #     logger.debug(f"Found top-level except function for {tableau_filter.field_name}, returning -NULL only")
+        #     return "-NULL"
+
         extracted_values = []
 
         for logic in tableau_filter.groupfilter_logic:
@@ -197,6 +218,10 @@ class FilterProcessor:
         rule = self.config.get_groupfilter_rule(logic.function)
         if not rule:
             return values
+
+        # Skip processing for except functions - this is now handled at the categorical filter level
+        # if logic.function == "except":
+        #     return []
 
         if not rule.extract_values:
             # Functions like level-members don't extract specific values
