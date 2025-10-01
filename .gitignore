@@ -12,6 +12,7 @@ sample_twb_files/processed_pipeline_output.json
 .coverage
 sample_twb_files/generated_lookml*
 sample_twb_files/generated_json*
+sample_twb_files/setup_and_go.twb
 .vscode/*
 sample_twb_files\Bar_charts.twb
 test_dashboard_handler_output.json
@@ -38,7 +39,6 @@ connected_devices_dashboard/Sales Summary_final.twb
 uv.lock
 uv.lock
 connected_devices_dashboard/Sales_Summary_final.twb
-
 connected_devices_dashboard/view
 connected_devices_dashboard/Balanced_Scorecard_Dashboard_BQ.twb
 connected_devices_dashboard/setup_and_go.twbx

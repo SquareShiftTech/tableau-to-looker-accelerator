@@ -2,6 +2,7 @@
 View LookML generator.
 """
 
+import re
 from typing import Dict, List, Set
 import logging
 from types import SimpleNamespace
@@ -11,6 +12,11 @@ from .base_generator import BaseGenerator
 # from .parameter_generator import generate_looker_parameters
 from ..converters.ast_to_lookml_converter import ASTToLookMLConverter
 from ..models.ast_schema import ASTNode, NodeType
+from .lookml_sql_converter import (
+    LookMLSQLConverter,
+    create_converter,
+    convert_lookml_sql,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +136,8 @@ class ViewGenerator(BaseGenerator):
 
         actual_table_name = actual_table["name"]
 
+        lookmlsqlconverter = create_converter(actual_table)
+
         table_dimensions = [
             dim
             for dim in all_dimensions
@@ -144,6 +152,13 @@ class ViewGenerator(BaseGenerator):
             if measure.get("table_name") == actual_table_name
             and not measure.get("is_internal", False)
         ]
+
+        count_measures = self._generate_measures_for_filters(
+            migration_data, actual_table_name, view_name
+        )
+
+        # Add count measures to table measures
+        table_measures.extend(count_measures)
 
         # Filter calculated fields for this specific table and convert AST to LookML, excluding internal fields
 
@@ -186,11 +201,16 @@ class ViewGenerator(BaseGenerator):
                     print("references_aggregated_fields")
 
                 converted_field = self._convert_calculated_field(
-                    calc_field,
-                    view_name,
-                    all_calculated_fields_dict,
-                    references_aggregated_fields,
+                    calc_field, view_name, all_calculated_fields_dict, count_measures,
+                    references_aggregated_fields
                 )
+
+                # <converted_field>
+                if isinstance(lookmlsqlconverter, LookMLSQLConverter):
+                    converted_field = convert_lookml_sql(
+                        lookmlsqlconverter, converted_field
+                    )
+
                 if converted_field.get("name") == "rptmth_copy":
                     print("here")
                 if converted_field:
@@ -272,6 +292,7 @@ class ViewGenerator(BaseGenerator):
         calc_field: Dict,
         table_context: str,
         all_calculated_fields_dict: Dict[str, Dict] = None,
+        count_measures: List[Dict] = None,
         references_aggregated_fields: bool = False,
     ) -> Dict:
         """
@@ -331,7 +352,11 @@ class ViewGenerator(BaseGenerator):
                 calc_field, calculation, references_aggregated_fields
             ):
                 return self._create_two_step_pattern(
-                    calc_field, lookml_sql, calculation, all_calculated_fields_dict
+                    calc_field,
+                    lookml_sql,
+                    calculation,
+                    all_calculated_fields_dict,
+                    count_measures,
                 )
 
             # Standard single field conversion for dimensions and simple measures
@@ -357,6 +382,12 @@ class ViewGenerator(BaseGenerator):
                 "datasource_id": calc_field.get("datasource_id", ""),
                 "local_name": calc_field.get("local_name", ""),
             }
+
+            count_measure_name = f"{field_name}_count_function"
+            if self._has_corresponding_count_measure(
+                count_measure_name, count_measures
+            ):
+                converted_field["order_by_field"] = count_measure_name
 
             # Add migration metadata for fallback fields
             if is_fallback:
@@ -578,6 +609,7 @@ TODO: Manual migration required - please convert this formula manually""",
         lookml_sql: str,
         calculation: Dict,
         all_calculated_fields_dict: Dict[str, Dict] = None,
+        count_measures: List[Dict] = None,
     ) -> Dict:
         """
         Create two-step pattern: hidden dimension + aggregated measure.
@@ -748,3 +780,67 @@ TODO: Manual migration required - please convert this formula manually""",
                 f"Failed to generate view file for {view_data['name']}: {str(e)}"
             )
             raise
+
+    def _generate_measures_for_filters(
+        self, migration_data: Dict, table_name: str, view_name: str
+    ) -> List[Dict]:
+        count_measures = []
+
+        try:
+            worksheets = migration_data.get("worksheets", [])
+
+            for worksheet in worksheets:
+                worksheet_filters = worksheet.get("filters", [])
+
+                for filter_data in worksheet_filters:
+                    groupfilter_logic = filter_data.get("groupfilter_logic", [])
+
+                    for value in groupfilter_logic:
+                        expression = value.get("expression", "")
+
+                        if "COUNT" in expression.upper():
+                            field_name = self._extract_field_from_count_expression(
+                                expression
+                            )
+                            if field_name:
+                                field_name = self._clean_name(field_name)
+                                count_measure = {
+                                    "name": f"{field_name}count_function",
+                                    "field_type": "measure",
+                                    "role": "measure",
+                                    "lookml_type": "count",
+                                    "order_by_field": field_name,
+                                }
+
+                                count_measures.append(count_measure)
+
+        except Exception as e:
+            logger.warning(f"Error generating count measures: {e}")
+
+        return count_measures
+
+    def _extract_field_from_count_expression(self, expression: str) -> str:
+        pattern = r"COUNT\(\s*\[([^\]]+)\]\s*\)"
+        match = re.search(pattern, expression, re.IGNORECASE)
+
+        if match:
+            field_name = match.group(1).strip()
+            pattern = r"_\d{9,}$"
+            field_name = re.sub(pattern, "", field_name)
+
+            return field_name
+
+        return None
+
+    def _has_corresponding_count_measure(
+        self, count_measure_name: str, count_measures: List[Dict] = None
+    ) -> bool:
+        if not count_measures:
+            return False
+
+        # Check if the count measure exists in the count measures list
+        for count_measure in count_measures:
+            if count_measure.get("name") == count_measure_name:
+                return True
+
+        return False

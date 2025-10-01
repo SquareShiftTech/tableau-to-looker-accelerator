@@ -1,0 +1,124 @@
+{
+  "test_cases": [
+    {
+      "name": "case_empty_sql",
+      "description": "Handles an empty SQL string without placeholders",
+      "input_sql": "",
+      "output_sql": ""
+    },
+    {
+        "name": "LookML Field Reference: Table Field",
+        "description": "Uses table-qualified field",
+        "input_sql": "${TABLE}.`revenue`",
+        "output_sql": "${TABLE}.`revenue`"
+    },
+    {
+        "name": "LookML Field in Function",
+        "description": "Field used inside a SQL function",
+        "input_sql": "SUM(${TABLE}.`quantity`)",
+        "output_sql": "SUM(${TABLE}.`quantity`)"
+    },
+    {
+        "name": "LookML Field Reference: Simple Field",
+        "description": "Uses simple field reference without table",
+        "input_sql": "${profit}",
+        "output_sql": "${profit}"
+    },
+    {
+        "name": "LookML Combined Table and Simple Field",
+        "description": "Mix of table-qualified and simple fields",
+        "input_sql": "SELECT ${TABLE}.`revenue`, ${profit} FROM ${TABLE}",
+        "output_sql": "SELECT ${TABLE}.`revenue`, ${profit} FROM ${TABLE}"
+    },
+    {
+      "name": "Arithmetic: Profit Margin %",
+      "description": "Calculates profit as a percentage of revenue",
+      "input_sql": "(${profit} / (${revenue} + 0.000001)) * 100",
+      "output_sql": "(CAST(${profit} AS DOUBLE PRECISION) / (${revenue} + 0.000001)) * 100"
+    },
+    {
+      "name": "Arithmetic: Profit Margin % SAFE_DIVIDE",
+      "description": "Calculates profit as a percentage of revenue with table reference",
+      "input_sql": "(SAFE_DIVIDE(${profit}, (${TABLE}.`revenue` + 0.000001))) * 100",
+      "output_sql": "(CASE WHEN (${TABLE}.`revenue` + 0.000001) <> 0 THEN CAST(${profit} AS DOUBLE PRECISION) / (${TABLE}.`revenue` + 0.000001) ELSE NULL END) * 100"
+    },
+    {
+        "name": "Arithmetic: Return on Investment",
+        "description": "Computes ROI as profit minus investment over investment",
+        "input_sql": "(${profit} - ${investment}) / (${investment} + 0.000001)",
+        "output_sql": "CAST((${profit} - ${investment}) AS DOUBLE PRECISION) / (${investment} + 0.000001)"
+    },
+    {
+        "name": "String Concat: Simple Fields",
+        "description": "Concatenate two fields using pipe operator",
+        "input_sql": "${first_name} || ' ' || ${last_name}",
+        "output_sql": "${first_name} || ' ' || ${last_name}"
+    },
+    {
+        "name": "Arithmetic: Composite Business Efficiency",
+        "description": "Combines profit margin, cost efficiency, and revenue growth",
+        "input_sql": "(((${profit} / (${revenue} + 0.000001)) * 0.5) + ((((${revenue} - ${cost}) / (${cost} + 0.000001)) * 0.3)) + ((((${current_revenue} - ${previous_revenue}) / (${previous_revenue} + 0.000001)) * 0.2)))",
+        "output_sql": "(((CAST(${profit} AS DOUBLE PRECISION) / (${revenue} + 0.000001)) * 0.5) + (((CAST((${revenue} - ${cost}) AS DOUBLE PRECISION) / (${cost} + 0.000001)) * 0.3)) + (((CAST((${current_revenue} - ${previous_revenue}) AS DOUBLE PRECISION) / (${previous_revenue} + 0.000001)) * 0.2)))"
+    },
+    {
+        "name": "LookML CASE WHEN: Simple Field",
+        "description": "Simple CASE WHEN using a field",
+        "input_sql": "IF(${profit} > 0, 'Positive', 'Negative')",
+        "output_sql": "CASE WHEN ${profit} > 0 THEN 'Positive' ELSE 'Negative' END"
+    },
+    {
+        "name": "LookML CASE WHEN: Multiple Conditions",
+        "description": "CASE WHEN with multiple conditions on fields",
+        "input_sql": "CASE WHEN ${profit} > 1000 AND ${revenue} > 5000 THEN 'Top Performer' ELSE 'Other' END",
+        "output_sql": "CASE WHEN ${profit} > 1000 AND ${revenue} > 5000 THEN 'Top Performer' ELSE 'Other' END"
+    },
+    {
+        "name": "BigQuery to Postgres: Null Handling",
+        "description": "Replace null values with default",
+        "input_sql": "SELECT IFNULL(${TABLE}.`phone`, 'N/A') AS phone_number FROM ${TABLE}",
+        "output_sql": "SELECT COALESCE(${TABLE}.`phone`, 'N/A') AS phone_number FROM ${TABLE}"
+    },
+    {
+        "name": "LookML Parameter Reference",
+        "description": "Uses a parameter inside SQL",
+        "input_sql": "SELECT * FROM ${TABLE} WHERE ${date} >= {% parameter start_date %}",
+        "output_sql": "SELECT * FROM ${TABLE} WHERE ${date} >= {% parameter start_date %}"
+    },
+    {
+        "name": "LookML Parameter Inside Expression",
+        "description": "Parameter used in expression",
+        "input_sql": "SELECT ${profit} / {% parameter divisor %} AS ratio FROM ${TABLE}",
+        "output_sql": "SELECT CAST(${profit} AS DOUBLE PRECISION) / {% parameter divisor %} AS ratio FROM ${TABLE}"
+    },
+    {
+        "name": "LookML Multiple Parameters",
+        "description": "Multiple parameters in the same SQL",
+        "input_sql": "SELECT * FROM ${TABLE} WHERE date BETWEEN {% parameter start_date %} AND {% parameter end_date %}",
+        "output_sql": "SELECT * FROM ${TABLE} WHERE date BETWEEN {% parameter start_date %} AND {% parameter end_date %}"
+    },
+    {
+        "name": "LookML CASE WHEN: Parameter",
+        "description": "CASE WHEN using a parameter",
+        "input_sql": "CASE WHEN ${profit} > {% parameter threshold %} THEN 'Above Threshold' ELSE 'Below Threshold' END",
+        "output_sql": "CASE WHEN ${profit} > {% parameter threshold %} THEN 'Above Threshold' ELSE 'Below Threshold' END"
+    },
+    {
+        "name": "LookML CASE WHEN: Nested CASE",
+        "description": "CASE WHEN nested inside another CASE",
+        "input_sql": "CASE WHEN ${profit} > 0 THEN CASE WHEN ${revenue} > 10000 THEN 'High Profit & Revenue' ELSE 'High Profit' END ELSE 'Loss' END",
+        "output_sql": "CASE WHEN ${profit} > 0 THEN CASE WHEN ${revenue} > 10000 THEN 'High Profit & Revenue' ELSE 'High Profit' END ELSE 'Loss' END"
+    },
+    {
+        "name": "LookML Liquid IF Statement: LOD Expression",
+        "description": "Conditional SQL using Liquid",
+        "input_sql": "SELECT SUM(sales) FROM `elastic-pocs.Super_Store_Sales.Order_Details` WHERE 1=1 {% if order_details.customer_name._in_query %} AND customer_name = ${customer_name} {% endif %}",
+        "output_sql": "SELECT SUM(sales) FROM \"elastic-pocs\".\"Super_Store_Sales\".\"Order_Details\" WHERE 1 = 1 {% if order_details.customer_name._in_query %} AND customer_name = ${customer_name} {% endif %}"
+    },
+    {
+        "name": "LookML Liquid Multiple IF Statement: LOD Expression",
+        "description": "Conditional SQL using Liquid",
+        "input_sql": "SELECT SUM(sales) FROM `elastic-pocs.Super_Store_Sales.Order_Details` WHERE 1=1 {% if order_details.customer_name._in_query %} AND customer_name = ${customer_name} {% endif %} {% if order_details.region._in_query %} AND region = ${region} {% endif %}",
+        "output_sql": "SELECT SUM(sales) FROM \"elastic-pocs\".\"Super_Store_Sales\".\"Order_Details\" WHERE 1 = 1 {% if order_details.customer_name._in_query %} AND customer_name = ${customer_name} {% endif %} {% if order_details.region._in_query %} AND region = ${region} {% endif %}"
+    }
+  ]
+}
