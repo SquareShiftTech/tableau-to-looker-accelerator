@@ -1278,7 +1278,7 @@ class ASTToLookMLConverter:
             "ASCII",
             "PROPER",
             "INITCAP",
-            "FIND",
+            # "FIND",
             "SEARCH",
             "SPLIT",
         }
