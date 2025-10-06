@@ -122,6 +122,26 @@ basic_chart_detection:
     fields_sources: ["columns_shelf", "rows_shelf"]
     pivot_field_source: ["color_marks"]
 
+  auto_temporal_line_chart:
+    conditions:
+      - mark_type: ["Automatic"]
+      - x_encoding: ["temporal", "date", "continuous"]
+      - y_encoding: "measure"
+      - columns_shelf_count: ">0"
+    confidence: 100
+    stacked_type: false
+    looker_equivalent: "looker_line"
+    pivot_required: false
+    fields_sources: ["columns_shelf", "rows_shelf", "text_marks", "measure_encoding"]
+    pivot_field_source: ["color_marks"]
+    variants:
+      - multi_line:
+          conditions:
+            - color_encoding: "categorical"
+          pivot_required: true
+          pivot_type: "series"
+          looker_equivalent: "looker_line"
+
   # Column Chart (Vertical Bars)
   column_chart:
     conditions:
