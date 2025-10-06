@@ -26,9 +26,6 @@ def test_dashboard_pipeline(test_file=None):
 
     output_dir = "verizon_test_output"
 
-    test_file = "sample_twb_postgres/Center_Employee_Statistics/Postgres_Center & Employee Statistics Modified.twb"
-    output_dir = "sample_twb_postgres/Center_Employee_Statistics/lookml_output"
-
     if not os.path.exists(test_file):
         print(f"❌ Test file not found: {test_file}")
         return False

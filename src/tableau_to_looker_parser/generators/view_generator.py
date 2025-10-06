@@ -136,12 +136,12 @@ class ViewGenerator(BaseGenerator):
 
         lookmlsqlconverter = create_converter(actual_table)
 
-        table_ref = self._format_table_name(table_ref)
+        lookml_table_ref = self._format_table_name(table_ref)
 
         if isinstance(lookmlsqlconverter, LookMLSQLConverter):
-            lookml_table_ref = lookmlsqlconverter.convert(table_ref)
+            lookml_table_ref = lookmlsqlconverter.convert(lookml_table_ref)
         else:
-            lookml_table_ref = table_ref
+            lookml_table_ref = lookml_table_ref
 
         actual_table_name = actual_table["name"]
 
@@ -154,7 +154,7 @@ class ViewGenerator(BaseGenerator):
 
         for dim in table_dimensions:
             if dim.get("sql_column"):
-                dim["sql_column"] = f"`{dim['sql_column']}`"
+                dim["sql_column"] = f"`{dim['sql_column'].strip('[]')}`"
 
                 if isinstance(lookmlsqlconverter, LookMLSQLConverter):
                     dim["sql_column"] = lookmlsqlconverter.convert(dim["sql_column"])
@@ -169,7 +169,7 @@ class ViewGenerator(BaseGenerator):
 
         for mea in table_measures:
             if mea.get("sql_column"):
-                mea["sql_column"] = f"`{mea['sql_column']}`"
+                mea["sql_column"] = f"`{mea['sql_column'].strip('[]')}`"
 
                 if isinstance(lookmlsqlconverter, LookMLSQLConverter):
                     mea["dimension_reference"] = lookmlsqlconverter.convert(
