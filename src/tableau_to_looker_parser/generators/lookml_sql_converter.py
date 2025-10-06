@@ -132,7 +132,7 @@ class LookMLSQLConverter:
         def dollar_table_replacer(match):
             placeholder = match.group(0)
             ph = gen_placeholder()
-            placeholder_map[ph] = placeholder
+            placeholder_map[ph] = placeholder.replace("`", '"')
             return ph
 
         sql = re.sub(r"\$\{TABLE\}.`[^`]+`", dollar_table_replacer, sql)
@@ -341,7 +341,9 @@ def create_converter(table: dict, verbose: bool = False) -> LookMLSQLConverter:
         return None
 
 
-def convert_lookml_sql(converter: LookMLSQLConverter, converted_field: dict) -> str:
+def convert_lookml_sql(
+    converter: LookMLSQLConverter, converted_field: dict, is_reference_field=False
+) -> str:
     """
     Convenience function for one-off conversions.
 
@@ -355,6 +357,25 @@ def convert_lookml_sql(converter: LookMLSQLConverter, converted_field: dict) -> 
     Returns:
         The converted SQL string
     """
+    if is_reference_field:
+        try:
+            sql = converted_field.get("sql")
+            converted_sql = converter.convert(sql)
+            converted_field["sql"] = converted_sql
+        except Exception as e:
+            logger.error(
+                f"Conversion failed for {converted_field.get('role')} SQL: {sql}. Error: {e}"
+                "TODO: Manual migration required - please convert this formula manually"
+            )
+            converted_field["sql"] = "'MIGRATION_REQUIRED'"
+            converted_field["migration_error"] = True
+            converted_field[
+                "migration_comment"
+            ] = f"""MIGRATION_ERROR: Could not convert calculated field
+ORIGINAL_FORMULA: {sql}
+CONVERSION_ERROR: {e}
+TODO: Manual migration required - please convert this formula manually"""
+
     if converted_field.get("dimension"):
         try:
             sql = converted_field.get("dimension").get("sql")

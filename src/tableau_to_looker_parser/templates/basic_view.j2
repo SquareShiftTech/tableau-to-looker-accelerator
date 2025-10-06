@@ -77,7 +77,7 @@ view: {{ view_name }} {
     {% else %}
     timeframes: [raw, time, date, week, month, quarter, year]
     {% endif %}
-    sql: TIMESTAMP(${TABLE}.{{ (dimension.sql_column or dimension.name) | sql_column }}) ;;
+    sql: TIMESTAMP(${TABLE}.{{ (dimension.sql_column or dimension.name) }}) ;;
     {% if dimension.description %}
     description: "{{ dimension.description | escape_quotes }}"
     {% endif %}
@@ -134,9 +134,9 @@ view: {{ view_name }} {
     type: string
     {% endif %}
     {% if dimension.sql_column %}
-    sql: ${TABLE}.{{ dimension.sql_column | sql_column }} ;;
+    sql: ${TABLE}.{{ dimension.sql_column }} ;;
     {% else %}
-    sql: ${TABLE}.{{ dimension.name | sql_column }} ;;
+    sql: ${TABLE}.{{ dimension.name }} ;;
     {% endif %}
     {% if dimension.hidden %}
     hidden: yes

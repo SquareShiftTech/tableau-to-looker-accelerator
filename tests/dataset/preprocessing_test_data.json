@@ -11,7 +11,7 @@
       "description": "Replaces a single ${TABLE}.`field` placeholder",
       "input_sql": "${TABLE}.`user_id`",
       "expected_placeholder_map": {
-        "__PH_0__": "${TABLE}.`user_id`"
+        "__PH_0__": "${TABLE}.\"user_id\""
       }
     },
     {
@@ -19,10 +19,10 @@
       "description": "Replaces multiple ${TABLE}.`field` placeholders in SELECT and WHERE clauses",
       "input_sql": "SELECT ${TABLE}.`first_name`, ${TABLE}.`last_name`, ${TABLE}.`email` FROM ${TABLE} WHERE ${TABLE}.`active` = 1",
       "expected_placeholder_map": {
-        "__PH_0__": "${TABLE}.`first_name`",
-        "__PH_1__": "${TABLE}.`last_name`",
-        "__PH_2__": "${TABLE}.`email`",
-        "__PH_3__": "${TABLE}.`active`",
+        "__PH_0__": "${TABLE}.\"first_name\"",
+        "__PH_1__": "${TABLE}.\"last_name\"",
+        "__PH_2__": "${TABLE}.\"email\"",
+        "__PH_3__": "${TABLE}.\"active\"",
         "__PH_4__": "${TABLE}"
       }
     },
@@ -52,9 +52,9 @@
       "description": "Replaces a mix of ${TABLE}.`field` and ${field_name} placeholders, prioritizing ${TABLE}.`field` first",
       "input_sql": "SELECT ${TABLE}.`id`, ${user_name}, ${TABLE}.`created_date`, ${status} FROM ${TABLE} WHERE ${TABLE}.`active` = 1",
       "expected_placeholder_map": {
-        "__PH_0__": "${TABLE}.`id`",
-        "__PH_1__": "${TABLE}.`created_date`",
-        "__PH_2__": "${TABLE}.`active`",
+        "__PH_0__": "${TABLE}.\"id\"",
+        "__PH_1__": "${TABLE}.\"created_date\"",
+        "__PH_2__": "${TABLE}.\"active\"",
         "__PH_3__": "${user_name}",
         "__PH_4__": "${status}",
         "__PH_5__": "${TABLE}"
@@ -93,9 +93,9 @@
       "description": "Combines ${TABLE}.`field` with a single {% parameter %} in WHERE clause",
       "input_sql": "SELECT ${TABLE}.`id`, ${TABLE}.`name` FROM ${TABLE} WHERE ${TABLE}.`created_at` >= {% parameter start_date %}",
       "expected_placeholder_map": {
-        "__PH_0__": "${TABLE}.`id`",
-        "__PH_1__": "${TABLE}.`name`",
-        "__PH_2__": "${TABLE}.`created_at`",
+        "__PH_0__": "${TABLE}.\"id\"",
+        "__PH_1__": "${TABLE}.\"name\"",
+        "__PH_2__": "${TABLE}.\"created_at\"",
         "__PH_3__": "${TABLE}",
         "__PH_4__": "{% parameter start_date %}"
       }
@@ -120,9 +120,9 @@
       "description": "Mix of ${TABLE}.`field`, ${field_name}, and {% parameter %} in SELECT and WHERE",
       "input_sql": "SELECT ${TABLE}.`id`, ${first_name}, ${last_name}, ${TABLE}.`email` FROM ${TABLE} WHERE ${TABLE}.`active` = 1 AND ${signup_date} >= {% parameter start_date %} AND ${status} = {% parameter user_status %}",
       "expected_placeholder_map": {
-        "__PH_0__": "${TABLE}.`id`",
-        "__PH_1__": "${TABLE}.`email`",
-        "__PH_2__": "${TABLE}.`active`",
+        "__PH_0__": "${TABLE}.\"id\"",
+        "__PH_1__": "${TABLE}.\"email\"",
+        "__PH_2__": "${TABLE}.\"active\"",
         "__PH_3__": "${first_name}",
         "__PH_4__": "${last_name}",
         "__PH_5__": "${TABLE}",

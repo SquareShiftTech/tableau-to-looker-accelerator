@@ -10,13 +10,13 @@
         "name": "LookML Field Reference: Table Field",
         "description": "Uses table-qualified field",
         "input_sql": "${TABLE}.`revenue`",
-        "output_sql": "${TABLE}.`revenue`"
+        "output_sql": "${TABLE}.\"revenue\""
     },
     {
         "name": "LookML Field in Function",
         "description": "Field used inside a SQL function",
         "input_sql": "SUM(${TABLE}.`quantity`)",
-        "output_sql": "SUM(${TABLE}.`quantity`)"
+        "output_sql": "SUM(${TABLE}.\"quantity\")"
     },
     {
         "name": "LookML Field Reference: Simple Field",
@@ -28,7 +28,7 @@
         "name": "LookML Combined Table and Simple Field",
         "description": "Mix of table-qualified and simple fields",
         "input_sql": "SELECT ${TABLE}.`revenue`, ${profit} FROM ${TABLE}",
-        "output_sql": "SELECT ${TABLE}.`revenue`, ${profit} FROM ${TABLE}"
+        "output_sql": "SELECT ${TABLE}.\"revenue\", ${profit} FROM ${TABLE}"
     },
     {
       "name": "Arithmetic: Profit Margin %",
@@ -40,7 +40,7 @@
       "name": "Arithmetic: Profit Margin % SAFE_DIVIDE",
       "description": "Calculates profit as a percentage of revenue with table reference",
       "input_sql": "(SAFE_DIVIDE(${profit}, (${TABLE}.`revenue` + 0.000001))) * 100",
-      "output_sql": "(CASE WHEN (${TABLE}.`revenue` + 0.000001) <> 0 THEN CAST(${profit} AS DOUBLE PRECISION) / (${TABLE}.`revenue` + 0.000001) ELSE NULL END) * 100"
+      "output_sql": "(CASE WHEN (${TABLE}.\"revenue\" + 0.000001) <> 0 THEN CAST(${profit} AS DOUBLE PRECISION) / (${TABLE}.\"revenue\" + 0.000001) ELSE NULL END) * 100"
     },
     {
         "name": "Arithmetic: Return on Investment",
@@ -76,7 +76,7 @@
         "name": "BigQuery to Postgres: Null Handling",
         "description": "Replace null values with default",
         "input_sql": "SELECT IFNULL(${TABLE}.`phone`, 'N/A') AS phone_number FROM ${TABLE}",
-        "output_sql": "SELECT COALESCE(${TABLE}.`phone`, 'N/A') AS phone_number FROM ${TABLE}"
+        "output_sql": "SELECT COALESCE(${TABLE}.\"phone\", 'N/A') AS phone_number FROM ${TABLE}"
     },
     {
         "name": "LookML Parameter Reference",

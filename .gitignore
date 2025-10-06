@@ -21,6 +21,7 @@ xml_parser_phase3_sample_output.json
 test_output/processed_pipeline_output.json
 sample_twb_files/Bar_charts.twb
 verizon_test_output/
+sample_twb_postgres/
 *.twbr
 # Test output directories
 test_output/
