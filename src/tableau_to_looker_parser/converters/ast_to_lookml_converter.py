@@ -214,7 +214,11 @@ class ASTToLookMLConverter:
             "MAKELINE": "MAKELINE_SPECIAL",
             "INDEX": "row_number() over (order by 1 desc)",  # INDEX() → row_number() with dummy sort
             "SIZE": "count(*) over ()",  # SIZE() → count(*) over window
-            "ATTR": "ANY_VALUE({0})",
+            "AGG": "{0}",
+            # User functions
+            "USERNAME": "'{{ _user_attributes['name']}}'",
+            # Attr
+            "ATTR": "CASE WHEN MIN({0}) IS NULL THEN NULL WHEN MIN({0}) = MAX({0}) THEN MIN({0}) ELSE '*' END",
         }
 
     # CONVERSION METHODS - Each handles a specific AST node type
@@ -594,6 +598,10 @@ class ASTToLookMLConverter:
                     return (
                         f"/* MAKELINE expects 2 arguments, got {len(converted_args)} */"
                     )
+
+            elif lookml_function == "'{{ _user_attributes['name']}}'":
+                # USERNAME() function - return the user attribute directly without parentheses
+                return lookml_function
 
             # Handle special function formats
             elif "{}" in lookml_function:
@@ -1270,7 +1278,7 @@ class ASTToLookMLConverter:
             "ASCII",
             "PROPER",
             "INITCAP",
-            "FIND",
+            # "FIND",
             "SEARCH",
             "SPLIT",
         }

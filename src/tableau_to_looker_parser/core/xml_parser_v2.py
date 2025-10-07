@@ -260,6 +260,7 @@ class TableauXMLParserV2:
             "Mode",
             "Any",
             "All",
+            "AGG",
         ]:
             return self._build_aggregation_calculation(column_ref, derivation)
 
@@ -299,6 +300,7 @@ class TableauXMLParserV2:
             # Logical aggregations
             "Any": f"ANY({column_ref})",
             "All": f"ALL({column_ref})",
+            "AGG": f"AGG({column_ref})",
         }
 
         return aggregation_calc_mapping.get(
@@ -344,9 +346,13 @@ class TableauXMLParserV2:
                     lookup_column = col_instance.get("column")
                     key_column = col_instance.get("name")
                     lookup_column_def = column_lookup[lookup_column]
+                    role = lookup_column_def.get("role")
 
                     column_ref = lookup_column.strip("[]")
                     name = f"{column_ref}_{derivation}_Derived"
+
+                    # if role == "measure" and derivation == "User":
+                    # derivation = "AGG"
 
                     aggregation_list = [
                         "sum",

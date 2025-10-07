@@ -360,11 +360,6 @@ class TableauChartRuleEngine:
             "field_count": len(fields),
             "has_alternating_square_text": has_alternating_square_text,
         }
-        if worksheet_data.get("name", "") == "Device TR Ranking":
-            print(
-                f"Detection context for worksheet '{worksheet_data.get('name', '')}':\n{context}\n"
-            )
-
         self.logger.debug(f"Detection context: {context}")
         return context
 
@@ -574,14 +569,21 @@ class TableauChartRuleEngine:
         fallback = self.rules.get("fallback", self._get_default_fallback())
 
         result = {
-            "chart_type": fallback.get("default_chart_type", "bar"),
+            "chart_type": fallback.get("default_chart_type", "looker_grid"),
             "confidence": fallback.get("default_confidence", 0.40),
             "method": DetectionMethod.FALLBACK_DEFAULT,
             "reasoning": fallback.get("default_reason", "No matching rules found"),
             "matched_rule": None,
             "looker_equivalent": "looker_column",
             "pivot_required": False,
-            "fields_sources": [],
+            "fields_sources": [
+                "rows_shelf",
+                "columns_shelf",
+                "color_marks",
+                "text_marks",
+                "size_marks",
+                "detail_shelf",
+            ],
             "pivot_field_source": [],
             "is_dual_axis": context.get("has_dual_axis", False),
         }

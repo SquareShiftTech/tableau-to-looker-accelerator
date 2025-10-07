@@ -198,7 +198,8 @@ class ViewGenerator(BaseGenerator):
                 )
 
                 if references_aggregated_fields:
-                    print("references_aggregated_fields")
+                    # print("references_aggregated_fields")
+                    pass
 
                 converted_field = self._convert_calculated_field(
                     calc_field, view_name, all_calculated_fields_dict, count_measures,
@@ -381,6 +382,9 @@ class ViewGenerator(BaseGenerator):
                 "lookml_type": lookml_type,  # Add LookML type for template
                 "datasource_id": calc_field.get("datasource_id", ""),
                 "local_name": calc_field.get("local_name", ""),
+                "tableau_instance": calc_field.get("tableau_instance", ""),
+                "aggregation": calc_field.get("aggregation", ""),
+                "is_derived": calc_field.get("is_derived", False),
             }
 
             count_measure_name = f"{field_name}_count_function"
@@ -510,7 +514,10 @@ TODO: Manual migration required - please convert this formula manually""",
             return "sum"
 
     def _references_aggregated_fields(
-        self, formula: str, all_calculated_fields_dict: Dict[str, Dict]
+        self,
+        formula: str,
+        all_calculated_fields_dict: Dict[str, Dict],
+        visited: set = None,
     ) -> bool:
         """
         Check if formula references fields that contain aggregation.
@@ -523,6 +530,9 @@ TODO: Manual migration required - please convert this formula manually""",
             bool: True if formula references fields containing aggregation
         """
         import re
+
+        if visited is None:
+            visited = set()
 
         # Extract field references from square brackets
         field_refs = re.findall(r"\[([^\]]+)\]", formula)
@@ -537,17 +547,27 @@ TODO: Manual migration required - please convert this formula manually""",
             # Clean the field reference (remove brackets)
             # clean_field_name = field_ref.strip("[]")
 
+            if field_ref in visited:
+                continue
+
             # Look up the field in our dictionary
             referenced_field = all_calculated_fields_dict.get(f"[{field_ref}]")
 
             if referenced_field:
                 # Get the referenced field's formula
+                visited.add(field_ref)
                 referenced_formula = referenced_field.get("calculation", {}).get(
                     "original_formula", ""
                 )
 
                 # Check if the referenced field contains aggregation
                 if any(func in referenced_formula.upper() for func in agg_functions):
+                    return True
+
+                # Recursively check if the referenced field references aggregated fields
+                if self._references_aggregated_fields(
+                    referenced_formula, all_calculated_fields_dict, visited
+                ):
                     return True
 
         return False
@@ -662,6 +682,7 @@ TODO: Manual migration required - please convert this formula manually""",
             "datasource_id": calc_field.get("datasource_id", ""),
             "local_name": calc_field.get("local_name", ""),
             "default_format": calc_field.get("default_format", ""),
+            "is_derived": calc_field.get("is_derived", False),
         }
 
         logger.debug(

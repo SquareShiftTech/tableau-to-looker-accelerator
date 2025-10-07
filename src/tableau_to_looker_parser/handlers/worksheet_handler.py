@@ -92,7 +92,7 @@ class WorksheetHandler(BaseHandler):
         datasource_id = data["datasource_id"]
 
         if name == "Channel Outlier Report":
-            print(f"Worksheet {name} has data: {data}")
+            logger.debug(f"Worksheet {name} has data")
 
         # Process fields
         fields = self._process_fields(data.get("fields", []))
@@ -108,18 +108,18 @@ class WorksheetHandler(BaseHandler):
         confidence = self._calculate_worksheet_confidence(data, fields, visualization)
 
         # Identify worksheet-specific measures from field aggregations
-        identified_measures = self._identify_worksheet_measures(fields, datasource_id)
-        logger.info(
-            f"Identified {len(identified_measures)} worksheet-specific measures for {name}"
-        )
+        # identified_measures = self._identify_worksheet_measures(fields, datasource_id)
+        # logger.info(
+        #   f"Identified {len(identified_measures)} worksheet-specific measures for {name}"
+        # )
 
         # Identify derived fields from Tableau instances (time functions, aggregations)
-        derived_fields = self._identify_derived_fields_from_visualization(
-            visualization, datasource_id
-        )
-        logger.debug(
-            f"WORKSHEET HANDLER: {name} has {len(derived_fields)} derived fields"
-        )
+        # derived_fields = self._identify_derived_fields_from_visualization(
+        #   visualization, datasource_id
+        # )
+        # logger.debug(
+        # f"WORKSHEET HANDLER: {name} has {len(derived_fields)} derived fields"
+        # )
         measure_names = []
 
         # Step 1: Find the dict with field_name "Measure Names"
@@ -146,8 +146,6 @@ class WorksheetHandler(BaseHandler):
                     cleaned_member = member_value.strip('"')
                     measure_names.append(cleaned_member)
 
-            print(f"Extracted measure names: {measure_names}")
-
             for field in fields:
                 tableau_instance = field.get("tableau_instance", "")
                 datasource_id = field.get("datasource_id", "")
@@ -165,8 +163,8 @@ class WorksheetHandler(BaseHandler):
             "calculated_fields": self._extract_calculated_fields(fields),
             "visualization": visualization,
             "filters": filters,
-            "identified_measures": identified_measures,  # NEW: Measure data for Migration Engine
-            "derived_fields": derived_fields,  # NEW: Derived field data for Migration Engine
+            # "identified_measures": identified_measures,  # NEW: Measure data for Migration Engine
+            # "derived_fields": derived_fields,  # NEW: Derived field data for Migration Engine
             "actions": actions,
             "dashboard_placements": [],  # Will be populated later by dashboard processing
             "suggested_explore_joins": self._suggest_joins(fields),

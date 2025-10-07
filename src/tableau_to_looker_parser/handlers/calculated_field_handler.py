@@ -190,6 +190,12 @@ class CalculatedFieldHandler(BaseHandler):
             else:
                 # Assign a special placeholder table_name to ensure generation
                 table_name = "__UNASSIGNED_TABLE__"
+
+        is_derived = data.get("is_derived", False)
+        tableau_instance = None
+        if is_derived:
+            tableau_instance = data.get("tableau_instance")
+
         # Create the JSON representation
         result = {
             "name": field_name,
@@ -198,6 +204,8 @@ class CalculatedFieldHandler(BaseHandler):
             "field_type": role,  # For compatibility
             "datatype": self._map_data_type(data.get("datatype", "string")),
             "default_format": data.get("default_format"),
+            "tableau_instance": tableau_instance,
+            "is_derived": is_derived,
             # Core calculated field data
             "calculation": {
                 "original_formula": calculation,
