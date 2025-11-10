@@ -21,6 +21,9 @@ Requires-Dist: jinja2<4.0.0,>=3.1.0
 Requires-Dist: setuptools>=61.0
 Requires-Dist: wheel
 Requires-Dist: sqlglot>=27.18.0
+Requires-Dist: tableauserverclient>=0.38
+Requires-Dist: python-slugify>=8.0.4
+Requires-Dist: python-dotenv>=1.2.1
 Provides-Extra: dev
 Requires-Dist: pytest<9.0.0,>=8.0.0; extra == "dev"
 Requires-Dist: pytest-cov<6.0.0,>=5.0.0; extra == "dev"

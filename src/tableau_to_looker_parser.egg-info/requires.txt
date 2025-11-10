@@ -6,6 +6,9 @@ jinja2<4.0.0,>=3.1.0
 setuptools>=61.0
 wheel
 sqlglot>=27.18.0
+tableauserverclient>=0.38
+python-slugify>=8.0.4
+python-dotenv>=1.2.1
 
 [dev]
 pytest<9.0.0,>=8.0.0

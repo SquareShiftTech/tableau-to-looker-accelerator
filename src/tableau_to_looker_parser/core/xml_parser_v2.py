@@ -13,6 +13,7 @@ Key improvements over v1:
 """
 
 import zipfile
+import ast
 import html
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Union, Any
@@ -199,13 +200,46 @@ class TableauXMLParserV2:
         self.logger.info(f"Total elements extracted: {len(elements)}")
         return elements
 
-    def _map_worksheet_type_to_datatype(self, worksheet_type):
+    def _map_worksheet_type_to_datatype(
+        self, worksheet_type, lookup_datatype, derivation
+    ):
         """
         Map worksheet column-instance type to Tableau datatype
         """
+
+        date_part = ["Day", "Month", "Year", "Quarter", "Week"]
+
+        if derivation in date_part:
+            return "integer"
+
+        date_truncations = [
+            "Day-Trunc",
+            "Month-Trunc",
+            "Year-Trunc",
+            "Quarter-Trunc",
+            "Week-Trunc",
+        ]
+
+        if derivation in date_truncations and lookup_datatype in [
+            "date",
+            "datetime",
+            "time",
+        ]:
+            return lookup_datatype
+
+        if worksheet_type == "ordinal":
+            if lookup_datatype in ["integer", "real"]:
+                return "number"
+
+            elif lookup_datatype == "string":
+                return "string"
+
+            else:
+                return "date"
+
         type_mapping = {
             "nominal": "string",  # Categorical text
-            "ordinal": "date",  # Ordered, often dates
+            # "ordinal": "date",  # Ordered, often dates
             "quantitative": "real",  # Numbers/measures
         }
         return type_mapping.get(worksheet_type, "string")
@@ -322,12 +356,16 @@ class TableauXMLParserV2:
 
         for worksheet in root.findall(".//worksheet"):
             # Look for datasource-dependencies with matching datasource ID
+
             for deps in worksheet.findall(".//datasource-dependencies"):
                 datasource_id = deps.get("datasource")
 
                 # Skip if not the target datasource
                 if datasource_id != target_datasource_id:
                     continue
+
+                if worksheet.get("name") == "TOP Y":
+                    self.logger.debug("Found Sales by Category worksheet")
 
                 # Now process column-instances within this datasource-dependencies
                 column_lookup = {}
@@ -342,14 +380,25 @@ class TableauXMLParserV2:
 
                 # Now process column-instances within this datasource-dependencies
                 for col_instance in deps.findall(".//column-instance"):
+                    if col_instance.find("table-calc") is not None:
+                        continue
                     derivation = col_instance.get("derivation")
                     lookup_column = col_instance.get("column")
                     key_column = col_instance.get("name")
+                    if lookup_column not in column_lookup:
+                        worksheet_name = worksheet.get("name")
+                        self.logger.warning(
+                            f"Worksheet '{worksheet_name}': column-instance references missing column definition: {lookup_column}"
+                        )
+                        continue
                     lookup_column_def = column_lookup[lookup_column]
-                    role = lookup_column_def.get("role")
+                    lookup_role = lookup_column_def.get("role")
 
                     column_ref = lookup_column.strip("[]")
                     name = f"{column_ref}_{derivation}_Derived"
+
+                    if name.lower() == "none_avg_derived40":
+                        print(name)
 
                     # if role == "measure" and derivation == "User":
                     # derivation = "AGG"
@@ -363,9 +412,34 @@ class TableauXMLParserV2:
                         "median",
                         "countd",
                     ]
-                    if derivation and derivation not in ["None", "User", ""]:
+
+                    list = [
+                        "Month-Trunc",
+                        "Month",
+                    ]
+
+                    if col_instance.get("type") == "quantitative":
+                        role = "measure"
+                    elif col_instance.get("type") == "ordinal" and derivation in [
+                        "User"
+                    ]:
+                        role = "measure"
+                    elif derivation.lower() in aggregation_list:
+                        role = "measure"  # Aggregations are always measures
+                    else:
+                        role = "dimension"
+
+                    if derivation and (
+                        derivation not in ["None", "User", ""]
+                        or not lookup_role == role
+                    ):
                         # Determine role based on type and derivation
-                        if col_instance.get("type") == "quantitative":
+                        if (
+                            col_instance.get("type") == "quantitative"
+                            and derivation in list
+                        ):
+                            role = "dimension"
+                        elif col_instance.get("type") == "quantitative":
                             role = "measure"
                         elif derivation.lower() in aggregation_list:
                             role = "measure"  # Aggregations are always measures
@@ -381,18 +455,20 @@ class TableauXMLParserV2:
                                 "raw_name": f"{name}",  # The worksheet field name
                                 "role": role,
                                 "datatype": self._map_worksheet_type_to_datatype(
-                                    col_instance.get("type")
+                                    col_instance.get("type"),
+                                    lookup_column_def.get("datatype"),
+                                    derivation,
                                 ),
                                 "table_name": table_name,  # Will be inferred by handler
                                 "calculation": self._build_calculation_for_derivation(
                                     lookup_column, derivation
                                 ),
-                                "caption": f"{lookup_column_def['caption']}-{derivation}-derived",  # Worksheet fields typically don't have captions
+                                "caption": f"{lookup_column_def['caption'] or column_ref}-{derivation}-derived",  # Worksheet fields typically don't have captions
                                 "aggregation": derivation.lower()
                                 if derivation.lower() in aggregation_list
                                 else None,
                                 "number_format": None,  # Could be extracted if needed
-                                "label": f"{lookup_column_def['caption']} - {derivation} - derived",  # Will be generated by _get_user_friendly_label
+                                "label": f"{lookup_column_def['caption'] or column_ref} - {derivation} - derived",  # Will be generated by _get_user_friendly_label
                                 "datasource_id": target_datasource_id,
                                 "field_type": "calculated_field",  # All go to calc handler
                                 "is_derived": True,
@@ -510,6 +586,53 @@ class TableauXMLParserV2:
         )
         return metadata_fields
 
+    def _get_group_tableau_formula(
+        self, column: str, default_value: str | None, bins: List
+    ) -> str:
+        """
+        Build Tableau-style group calculation formula for the calc handler
+
+        Args:
+            group_field: Dict containing group field data
+        """
+
+        def format_list(lst):
+            if not lst:
+                return ""
+
+            # detect element type (based on first item)
+            first = lst[0]
+
+            if isinstance(first, str):
+                return ", ".join(f'"{v}"' for v in lst)
+            elif isinstance(first, (int, float)):
+                return ", ".join(str(v) for v in lst)
+            else:
+                raise TypeError("Unsupported list element type")
+
+        if not bins:
+            return f"{column} ;;"
+
+        lookml_sql = ""
+
+        for i, bin in enumerate(bins):
+            values = bin.get("values", [])
+            condition = f"{column} IN (\n    {format_list(values)}\n  )"
+
+            if i == 0:
+                lookml_sql += f'IF {condition} THEN "{bin.get("name")}"'
+            else:
+                lookml_sql += f'\nELSEIF {condition} THEN "{bin.get("name")}"'
+
+        if default_value is not None:
+            lookml_sql += f"\nELSE '{default_value}'"
+        else:
+            lookml_sql += f"\nELSE STR({column})"
+
+        lookml_sql += "\nEND"
+
+        return lookml_sql
+
     def _extract_column_enhancements(self, datasource: Element) -> Dict[str, Dict]:
         """Extract enhancements and calculated fields from column elements.
 
@@ -548,9 +671,43 @@ class TableauXMLParserV2:
             # Check for calculations (CALCULATED FIELDS)
             calc_element = col.find("calculation")
             if calc_element is not None:
-                enhancement["calculation"] = calc_element.get("formula")
                 enhancement["is_calculated"] = True
                 enhancement["calculation_class"] = calc_element.get("class")
+
+                if calc_element.get("class") == "categorical-bin":
+
+                    def parse_value(text: str):
+                        try:
+                            return ast.literal_eval(text)
+                        except (ValueError, SyntaxError):
+                            return text
+
+                    column = calc_element.get("column")
+                    new_bin = calc_element.get("new-bin", False)
+                    default_value = parse_value(calc_element.get("default"))
+                    bins = []
+                    for bin_el in calc_element.findall("bin"):
+                        bin_data = {
+                            "default": bin_el.get("default-name"),
+                            "name": bin_el.get("value").replace('"', ""),
+                            "values": [
+                                parse_value(v.text) for v in bin_el.findall("value")
+                            ],
+                        }
+                        bins.append(bin_data)
+
+                    formula = self._get_group_tableau_formula(
+                        column, default_value, bins
+                    )
+                    enhancement["calculation"] = formula
+
+                    enhancement["group_column"] = column
+                    enhancement["group_new_bin"] = new_bin
+                    enhancement["group_default_value"] = default_value
+                    enhancement["bins"] = bins
+                else:
+                    enhancement["calculation"] = calc_element.get("formula")
+
             else:
                 enhancement["is_calculated"] = False
 
@@ -703,6 +860,11 @@ class TableauXMLParserV2:
                     "aggregation": enhancement.get("aggregation"),
                     "caption": enhancement.get("caption"),
                     "calculation": enhancement.get("calculation"),
+                    "calculation_class": enhancement.get("calculation_class"),
+                    "group_column": enhancement.get("group_column"),
+                    "group_new_bin": enhancement.get("group_new_bin"),
+                    "group_default_value": enhancement.get("group_default_value"),
+                    "bins": enhancement.get("bins"),
                     "is_calculated": True,
                     "source": "column_calculated",
                     "contains_null": False,
@@ -942,6 +1104,8 @@ class TableauXMLParserV2:
                     "role": field_def["role"],
                     "datatype": field_def["datatype"],
                     "table_name": resolved_table,  # Will be inferred by handler
+                    "is_calculated": True,
+                    "calculation_class": field_def["calculation_class"],
                     "calculation": field_def["calculation"],
                     "caption": field_def.get("caption"),
                     "aggregation": field_def.get("aggregation"),
@@ -954,6 +1118,14 @@ class TableauXMLParserV2:
                     "datasource_id": field_def.get("datasource_id"),
                     "default_format": field_def.get("default_format"),
                 }
+
+                if field_def.get("calculation_class") == "categorical-bin":
+                    element_data["group_column"] = field_def["group_column"]
+                    element_data["group_new_bin"] = field_def["group_new_bin"]
+                    element_data["group_default_value"] = field_def[
+                        "group_default_value"
+                    ]
+                    element_data["bins"] = field_def["bins"]
 
                 elements.append({"type": "calculated_field", "data": element_data})
 
@@ -1024,6 +1196,206 @@ class TableauXMLParserV2:
             elements.append({"type": "relationships", "data": relationship_data})
 
         return elements
+
+    def _extract_workbook_actions(self, root: Element) -> List[Dict]:
+        """Extract all action and nav-action tags from the workbook."""
+        actions = []
+        actions_elem = root.find(".//actions")
+        if actions_elem is not None:
+            # Process regular actions
+            for action_elem in actions_elem.findall("action"):
+                actions.append(self._parse_action_element(action_elem, "action", root))
+
+            # Process nav-actions (navigation actions)
+            for action_elem in actions_elem.findall("nav-action"):
+                actions.append(
+                    self._parse_action_element(action_elem, "nav-action", root)
+                )
+        return actions
+
+    def _parse_action_element(
+        self, action_elem: Element, action_type: str, root: Element
+    ) -> Dict:
+        """Parse a single action element (either action or nav-action)."""
+        action_data = {
+            "type": action_type,
+            "caption": action_elem.get("caption"),
+            "name": action_elem.get("name"),
+        }
+
+        activation = action_elem.find("activation")
+        if activation is not None:
+            action_data["activation"] = dict(activation.attrib)
+
+        source = action_elem.find("source")
+        if source is not None:
+            action_data["source"] = dict(source.attrib)
+            exclude_sheets = [es.get("name") for es in source.findall("exclude-sheet")]
+            if exclude_sheets:
+                action_data["source"]["exclude_sheets"] = exclude_sheets
+
+            source_type = source.get("type")
+            dashboard_name = source.get("dashboard")
+            datasource_name = source.get("datasource")
+
+            if source_type == "sheet" and dashboard_name:
+                dashboard_sheet_names = self._get_dashboard_zone_names(
+                    root, dashboard_name
+                )
+                if dashboard_sheet_names:
+                    # filtered_excludes = []
+                    actual_sheets_list = []
+
+                    for sheet_name in dashboard_sheet_names:
+                        if exclude_sheets and sheet_name in exclude_sheets:
+                            # filtered_excludes.append(sheet_name)
+                            pass
+                        else:
+                            # This sheet is not excluded, add to actual_sheets
+                            actual_sheets_list.append(sheet_name)
+
+                    # Set the filtered exclude_sheets
+                    # if filtered_excludes or (exclude_sheets and any(es not in dashboard_sheet_names for es in exclude_sheets)):
+                    #     # Include sheets outside the dashboard that were in the original exclude list
+                    #     for es in exclude_sheets if exclude_sheets else []:
+                    #         if es not in dashboard_sheet_names and es not in filtered_excludes:
+                    #             filtered_excludes.append(es)
+                    # if filtered_excludes:
+                    #         action_data["source"]["exclude_sheets"] = filtered_excludes
+
+                    # Store the actual sheets that are in the dashboard and NOT excluded
+                    if actual_sheets_list:
+                        action_data["source"]["worksheet"] = actual_sheets_list
+                # else:
+                #     # If no dashboard zones found, keep original exclude_sheets
+                #     if exclude_sheets:
+                #         action_data["source"]["exclude_sheets"] = exclude_sheets
+
+            elif source_type == "datasource" and datasource_name:
+                worksheet_names = self._get_worksheet_names_by_datasource(
+                    root, datasource_name
+                )
+                if worksheet_names:
+                    # filtered_excludes = []
+                    actual_sheets_list = []
+
+                    for worksheet_name in worksheet_names:
+                        if exclude_sheets and worksheet_name in exclude_sheets:
+                            # This worksheet is explicitly excluded, add to exclude_sheets
+                            # filtered_excludes.append(worksheet_name)
+                            pass
+                        else:
+                            # This worksheet is not excluded, add to actual sheets
+                            actual_sheets_list.append(worksheet_name)
+
+                    # Set the filtered exclude_sheets
+                    # if filtered_excludes or (exclude_sheets and any(es not in worksheet_names for es in exclude_sheets)):
+                    #     # Include worksheets outside the datasource that were in the original exclude list
+                    #     for es in exclude_sheets if exclude_sheets else []:
+                    #         if es not in worksheet_names and es not in filtered_excludes:
+                    #             filtered_excludes.append(es)
+                    # if filtered_excludes:
+                    #         action_data["source"]["exclude_sheets"] = filtered_excludes
+
+                    # Store the actual worksheets that use this datasource and NOT excluded
+                    if actual_sheets_list:
+                        action_data["source"]["worksheet"] = actual_sheets_list
+
+        # Extract type-specific elements
+        if action_type == "action":
+            # Regular actions use command or link
+            command = action_elem.find("command")
+            if command is not None:
+                action_data["command"] = {
+                    "command": command.get("command"),
+                    "params": [
+                        {"name": p.get("name"), "value": p.get("value")}
+                        for p in command.findall("param")
+                    ],
+                }
+
+            link = action_elem.find("link")
+            if link is not None:
+                action_data["link"] = dict(link.attrib)
+
+        elif action_type == "nav-action":
+            # Nav-actions use params (not command/link)
+            params_elem = action_elem.find("params")
+            if params_elem is not None:
+                action_data["params"] = [
+                    {"name": p.get("name"), "value": p.get("value")}
+                    for p in params_elem.findall("param")
+                ]
+
+        return action_data
+
+    def _get_dashboard_zone_names(
+        self, root: Element, dashboard_name: str
+    ) -> List[str]:
+        """Get all zone names from a dashboard's zones.
+
+        Args:
+            root: Root element of workbook
+            dashboard_name: Name of the dashboard
+
+        Returns:
+            List of unique zone names (sheet names) in the dashboard
+        """
+        zone_names = []
+        seen_names = set()
+
+        # Find the dashboard element
+        dashboards_elem = root.find("dashboards")
+        if dashboards_elem is None:
+            return zone_names
+
+        for dashboard in dashboards_elem.findall("dashboard"):
+            if dashboard.get("name") == dashboard_name:
+                # Find all zones with name attributes
+                zones_elem = dashboard.find("zones")
+                if zones_elem is not None:
+                    for zone in zones_elem.findall(".//zone[@name]"):
+                        zone_name = zone.get("name")
+                        if zone_name and zone_name not in seen_names:
+                            zone_names.append(zone_name)
+                            seen_names.add(zone_name)
+                break
+
+        return zone_names
+
+    def _get_worksheet_names_by_datasource(
+        self, root: Element, datasource_name: str
+    ) -> List[str]:
+        """Get all worksheet names that use a specific datasource.
+
+        Args:
+            root: Root element of workbook
+            datasource_name: Name of the datasource (e.g., 'federated.xxx')
+
+        Returns:
+            List of worksheet names that use this datasource
+        """
+        worksheet_names = []
+
+        # Find all worksheets
+        worksheets_elem = root.find("worksheets")
+        if worksheets_elem is None:
+            return worksheet_names
+
+        for worksheet in worksheets_elem.findall("worksheet"):
+            worksheet_name = worksheet.get("name")
+            if not worksheet_name:
+                continue
+
+            # Check if this worksheet uses the target datasource
+            datasources_elem = worksheet.find(".//datasources")
+            if datasources_elem is not None:
+                for datasource in datasources_elem.findall("datasource"):
+                    if datasource.get("name") == datasource_name:
+                        worksheet_names.append(worksheet_name)
+                        break
+
+        return worksheet_names
 
     def _resolve_table_alias(
         self, table_name: str, alias_mapping: Dict[str, str]
@@ -1302,6 +1674,38 @@ class TableauXMLParserV2:
             "second_endpoint": second_info,
         }
 
+    def extract_union(self, element: Element) -> Optional[Dict]:
+        """Extract Union relation information from a relation element."""
+        if element.get("type") != "union":
+            return None
+
+        name = element.get("name", "Union")
+        
+        # Extract tables that are being unioned
+        tables = []
+        table_aliases = {}
+        
+        for rel in element.findall("relation"):
+            if rel.get("type") == "table":
+                table_info = self.extract_table_info(rel)
+                if table_info:
+                    tables.append(table_info)
+                    # Map alias to actual table
+                    alias = table_info.get("name")
+                    actual_table = table_info.get("table")
+                    if alias and actual_table:
+                        table_aliases[alias] = actual_table
+
+        if not tables:
+            return None
+
+        # Union doesn't have join expressions like joins do
+        return {
+            "name": name,
+            "tables": tables,
+            "table_aliases": table_aliases,
+        }
+
     def extract_relationships(self, datasource: Element) -> Dict:
         """Extract all relationships from a datasource element."""
         tables = []
@@ -1335,6 +1739,12 @@ class TableauXMLParserV2:
                             {"relationship_type": "logical", **join_info}
                         )
 
+        # Extract Union relations
+        for union_rel in datasource.findall(".//relation[@type='union']"):
+            union_info = self.extract_union(union_rel)
+            if union_info:
+                relationships.append({"relationship_type": "union", **union_info})
+
         return {"tables": tables, "relationships": relationships}
 
     # ============================================================================
@@ -1354,6 +1764,167 @@ class TableauXMLParserV2:
             List of element dictionaries (enhanced)
         """
         return self.get_all_elements_enhanced(root)
+
+    def extract_datasource_hierarchies(self, root: Element) -> Dict[str, Dict]:
+        """Extract all hierarchy definitions from datasources.
+
+        Args:
+            root: Root element of the workbook
+
+        Returns:
+            Dict mapping datasource_id to hierarchy definitions
+        """
+        datasource_hierarchies = {}
+
+        for datasource in root.findall(".//datasource"):
+            datasource_id = datasource.get("name")
+            if not datasource_id:
+                continue
+
+            hierarchies = {}
+            drill_paths = datasource.find("drill-paths")
+            if drill_paths is not None:
+                for drill_path in drill_paths.findall("drill-path"):
+                    hierarchy_name = drill_path.get("name", "")
+                    if hierarchy_name:
+                        fields = []
+                        for field in drill_path.findall("field"):
+                            if field.text:
+                                field_name = field.text.strip("[]")
+                                fields.append(field_name)
+
+                        if fields:
+                            hierarchies[hierarchy_name] = {
+                                "fields": fields,
+                                "levels": len(fields),
+                            }
+
+            if hierarchies:
+                datasource_hierarchies[datasource_id] = hierarchies
+
+        return datasource_hierarchies
+
+    def _extract_worksheet_hierarchy_usage(
+        self, worksheet: Element, root: Element
+    ) -> Dict:
+        """Extract hierarchy usage information for a specific worksheet.
+
+        Args:
+            worksheet: Worksheet XML element
+            root: Root element (needed to access datasource hierarchies)
+
+        Returns:
+            Dict containing hierarchy usage information
+        """
+        # Get datasource hierarchies
+        datasource_hierarchies = self.extract_datasource_hierarchies(root)
+
+        # Get worksheet's datasource
+        worksheet_datasource_id = self._extract_worksheet_datasource_id(worksheet)
+        if (
+            not worksheet_datasource_id
+            or worksheet_datasource_id not in datasource_hierarchies
+        ):
+            return {
+                "has_hierarchy_usage": False,
+                "hierarchies_used": [],
+                "available_hierarchies": [],
+            }
+
+        # Get fields used in this worksheet
+        worksheet_fields = self._extract_worksheet_fields(worksheet)
+        used_field_names = [
+            field.get("original_name", "").strip("[]") for field in worksheet_fields
+        ]
+
+        # Check which hierarchies are used
+        available_hierarchies = datasource_hierarchies[worksheet_datasource_id]
+        hierarchies_used = []
+
+        for hierarchy_name, hierarchy_info in available_hierarchies.items():
+            hierarchy_fields = hierarchy_info["fields"]
+            used_from_hierarchy = [f for f in used_field_names if f in hierarchy_fields]
+
+            if len(used_from_hierarchy) >= 2:  # Using 2+ fields from same hierarchy
+                hierarchies_used.append(
+                    {
+                        "hierarchy_name": hierarchy_name,
+                        "fields_used": used_from_hierarchy,
+                        "hierarchy_definition": hierarchy_fields,
+                        "usage_level": len(used_from_hierarchy),
+                    }
+                )
+
+        return {
+            "has_hierarchy_usage": len(hierarchies_used) > 0,
+            "hierarchies_used": hierarchies_used,
+            "available_hierarchies": list(available_hierarchies.keys()),
+        }
+
+    def _extract_worksheet_cascading_filter(
+        self, worksheet: Element, root: Element
+    ) -> Dict:
+        """Extract cascading filter information for a specific worksheet.
+
+        Args:
+            worksheet: Worksheet XML element
+            root: Root element (needed to access window elements)
+
+        Returns:
+            Dict containing cascading filter information
+        """
+        worksheet_name = worksheet.get("name")
+        if not worksheet_name:
+            return {
+                "has_cascading_filter": False,
+                "parent_filter": None,
+                "child_filter": None,
+            }
+
+        window = root.find(f".//window[@class='worksheet'][@name='{worksheet_name}']")
+        if window is None:
+            return {
+                "has_cascading_filter": False,
+                "parent_filter": None,
+                "child_filter": None,
+            }
+
+        parent_filter = None
+        child_filter = None
+        relevant_cards = []
+
+        filter_cards = window.findall(".//card[@type='filter']")
+
+        for card in filter_cards:
+            values_attr = card.get("values")
+            param_attr = card.get("param")
+
+            if not param_attr:
+                continue
+
+            # Use existing helper to parse field reference
+            field_info = self._parse_filter_field_reference(param_attr)
+            if not field_info:
+                continue
+
+            field_name = field_info["field_name"]
+
+            if values_attr == "cascading":
+                parent_filter = field_name
+            elif values_attr == "relevant":
+                relevant_cards.append(field_name)
+
+        if parent_filter and relevant_cards:
+            child_filter = relevant_cards[0]
+            has_cascading = True
+        else:
+            has_cascading = False
+
+        return {
+            "has_cascading_filter": has_cascading,
+            "parent_filter": parent_filter,
+            "child_filter": child_filter,
+        }
 
     # ============================================================================
     # PHASE 3: WORKSHEET AND DASHBOARD EXTRACTION METHODS
@@ -1386,11 +1957,21 @@ class TableauXMLParserV2:
                     "title": self._extract_worksheet_title(worksheet),
                     "datasource_id": self._extract_worksheet_datasource_id(worksheet),
                     "fields": self._extract_worksheet_fields(worksheet),
+                    "group_fields": self._extract_categorical_bin_fields(worksheet),
+                    "parameters": self._extract_worksheet_parameters(worksheet),
                     "visualization": self._extract_visualization_config(worksheet),
                     "filters": self._extract_worksheet_filters(worksheet),
                     "sorts": self._extract_worksheet_sorts(worksheet),
                     "actions": self._extract_worksheet_actions(worksheet),
                 }
+                hierarchy_usage = self._extract_worksheet_hierarchy_usage(
+                    worksheet, root
+                )
+                worksheet_data["hierarchy_usage"] = hierarchy_usage
+                cascading_filter = self._extract_worksheet_cascading_filter(
+                    worksheet, root
+                )
+                worksheet_data["cascading_filter"] = cascading_filter
 
                 # NEW: Extract styling data using separate module (non-breaking)
                 try:
@@ -1545,6 +2126,7 @@ class TableauXMLParserV2:
                 continue
 
             try:
+                toggles_data = self._extract_dashboard_toggles(dashboard)
                 dashboard_data = {
                     "name": dashboard_name,
                     "clean_name": self._clean_name(dashboard_name),
@@ -1554,6 +2136,8 @@ class TableauXMLParserV2:
                     "layout_type": self._determine_layout_type(dashboard),
                     "global_filters": self._extract_dashboard_filters(dashboard),
                     "responsive_config": self._extract_responsive_config(dashboard),
+                    "toggles": toggles_data.get("toggles", []),
+                    "dynamic-toggle": toggles_data.get("dynamic-toggle", False),
                 }
                 dashboards.append(dashboard_data)
 
@@ -1602,6 +2186,131 @@ class TableauXMLParserV2:
 
         return fields
 
+    def _extract_categorical_bin_fields(self, worksheet: Element) -> List[Dict]:
+        """Extract categorical bin calculated fields from worksheet dependencies."""
+        fields = []
+
+        # Find all datasource-dependencies elements
+        all_dependencies = worksheet.findall(".//datasource-dependencies")
+        if not all_dependencies:
+            return fields
+
+        # Process each datasource-dependencies element
+        for dependencies in all_dependencies:
+            datasource_id = None
+
+            for column in dependencies.findall("column"):
+                if not datasource_id:
+                    # <datasource-dependencies datasource='federated.1fc6jd010l1f0m19s90ze0noolhe'>
+                    datasource_id = dependencies.get("datasource")
+
+                calculation = column.find("calculation")
+                if calculation is None:
+                    continue
+
+                calculation_class = calculation.get("class", "tableau")
+
+                if calculation_class != "categorical-bin":
+                    continue
+
+                field_data = self._parse_column_group(column, worksheet)
+
+                if field_data:
+                    field_data["datasource_id"] = datasource_id
+                    fields.append(field_data)
+
+        return fields
+
+    def _extract_worksheet_parameters(self, worksheet: Element) -> List[Dict]:
+        """Extract parameters from worksheet datasource-dependencies."""
+        parameters = []
+
+        # Find all datasource-dependencies elements
+        all_dependencies = worksheet.findall(".//datasource-dependencies")
+        if not all_dependencies:
+            return parameters
+
+        # Process each datasource-dependencies element
+        for dependencies in all_dependencies:
+            datasource_id = dependencies.get("datasource")
+
+            # Look for column elements with param-domain-type (parameters)
+            for column in dependencies.findall("column[@param-domain-type]"):
+                param_data = self._extract_parameter_from_column(column, datasource_id)
+                if param_data:
+                    parameters.append(param_data)
+
+        return parameters
+
+    def _extract_parameter_from_column(
+        self, column: Element, datasource_id: str
+    ) -> Optional[Dict]:
+        """Extract parameter data from a column element with param-domain-type."""
+        try:
+            # Get basic attributes
+            name = column.get("name", "")
+            domain_type = column.get("param-domain-type")
+
+            if not name or not domain_type:
+                return None
+
+            param_data = {
+                "name": name,
+                "raw_name": name,
+                "role": "parameter",
+                "datatype": column.get("datatype", "string"),
+                "param_domain_type": domain_type,
+                "label": column.get("caption"),
+                "description": column.get("description"),
+                "values": [],
+                "datasource_id": datasource_id,
+            }
+
+            # Get allowed values for list parameters
+            if domain_type == "list":
+                members = column.findall(".//member")
+                param_data["values"] = [
+                    m.get("value") for m in members if m.get("value")
+                ]
+
+            # Get range settings for range parameters
+            elif domain_type == "range":
+                range_element = column.find("range")
+                if range_element is not None:
+                    param_data["range"] = {
+                        "min": range_element.get("min"),
+                        "max": range_element.get("max"),
+                        "step": range_element.get("step", "1"),
+                    }
+
+            # Get default value
+            default = column.find("default-value")
+            if default is not None:
+                param_data["default_value"] = default.get("value") or default.get(
+                    "formula"
+                )
+            else:
+                # Check if there's a value attribute directly on the column
+                param_data["default_value"] = column.get("value")
+
+            # Get calculation formula if present
+            calc_element = column.find("calculation")
+            if calc_element is not None:
+                param_data["formula"] = calc_element.get("formula")
+
+            param_domain_type = param_data.get("param_domain_type", "")
+
+            if param_domain_type in ["list", "range"]:
+                param_data["parameter-type"] = "Dynamic-parameter"
+            else:
+                param_data["parameter-type"] = "single-value-parameter"
+
+            return param_data
+
+        except Exception as e:
+            self.logger.warning(f"Failed to extract parameter from column: {e}")
+            return None
+
     def _lookup_field_caption(
         self, worksheet: Element, column_ref: str
     ) -> Optional[str]:
@@ -1644,10 +2353,49 @@ class TableauXMLParserV2:
 
         return None
 
+    def _parse_column_group(
+        self, column_group: Element, worksheet: Element
+    ) -> Optional[Dict]:
+        """Parse a column-group element into field reference data."""
+        column_ref = column_group.get("name", "")
+        instance_name = column_group.get("name", "")
+        caption = column_group.get("caption", None)
+
+        # Clean field name
+        if caption is not None:
+            clean_name = self._clean_name(caption)
+        else:
+            field_name = column_ref.strip("[]")
+            clean_name = self._clean_name(field_name)
+
+        datatype = column_group.get("datatype", "string")
+        role = column_group.get("role", "dimension")
+        derivation = "None"
+
+        # Determine shelf placement and encoding type
+        shelf_info = self._determine_field_shelf_and_encoding(worksheet, instance_name)
+
+        return {
+            "name": clean_name,
+            "original_name": column_ref,
+            "tableau_instance": instance_name,
+            "datatype": datatype,
+            "role": role,
+            "aggregation": derivation if derivation != "None" else None,
+            "shelf": shelf_info["shelf"],
+            "encodings": shelf_info["encodings"],  # List of all encodings
+            "derivation": derivation,
+            "caption": caption,
+        }
+
     def _parse_column_instance(
         self, column_instance: Element, worksheet: Element
     ) -> Optional[Dict]:
         """Parse a column-instance element into field reference data."""
+
+        if column_instance.find("table-calc") is not None:
+            return None
+
         column_ref = column_instance.get("column", "")
         instance_name = column_instance.get("name", "")
         derivation = column_instance.get("derivation", "None")
@@ -1792,6 +2540,11 @@ class TableauXMLParserV2:
                     chart_type_extracted = "pie"
                 elif "bar" in unique_vals:
                     chart_type_extracted = "bar"
+                else:
+                    # All marks are the same but not pie or bar, use chart_values[1] if available
+                    chart_type_extracted = (
+                        chart_values[1] if len(chart_values) > 1 else chart_values[0]
+                    )
 
             else:
                 # Case 2: multiple different marks — choose mark_2 where present
@@ -1879,6 +2632,7 @@ class TableauXMLParserV2:
             "color_columns": [],
             "size_columns": [],
             "detail_columns": [],
+            "lod_columns": [],
         }
 
         encodings = pane.find("encodings")
@@ -1891,10 +2645,12 @@ class TableauXMLParserV2:
                     encodings_info["text_columns"].append(column)
                 elif encoding_type == "color":
                     encodings_info["color_columns"].append(column)
-                elif encoding_type == "size":
+                elif encoding_type == "wedge-size":
                     encodings_info["size_columns"].append(column)
                 elif encoding_type == "detail":
                     encodings_info["detail_columns"].append(column)
+                elif encoding_type == "lod":
+                    encodings_info["lod_columns"].append(column)
 
         return encodings_info
 
@@ -2160,12 +2916,70 @@ class TableauXMLParserV2:
 
         return elements
 
+    def _extract_dashboard_toggles(self, dashboard: Element) -> Dict[str, Any]:
+        toggles = []
+        zone_positions = {}
+
+        main_zones = dashboard.find("zones")
+        if main_zones is not None:
+            for zone in main_zones.findall(".//zone[@name]"):
+                zone_name = zone.get("name")
+                if not zone_name:
+                    continue
+
+                # Skip zones that are hidden by user
+                hidden_dashboard = zone.get("hidden-by-user", "false")
+                if hidden_dashboard.lower() == "true":
+                    continue
+
+                # Extract raw coordinates (Tableau uses integer values)
+                x = int(zone.get("x", "0"))
+                y = int(zone.get("y", "0"))
+                w = int(zone.get("w", "0"))
+                h = int(zone.get("h", "0"))
+
+                # Create position key to check for overlaps
+                position_key = (x, y, w, h)
+
+                # Store zone info
+                toggle_data = {
+                    "name": zone_name,
+                    "width": w,
+                    "height": h,
+                    "x": x,
+                    "y": y,
+                }
+                toggles.append(toggle_data)
+
+                # Track positions for overlap detection
+                if position_key not in zone_positions:
+                    zone_positions[position_key] = []
+                zone_positions[position_key].append(zone_name)
+
+        # Determine toggle status for each toggle based on position overlaps
+        for toggle in toggles:
+            position_key = (toggle["x"], toggle["y"], toggle["width"], toggle["height"])
+            # If more than one zone has the same position, set toggle to true, else false
+            toggle["toggle"] = len(zone_positions[position_key]) > 1
+
+        # Calculate dynamic-toggle: true if any toggle has toggle: true, false otherwise
+        dynamic_toggle = (
+            any(toggle.get("toggle", False) for toggle in toggles) if toggles else False
+        )
+
+        return {"toggles": toggles, "dynamic-toggle": dynamic_toggle}
+
     def _parse_dashboard_zone(self, zone: Element) -> Optional[Dict]:
         """Parse a dashboard zone into an element dictionary."""
         zone_id = zone.get("id")
         zone_name = zone.get("name")
 
         if not zone_id or not zone_name:
+            return None
+
+        # Skip zones that are hidden by user
+        hidden_dashboard = zone.get("hidden-by-user", "false")
+        if hidden_dashboard.lower() == "true":
             return None
 
         # Extract position

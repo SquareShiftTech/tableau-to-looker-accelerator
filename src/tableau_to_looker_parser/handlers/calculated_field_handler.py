@@ -57,7 +57,7 @@ class CalculatedFieldHandler(BaseHandler):
             float: Confidence score between 0.0 and 1.0
         """
         # Must have a calculation formula to be a calculated field
-        if not data.get("calculation"):
+        if not data.get("is_calculated"):
             return 0.0
 
         # Must be a dimension or measure with a role
@@ -70,36 +70,49 @@ class CalculatedFieldHandler(BaseHandler):
         if not name:
             return 0.0
 
-        calculation = data.get("calculation", "")
-        if not calculation.strip():
-            return 0.0
+        calculation_class = data.get("calculation_class", "")
 
-        # Higher confidence for common calculated field patterns
-        confidence = 0.8
+        if calculation_class == "categorical-bin":
+            if not data.get("group_column"):
+                return 0.0
 
-        # Increase confidence for common formula patterns
-        formula = calculation.upper()
-        if any(
-            pattern in formula for pattern in ["IF", "CASE", "SUM(", "COUNT(", "AVG("]
-        ):
-            confidence = 0.9
+            confidence = 0.8
+        else:
+            calculation = data.get("calculation", "")
+            if not calculation.strip():
+                return 0.0
 
-        # Increase confidence for field references
-        if "[" in calculation and "]" in calculation:
-            confidence = 0.95
+            # Higher confidence for common calculated field patterns
+            confidence = 0.8
 
-        # Perfect confidence if we have all expected metadata
-        if data.get("datatype") and data.get("aggregation"):
-            confidence = 1.0
+            # Increase confidence for common formula patterns
+            formula = calculation.upper()
+            if any(
+                pattern in formula
+                for pattern in ["IF", "CASE", "SUM(", "COUNT(", "AVG("]
+            ):
+                confidence = 0.9
 
-        if data.get("is_derived"):
-            confidence = 1.0
+            # Increase confidence for field references
+            if "[" in calculation and "]" in calculation:
+                confidence = 0.95
 
-        logger.debug(f"Calculated field confidence for '{name}': {confidence}")
+            # Perfect confidence if we have all expected metadata
+            if data.get("datatype") and data.get("aggregation"):
+                confidence = 1.0
+
+            if data.get("is_derived"):
+                confidence = 1.0
+
+            logger.debug(f"Calculated field confidence for '{name}': {confidence}")
+
         return confidence
 
     def convert_to_json(
-        self, data: Dict, field_table_mapping: Optional[Dict[str, str]] = None
+        self,
+        data: Dict,
+        field_table_mapping: Optional[Dict[str, str]] = None,
+        field_metadata: Optional[Dict[str, Dict[str, str]]] = None,
     ) -> Dict:
         """
         Convert raw calculated field data to schema-compliant JSON.
@@ -150,9 +163,14 @@ class CalculatedFieldHandler(BaseHandler):
                 original_name, field_name, user_caption, is_calculated=True
             )
         role = data.get("role", "dimension")
+        calculation_class = data.get("calculation_class", "")
+        logger.info(f"Converting calculated field: {field_name}")
+
+
         calculation = data.get("calculation", "")
 
-        logger.info(f"Converting calculated field: {field_name}")
+        self.parser.set_field_metadata(field_metadata)
+
 
         # Parse the formula into AST
         parse_result = self.parser.parse_formula(
@@ -196,6 +214,39 @@ class CalculatedFieldHandler(BaseHandler):
         if is_derived:
             tableau_instance = data.get("tableau_instance")
 
+        # Try to serialize AST, handle circular references
+        ast_representation = None
+        try:
+            # Try normal serialization first
+            ast_representation = calculated_field.ast_root.model_dump()
+        except (ValueError, RecursionError) as e:
+            error_msg = str(e).lower()
+            if "circular reference" in error_msg or "depth exceeded" in error_msg or "maximum recursion" in error_msg:
+                # Handle circular reference by using a simplified representation
+                logger.warning(
+                    f"Circular reference detected in AST for field '{field_name}'. "
+                    f"Using simplified representation. Original formula: {calculation[:100] if len(calculation) > 100 else calculation}..."
+                )
+                try:
+                    # Try with mode='json' which may handle circular refs better
+                    ast_representation = calculated_field.ast_root.model_dump(mode='json')
+                except Exception:
+                    try:
+                        # Try with exclude_none to reduce complexity
+                        ast_representation = calculated_field.ast_root.model_dump(exclude_none=True, mode='json')
+                    except Exception:
+                        # If that still fails, create a minimal representation
+                        ast_representation = {
+                            "node_type": str(getattr(calculated_field.ast_root, 'node_type', 'unknown')),
+                            "error": "Circular reference detected - AST serialization skipped",
+                            "original_formula": calculation,
+                            "note": "Full AST could not be serialized due to circular references. "
+                                   "The original formula is preserved above."
+                        }
+            else:
+                # Re-raise if it's a different error
+                raise
+        
         # Create the JSON representation
         result = {
             "name": field_name,
@@ -207,9 +258,10 @@ class CalculatedFieldHandler(BaseHandler):
             "tableau_instance": tableau_instance,
             "is_derived": is_derived,
             # Core calculated field data
+            "calculation_class": calculation_class,
             "calculation": {
                 "original_formula": calculation,
-                "ast": calculated_field.ast_root.model_dump(),
+                "ast": ast_representation,
                 "complexity": calculated_field.complexity,
                 "dependencies": calculated_field.dependencies,
                 "requires_aggregation": calculated_field.requires_aggregation,
@@ -239,6 +291,16 @@ class CalculatedFieldHandler(BaseHandler):
             "datasource_id": data.get("datasource_id"),
             "local_name": data.get("raw_name"),
         }
+
+        if calculation_class == "categorical-bin":
+            result.update(
+                {
+                    "group_column": data.get("group_column"),
+                    "group_new_bin": data.get("group_new_bin"),
+                    "group_default_value": data.get("group_default_value"),
+                    "bins": data.get("bins"),
+                }
+            )
 
         logger.debug(
             f"Successfully converted calculated field {field_name} with {len(calculated_field.dependencies)} dependencies"
