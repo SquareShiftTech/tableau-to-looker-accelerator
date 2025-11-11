@@ -152,7 +152,7 @@ steps:
 
 substitutions:
   _REGION: us-central1
-  _REPO_NAME: "tabular-assess"
+  _REPO_NAME: "sample-repo"
 timeout: 1200s
 options:
   logging: CLOUD_LOGGING_ONLY
