@@ -109,7 +109,7 @@ steps:
 
 substitutions:
   _REGION: us-central1
-  _REPO_NAME: "tableau-to-looker-parser"
+  _REPO_NAME: "tableau-to-looker-accelerator-"
 timeout: 1200s
 options:
   logging: CLOUD_LOGGING_ONLY
