@@ -17,6 +17,7 @@ from tableau_to_looker_parser.handlers.calculated_field_handler import (
 )
 from tableau_to_looker_parser.handlers.worksheet_handler import WorksheetHandler
 from tableau_to_looker_parser.handlers.dashboard_handler import DashboardHandler
+from tableau_to_looker_parser.models.json_schema import DimensionType
 
 
 class MigrationEngine:
@@ -112,6 +113,7 @@ class MigrationEngine:
                 },
                 "tables": [],
                 "relationships": [],
+                "actions": [],
                 "connections": [],
                 "dimensions": [],
                 "measures": [],
@@ -137,6 +139,7 @@ class MigrationEngine:
             # Build field-to-table mapping for calculated field inference
             # V2 parser provides more accurate mappings from metadata-records
             field_table_mapping = self._build_field_table_mapping(elements)
+            field_metadata = self._build_field_metadata(elements)
 
             # Process each element through handlers
             for element in elements:
@@ -158,7 +161,7 @@ class MigrationEngine:
                         # Provide field mapping context to calculated field handler
                         if handler.__class__.__name__ == "CalculatedFieldHandler":
                             json_data = handler.convert_to_json(
-                                element_data, field_table_mapping
+                                element_data, field_table_mapping, field_metadata
                             )
 
                         else:
@@ -167,7 +170,12 @@ class MigrationEngine:
                         # Route to appropriate result category
                         # Check if this is a calculated field first
                         if handler.__class__.__name__ == "CalculatedFieldHandler":
-                            result["calculated_fields"].append(json_data)
+                            if json_data:
+                                result["calculated_fields"].append(json_data)
+                            else:
+                                self.logger.warning(
+                                    f"Calculated field {element_name} is None"
+                                )
                         elif element["type"] == "measure":
                             # Handle two-step pattern from measure handler
                             if json_data.get("two_step_pattern"):
@@ -204,6 +212,9 @@ class MigrationEngine:
                 self.logger.info("Processing Phase 3: Worksheets and Dashboards")
                 self._process_worksheets_and_dashboards(parser, root, result)
 
+            actions = parser._extract_workbook_actions(root)
+            result["actions"].extend(actions)
+
             # Save JSON output
             json_path = output_path / "processed_pipeline_output.json"
             with open(json_path, "w") as f:
@@ -214,6 +225,68 @@ class MigrationEngine:
         except Exception as e:
             self.logger.error(f"Migration failed: {str(e)}", exc_info=True)
             raise MigrationError(f"Failed to migrate {tableau_file}: {str(e)}")
+
+    def _build_field_metadata(self, elements: List[Dict]) -> Dict[str, Dict[str, str]]:
+        """
+        Build comprehensive field metadata for parser.
+        Only includes base fields (dimensions and measures), NOT calculated fields.
+
+        Args:
+            elements: List of element dicts
+
+        Returns:
+            Dict mapping field_name -> {sql_type, datasource_id, table_name}
+        """
+        field_metadata = {}
+
+        for element in elements:
+            # ONLY dimensions and measures (base fields from datasource)
+            if element.get("type") in ["dimension", "measure"]:
+                element_data = element.get("data", {})
+
+                # Skip if this is actually a calculated field (has 'calculation')
+                if element_data.get("calculation"):
+                    continue
+
+                field_name = (
+                    element_data.get("name", "").strip("[]").lower().replace(" ", "_")
+                )
+                datatype = element_data.get("datatype", "string")
+                datasource_id = element_data.get("datasource_id", "")
+                table_name = element_data.get("table_name", "")
+
+                if field_name:
+                    field_metadata[field_name] = {
+                        "sql_type": datatype,
+                        "datasource_id": datasource_id,
+                        "table_name": table_name,
+                    }
+
+                    self.logger.debug(
+                        f"Field metadata: {field_name} -> "
+                        f"type={field_metadata[field_name]['sql_type']}, "
+                        f"datasource={datasource_id}"
+                    )
+
+        self.logger.info(
+            f"Built metadata for {len(field_metadata)} base fields (dimensions/measures only)"
+        )
+        return field_metadata
+
+    def _map_tableau_type_to_sql(self, tableau_type: str) -> str:
+        """
+        Map Tableau datatype to SQL datatype.
+        """
+        TYPE_MAP = {
+            "string": DimensionType.STRING,
+            "integer": DimensionType.INTEGER,
+            "real": DimensionType.REAL,
+            "boolean": DimensionType.BOOLEAN,
+            "date": DimensionType.DATE,
+            "datetime": DimensionType.DATETIME,
+        }
+
+        return TYPE_MAP.get(tableau_type.lower(), DimensionType.STRING)
 
     def _build_field_table_mapping(self, elements: List[Dict]) -> Dict[str, str]:
         """
@@ -245,7 +318,7 @@ class MigrationEngine:
                 table_name = data.get("table_name")
 
                 # Skip calculated fields (they don't help with inference)
-                if data.get("calculation"):
+                if data.get("is_calculated"):
                     continue
 
                 if field_name and table_name:
@@ -268,7 +341,7 @@ class MigrationEngine:
                 table_name = data.get("table_name")
 
                 # Skip calculated fields (they don't help with inference)
-                if data.get("calculation"):
+                if data.get("is_calculated"):
                     continue
 
                 if field_name and table_name:
@@ -359,7 +432,9 @@ class MigrationEngine:
                 f"Failed to process datasource-dependencies mappings: {e}"
             )
 
-    def _process_worksheets_and_dashboards(self, parser, root, result: Dict) -> None:
+    def _process_worksheets_and_dashboards(
+        self, parser: TableauXMLParserV2, root, result: Dict
+    ) -> None:
         """
         Process worksheets and dashboards using Phase 3 handlers.
 

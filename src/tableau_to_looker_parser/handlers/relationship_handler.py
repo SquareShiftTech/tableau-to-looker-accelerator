@@ -45,6 +45,11 @@ class RelationshipHandler(BaseHandler):
             if data.get("first_endpoint") and data.get("second_endpoint"):
                 return 1.0
 
+        # Handle Union relationships
+        if relationship_type == "union":
+            if data.get("tables") and data.get("name"):
+                return 1.0
+
         return 0.0
 
     def convert_to_json(self, data: Dict) -> Dict:
@@ -60,15 +65,16 @@ class RelationshipHandler(BaseHandler):
         if "relationships" in data and "tables" in data:
             return self.process_datasource(data)
 
-        # Extract expression data
-        expr = data["expression"]
-        expr_data = {
-            "operator": expr["operator"],
-            "expressions": sorted(expr["expressions"]),
-        }
-
         # Process based on relationship type
         relationship_type = data["relationship_type"]
+
+        if relationship_type != "union":
+            # Extract expression data
+            expr = data["expression"]
+            expr_data = {
+                "operator": expr["operator"],
+                "expressions": sorted(expr["expressions"]),
+            }
 
         # For physical joins
         if relationship_type == "physical":
@@ -154,6 +160,26 @@ class RelationshipHandler(BaseHandler):
                 },
             }
 
+        # For Union relationships
+        elif relationship_type == "union":
+            # Extract unique tables and their aliases
+            unique_tables = []
+            seen_tables = set()
+            table_aliases = data.get("table_aliases", {})
+
+            for table_info in data["tables"]:
+                table_name = table_info["table"]
+
+                if table_name not in seen_tables:
+                    unique_tables.append(table_name)
+                    seen_tables.add(table_name)
+            return {
+                "relationship_type": "union",
+                "name": data.get("name", "Union"),
+                "tables": sorted(unique_tables),
+                "table_aliases": table_aliases,
+            }
+
         raise ValueError(f"Unsupported relationship type: {relationship_type}")
 
     def process_datasource(self, data: Dict) -> Dict:
@@ -190,12 +216,19 @@ class RelationshipHandler(BaseHandler):
         unique_relationships = {}
         for rel in relationships:
             # Create key from normalized data
-            expr = rel.get("expression", {})
-            expressions = sorted(expr.get("expressions", []))
-            if rel["relationship_type"] == "physical":
-                key = f"physical:{rel['join_type']}:{expr['operator']}:{','.join(expressions)}"
+            if rel["relationship_type"] == "union":
+                name = rel.get("name", "Union")
+                tables = sorted(rel.get("tables", []))
+                key = f"union:{name}:{','.join(tables)}"
             else:
-                key = f"logical:{expr['operator']}:{','.join(expressions)}"
+                # Physical and logical relationships have expressions
+                expr = rel.get("expression", {})
+                expressions = sorted(expr.get("expressions", []))
+                operator = expr.get("operator", "")
+                if rel["relationship_type"] == "physical":
+                    key = f"physical:{rel['join_type']}:{operator}:{','.join(expressions)}"
+                else:
+                    key = f"logical:{operator}:{','.join(expressions)}"
 
             if key not in unique_relationships:
                 unique_relationships[key] = rel

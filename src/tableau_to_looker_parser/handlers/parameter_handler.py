@@ -118,6 +118,20 @@ class ParameterHandler(BaseHandler):
             "param_domain_type": data["param-domain-type"],
         }
 
+        # has_members = data.get("values") and len(data.get("values", [])) > 0
+        # has_range = data.get("range") is not None
+
+        # if has_members or has_range:
+        #     json_data["parameter-type"] = "Dynamic-parameter"
+        # else:
+        #     json_data["parameter-type"] = "single-value-parameter"
+
+        param_domain_type = json_data.get("param_domain_type", "")
+        if param_domain_type in ["list", "range"]:
+            json_data["parameter-type"] = "Dynamic-parameter"
+        else:
+            json_data["parameter-type"] = "single-value-parameter"
+
         if data.get("values"):
             json_data["members"] = []
             for val in data["values"]:

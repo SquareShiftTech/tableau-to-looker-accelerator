@@ -80,6 +80,9 @@ class DashboardHandler(BaseHandler):
         # Process responsive configuration
         responsive_config = data.get("responsive_config", {})
 
+        toggles = data.get("toggles", [])
+        dynamic_toggle = data.get("dynamic-toggle", False)
+
         # Calculate confidence
         confidence = self._calculate_dashboard_confidence(data, elements)
 
@@ -94,6 +97,8 @@ class DashboardHandler(BaseHandler):
             "global_filters": global_filters,
             "cross_filter_enabled": True,  # Default assumption
             "responsive_config": responsive_config,
+            "toggles": toggles,
+            "dynamic_toggle": dynamic_toggle,
             "confidence": confidence,
             "parsing_errors": [],
             "custom_properties": {},
@@ -103,6 +108,7 @@ class DashboardHandler(BaseHandler):
         try:
             dashboard = DashboardSchema(**dashboard_data)
             return dashboard.model_dump()
+
         except Exception as e:
             # If validation fails, return with lower confidence and error
             dashboard_data["confidence"] = 0.3

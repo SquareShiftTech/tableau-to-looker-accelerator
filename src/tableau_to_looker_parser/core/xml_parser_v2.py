@@ -1675,22 +1675,19 @@ class TableauXMLParserV2:
         }
 
     def extract_union(self, element: Element) -> Optional[Dict]:
-        """Extract Union relation information from a relation element."""
         if element.get("type") != "union":
             return None
 
         name = element.get("name", "Union")
-        
-        # Extract tables that are being unioned
+
         tables = []
         table_aliases = {}
-        
+
         for rel in element.findall("relation"):
             if rel.get("type") == "table":
                 table_info = self.extract_table_info(rel)
                 if table_info:
                     tables.append(table_info)
-                    # Map alias to actual table
                     alias = table_info.get("name")
                     actual_table = table_info.get("table")
                     if alias and actual_table:
@@ -1699,7 +1696,6 @@ class TableauXMLParserV2:
         if not tables:
             return None
 
-        # Union doesn't have join expressions like joins do
         return {
             "name": name,
             "tables": tables,

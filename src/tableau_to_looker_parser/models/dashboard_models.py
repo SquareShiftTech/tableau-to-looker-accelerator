@@ -149,6 +149,15 @@ class DashboardSchema(BaseModel):
         default_factory=dict, description="Mobile/tablet layout configurations"
     )
 
+    toggles: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Toggle information for zones with name attributes",
+    )
+    dynamic_toggle: bool = Field(
+        default=False,
+        description="Whether dashboard has dynamic toggle (true if any toggle has toggle: true)",
+    )
+
     # Processing metadata
     confidence: float = Field(
         default=0.85, description="Handler confidence score (0.0-1.0)"

@@ -55,6 +55,11 @@ class WorksheetHandler(BaseHandler):
         if not isinstance(fields, list):
             return 0.0
 
+        # Check group field structure
+        group_fields = data.get("group_fields", [])
+        if not isinstance(group_fields, list):
+            return 0.0
+
         # Check visualization structure
         viz = data.get("visualization", {})
         if not isinstance(viz, dict) or "chart_type" not in viz:
@@ -64,7 +69,7 @@ class WorksheetHandler(BaseHandler):
         # name = data.get("name", "").lower()
 
         # Check for text-only or placeholder worksheets
-        if self._is_text_or_placeholder_worksheet(data, fields):
+        if self._is_text_or_placeholder_worksheet(data, fields, group_fields):
             # Debug output for CD detail
             return 0.0
 
@@ -91,14 +96,17 @@ class WorksheetHandler(BaseHandler):
         clean_name = data.get("clean_name", self._clean_name(name))
         datasource_id = data["datasource_id"]
 
-        if name == "Channel Outlier Report":
+        if name == "Day Actual":
             logger.debug(f"Worksheet {name} has data")
 
         # Process fields
         fields = self._process_fields(data.get("fields", []))
+        group_fields = self._process_group_fields(data.get("group_fields", []))
 
         # Process visualization with YAML rule-based chart type detection
-        visualization = self._process_visualization_with_yaml_rules(data, fields)
+        visualization = self._process_visualization_with_yaml_rules(
+            data, fields, group_fields
+        )
 
         # Process filters and actions
         filters = data.get("filters", [])
@@ -160,7 +168,9 @@ class WorksheetHandler(BaseHandler):
             "title": data.get("title", ""),
             "datasource_id": datasource_id,
             "fields": fields,
+            "group_fields": group_fields,
             "calculated_fields": self._extract_calculated_fields(fields),
+            "parameters": data.get("parameters", []),
             "visualization": visualization,
             "filters": filters,
             # "identified_measures": identified_measures,  # NEW: Measure data for Migration Engine
@@ -174,6 +184,25 @@ class WorksheetHandler(BaseHandler):
             "confidence": confidence,
             "parsing_errors": [],
             "custom_properties": {},
+            "hierarchy_usage": data.get(
+                "hierarchy_usage",
+                {
+                    "has_hierarchy_usage": False,
+                    "hierarchies_used": [],
+                    "available_hierarchies": [],
+                },
+            ),
+            "cascading_filter": data.get(
+                "cascading_filter",
+                {
+                    "has_cascading_filter": False,
+                    "parent_filter": None,
+                    "child_filter": None,
+                },
+            ),
+            # "group_feature": data.get(
+            #     "group_feature", {"is_group_feature": False, "group_features": []}
+            # ),
         }
 
         # NEW: Add styling data if extracted from XML parser with field-specific color mapping
@@ -215,11 +244,18 @@ class WorksheetHandler(BaseHandler):
                 original = field.get("original_name", f"[{field['name'].title()}]")
                 display_label = original.strip("[]").replace("_", " ").title()
 
+            # Get the original name and extract the base name
+            original_name = field.get("original_name", f"[{field['name'].title()}]")
+            base_name = original_name.strip("[]")
+
+            # Preserve trailing underscore if it exists in the original name
+            field_name = field["name"]
+            if base_name.endswith("_") and not field_name.endswith("_"):
+                field_name = field_name + "_"
+
             field_ref = {
-                "name": field["name"],
-                "original_name": field.get(
-                    "original_name", f"[{field['name'].title()}]"
-                ),
+                "name": field_name,
+                "original_name": original_name,
                 "tableau_instance": field.get("tableau_instance", ""),
                 "datatype": field.get("datatype", "string"),
                 "role": field.get("role", "dimension"),
@@ -237,8 +273,50 @@ class WorksheetHandler(BaseHandler):
 
         return processed_fields
 
+    def _process_group_fields(self, raw_group_fields: List[Dict]) -> List[Dict]:
+        """Process raw group field data into FieldReference format."""
+        processed_group_fields = []
+
+        for field in raw_group_fields:
+            if not isinstance(field, dict) or "name" not in field:
+                continue
+
+            # Create display label from caption or original name
+            original = field.get("original_name", f"[{field['name'].title()}]")
+            caption = field.get("caption")
+
+            if caption:
+                display_label = caption
+            else:
+                # Fallback: clean the original name (remove brackets)
+                display_label = original.strip("[]").replace("_", " ").title()
+
+            derivation = field.get("derivation")
+            if derivation is None:
+                derivation = "None"
+
+            field_ref = {
+                "name": field["name"],
+                "original_name": original,
+                "tableau_instance": field.get("tableau_instance", ""),
+                "datatype": field.get("datatype", "string"),
+                "role": field.get("role", "dimension"),
+                "aggregation": field.get("aggregation"),
+                "shelf": field.get("shelf", "unknown"),
+                "encodings": field.get("encodings", []),  # Add encodings list
+                "derivation": derivation,
+                "suggested_type": field.get("role", "dimension"),
+                "drill_fields": [],
+                "display_label": display_label,
+                "datasource_id": field.get("datasource_id"),
+            }
+
+            processed_group_fields.append(field_ref)
+
+        return processed_group_fields
+
     def _process_visualization_with_yaml_rules(
-        self, worksheet_data: Dict, fields: List[Dict]
+        self, worksheet_data: Dict, fields: List[Dict], group_fields: List[Dict]
     ) -> Dict:
         """
         Process visualization with YAML rule-based chart type detection.
@@ -262,8 +340,10 @@ class WorksheetHandler(BaseHandler):
             detection_input = {
                 "name": worksheet_data.get("name", ""),
                 "fields": fields,
+                "group_fields": group_fields,
                 "visualization": viz_config,
                 "datasource_id": worksheet_data.get("datasource_id"),
+                "filters": worksheet_data.get("filters", []),
             }
             logger.debug(f"YAML detection input: {detection_input}")
 
@@ -302,6 +382,9 @@ class WorksheetHandler(BaseHandler):
                             "pivot_selection_logic"
                         ),
                         "stacked_type": detection_result.get("stacked_type", False),
+                        "transpose_required": detection_result.get(
+                            "transpose_required", False
+                        ),
                     },
                 }
             )
@@ -787,7 +870,9 @@ class WorksheetHandler(BaseHandler):
 
         return max(0.0, min(1.0, confidence))
 
-    def _is_text_or_placeholder_worksheet(self, data: Dict, fields: List[Dict]) -> bool:
+    def _is_text_or_placeholder_worksheet(
+        self, data: Dict, fields: List[Dict], group_fields: List[Dict]
+    ) -> bool:
         """
         Check if a worksheet is likely a text element or placeholder rather than a data visualization.
 
@@ -829,14 +914,18 @@ class WorksheetHandler(BaseHandler):
         if name_matches_indicator and has_no_viz_data:
             return True
 
+        all_fields = fields + group_fields
+
         # Check if all fields are calculated fields with empty formulas
-        if fields and all(self._is_empty_calculated_field(field) for field in fields):
+        if all_fields and all(
+            self._is_empty_calculated_field(field) for field in all_fields
+        ):
             return True
 
         # Additional check for worksheets with text-like names but some fields
         if name_matches_indicator:
             # Check if the fields are meaningful or just placeholders
-            meaningful_fields = self._count_meaningful_fields(fields)
+            meaningful_fields = self._count_meaningful_fields(all_fields)
             if meaningful_fields <= 1:  # Only one or no meaningful fields
                 return True
 

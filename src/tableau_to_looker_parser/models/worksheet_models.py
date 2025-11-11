@@ -210,8 +210,15 @@ class WorksheetSchema(BaseModel):
     fields: List[FieldReference] = Field(
         default_factory=list, description="All fields used in this worksheet"
     )
+    group_fields: List[FieldReference] = Field(
+        default_factory=list, description="All the group fields used in this worksheet"
+    )
     calculated_fields: List[str] = Field(
         default_factory=list, description="Names of calculated fields used"
+    )
+
+    parameters: List[Dict[str, Any]] = Field(
+        default_factory=list, description="Parameters used in this worksheet"
     )
 
     # Complete visualization configuration
@@ -226,6 +233,24 @@ class WorksheetSchema(BaseModel):
     actions: List[Dict[str, Any]] = Field(
         default_factory=list, description="Worksheet actions and interactions"
     )
+
+    # Hierarchy usage information
+    hierarchy_usage: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Information about hierarchy usage in this worksheet",
+    )
+
+    # Cascading filter information
+    cascading_filter: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Information about cascading filters in this worksheet",
+    )
+
+    # Group feature information (categorical-bin calculations)
+    # group_feature: Dict[str, Any] = Field(
+    #     default_factory=dict,
+    #     description="Information about group features (categorical-bin calculations) in this worksheet",
+    # )
 
     # Dashboard usage (self-contained - no lookups needed!)
     dashboard_placements: List[DashboardPlacement] = Field(
