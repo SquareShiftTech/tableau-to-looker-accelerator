@@ -627,101 +627,111 @@ def download_workbooks_from_server(
     json_files = []
     json_errors = []  # Track files that failed JSON conversion
     if generate_json:
-        print(f"\n{'='*60}")
-        print(f"Generating JSON from downloaded workbooks...")
-        print(f"{'='*60}")
-        
-        if json_output_dir is None:
-            json_output_dir = Path("output")
-        else:
-            json_output_dir = Path(json_output_dir)
-        
-        json_output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Find all downloaded files and convert .twbx to .twb automatically
-        downloaded_files = []
-        for batch_folder in batch_folders:
-            # First, convert any remaining .twbx files to .twb and remove .twbx
-            twbx_files = list(batch_folder.glob("*.twbx"))
-            for twbx_file in twbx_files:
-                print(f"Converting {twbx_file.name} to .twb format...")
-                twb_path = convert_twbx_to_twb(twbx_file, remove_twbx=True)
-                if twb_path:
-                    print(f"  ✓ Converted and removed .twbx file")
-                else:
-                    print(f"  ⚠ Could not convert {twbx_file.name}, will try to process as-is")
-            
-            # Now collect all .twb files (including newly converted ones)
-            downloaded_files.extend(list(batch_folder.glob("*.twb")))
-        
-        print(f"Found {len(downloaded_files)} downloaded workbook(s) to process")
-        
-        for i, twb_file in enumerate(downloaded_files, 1):
-            print(f"\n[{i}/{len(downloaded_files)}] Generating JSON from: {twb_file.name}")
-            try:
-                # Remove double extension if present (e.g., .twb.twb -> .twb)
-                file_stem = twb_file.stem
-                if file_stem.endswith('.twb'):
-                    # Already has extension in stem, use it as is
-                    file_output_dir = json_output_dir / file_stem
-                else:
-                    # Use the stem normally
-                    file_output_dir = json_output_dir / twb_file.stem
-                
-                generate_json_from_twb(str(twb_file), str(file_output_dir))
-                json_files.append(str(file_output_dir / "processed_pipeline_output.json"))
-                print(f"  ✅ Successfully generated and transformed JSON for {twb_file.name}")
-            except Exception as e:
-                import traceback
-                error_traceback = traceback.format_exc()
-                error_message = str(e)
-                
-                # Extract the main error type and message
-                error_type = type(e).__name__
-                error_summary = error_message.split('\n')[0] if '\n' in error_message else error_message
-                
-                # Store error information
-                json_errors.append({
-                    "file": twb_file.name,
-                    "file_path": str(twb_file),
-                    "error_type": error_type,
-                    "error_message": error_summary,
-                    "full_error": error_traceback
-                })
-                
-                print(f"  ❌ FAILED to generate JSON for {twb_file.name}")
-                print(f"     Error Type: {error_type}")
-                print(f"     Error: {error_summary}")
-                # Continue with next file instead of stopping
-        
-        # Print summary
-        print(f"\n{'='*60}")
-        print(f"✅ JSON generation complete!")
-        print(f"{'='*60}")
-        print(f"  Total files processed: {len(downloaded_files)}")
-        print(f"  ✅ Successfully converted: {len(json_files)}")
-        print(f"  ❌ Failed conversions: {len(json_errors)}")
-        print(f"  Output directory: {json_output_dir}")
-        
-        # Print detailed error information if any failures occurred
-        if json_errors:
+        # Only generate JSON if site_id is provided (ensures it's from a specific site, not default)
+        if not SITE_ID:
             print(f"\n{'='*60}")
-            print(f"❌ FILES WITH JSON CONVERSION ERRORS:")
+            print(f"⚠️  WARNING: JSON generation skipped!")
             print(f"{'='*60}")
-            for idx, error_info in enumerate(json_errors, 1):
-                print(f"\n[{idx}] File: {error_info['file']}")
-                print(f"    Path: {error_info['file_path']}")
-                print(f"    Error Type: {error_info['error_type']}")
-                print(f"    Error Message: {error_info['error_message']}")
-                print(f"    Full Error Details:")
-                # Print first few lines of full error for context
-                error_lines = error_info['full_error'].split('\n')
-                for line in error_lines[:10]:  # Show first 10 lines
-                    if line.strip():
-                        print(f"      {line}")
-                if len(error_lines) > 10:
-                    print(f"      ... ({len(error_lines) - 10} more lines)")
+            print(f"  JSON generation is only allowed when downloading from a specific site.")
+            print(f"  Please provide --site-id or set SITE_ID in .env file to generate JSON.")
+            print(f"  Workbooks were downloaded but JSON was not generated.")
+            print(f"{'='*60}\n")
+        else:
             print(f"\n{'='*60}")
+            print(f"Generating JSON from downloaded workbooks...")
+            print(f"{'='*60}")
+            
+            if json_output_dir is None:
+                json_output_dir = Path("output")
+            else:
+                json_output_dir = Path(json_output_dir)
+            
+            json_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Find all downloaded files and convert .twbx to .twb automatically
+            downloaded_files = []
+            for batch_folder in batch_folders:
+                # First, convert any remaining .twbx files to .twb and remove .twbx
+                twbx_files = list(batch_folder.glob("*.twbx"))
+                for twbx_file in twbx_files:
+                    print(f"Converting {twbx_file.name} to .twb format...")
+                    twb_path = convert_twbx_to_twb(twbx_file, remove_twbx=True)
+                    if twb_path:
+                        print(f"  ✓ Converted and removed .twbx file")
+                    else:
+                        print(f"  ⚠ Could not convert {twbx_file.name}, will try to process as-is")
+                
+                # Now collect all .twb files (including newly converted ones)
+                downloaded_files.extend(list(batch_folder.glob("*.twb")))
+            
+            print(f"Found {len(downloaded_files)} downloaded workbook(s) to process")
+            
+            for i, twb_file in enumerate(downloaded_files, 1):
+                print(f"\n[{i}/{len(downloaded_files)}] Generating JSON from: {twb_file.name}")
+                try:
+                    # Remove double extension if present (e.g., .twb.twb -> .twb)
+                    file_stem = twb_file.stem
+                    if file_stem.endswith('.twb'):
+                        # Already has extension in stem, use it as is
+                        file_output_dir = json_output_dir / file_stem
+                    else:
+                        # Use the stem normally
+                        file_output_dir = json_output_dir / twb_file.stem
+                    
+                    generate_json_from_twb(str(twb_file), str(file_output_dir))
+                    json_files.append(str(file_output_dir / "processed_pipeline_output.json"))
+                    print(f"  ✅ Successfully generated and transformed JSON for {twb_file.name}")
+                except Exception as e:
+                    import traceback
+                    error_traceback = traceback.format_exc()
+                    error_message = str(e)
+                    
+                    # Extract the main error type and message
+                    error_type = type(e).__name__
+                    error_summary = error_message.split('\n')[0] if '\n' in error_message else error_message
+                    
+                    # Store error information
+                    json_errors.append({
+                        "file": twb_file.name,
+                        "file_path": str(twb_file),
+                        "error_type": error_type,
+                        "error_message": error_summary,
+                        "full_error": error_traceback
+                    })
+                    
+                    print(f"  ❌ FAILED to generate JSON for {twb_file.name}")
+                    print(f"     Error Type: {error_type}")
+                    print(f"     Error: {error_summary}")
+                    # Continue with next file instead of stopping
+            
+            # Print summary
+            print(f"\n{'='*60}")
+            print(f"✅ JSON generation complete!")
+            print(f"{'='*60}")
+            print(f"  Total files processed: {len(downloaded_files)}")
+            print(f"  ✅ Successfully converted: {len(json_files)}")
+            print(f"  ❌ Failed conversions: {len(json_errors)}")
+            print(f"  Output directory: {json_output_dir}")
+            
+            # Print detailed error information if any failures occurred
+            if json_errors:
+                print(f"\n{'='*60}")
+                print(f"❌ FILES WITH JSON CONVERSION ERRORS:")
+                print(f"{'='*60}")
+                for idx, error_info in enumerate(json_errors, 1):
+                    print(f"\n[{idx}] File: {error_info['file']}")
+                    print(f"    Path: {error_info['file_path']}")
+                    print(f"    Error Type: {error_info['error_type']}")
+                    print(f"    Error Message: {error_info['error_message']}")
+                    print(f"    Full Error Details:")
+                    # Print first few lines of full error for context
+                    error_lines = error_info['full_error'].split('\n')
+                    for line in error_lines[:10]:  # Show first 10 lines
+                        if line.strip():
+                            print(f"      {line}")
+                    if len(error_lines) > 10:
+                        print(f"      ... ({len(error_lines) - 10} more lines)")
+                print(f"\n{'='*60}")
     
     return {
         "total_workbooks": total_workbooks,
