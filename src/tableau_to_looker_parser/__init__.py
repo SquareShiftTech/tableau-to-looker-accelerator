@@ -18,7 +18,7 @@ from tableau_to_looker_parser.handlers.parameter_handler import ParameterHandler
 from tableau_to_looker_parser.handlers.fallback_handler import FallbackHandler
 
 # Version
-__version__ = "0.1.0"
+__version__ = "2.0.2"
 
 # Public API
 __all__ = [
