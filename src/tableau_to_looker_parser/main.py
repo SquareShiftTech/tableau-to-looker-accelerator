@@ -10,6 +10,8 @@ This module handles:
 import sys
 import zipfile
 import time
+import json
+import requests
 from pathlib import Path
 import tableauserverclient as TSC
 from slugify import slugify
@@ -17,6 +19,73 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tableau_to_looker_parser.core.migration_engine import MigrationEngine
 from tableau_to_looker_parser.converter import transform_json
+
+
+def fetch_site_luid(server_url: str, username: str, password: str, site_content_url: str) -> str:
+    """
+    Fetch the Tableau Site LUID from the Tableau Server API using the site content URL.
+    
+    Args:
+        server_url: Tableau server URL (e.g., https://tableau.squareshift.dev)
+        username: Tableau username
+        password: Tableau password
+        site_content_url: Site content URL (e.g., "dev", "prod")
+        
+    Returns:
+        str: Site LUID (e.g., "fe224d5a-80e9-4641-aec9-565bd4199896")
+        
+    Raises:
+        Exception: If the API request fails or LUID cannot be retrieved
+    """
+    # Construct the signin API endpoint
+    api_version = "3.19"  # You can make this configurable if needed
+    signin_url = f"{server_url.rstrip('/')}/api/{api_version}/auth/signin"
+    
+    # Prepare the request body
+    payload = {
+        "credentials": {
+            "name": username,
+            "password": password,
+            "site": {
+                "contentUrl": site_content_url
+            }
+        }
+    }
+    
+    # Set headers
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    
+    try:
+        print(f"Fetching Site LUID for site '{site_content_url}' from Tableau Server...")
+        response = requests.post(signin_url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        response_data = response.json()
+        
+        # Extract the site LUID from the response
+        site_luid = response_data.get("credentials", {}).get("site", {}).get("id")
+        
+        if not site_luid:
+            raise ValueError(f"Site LUID not found in API response. Response: {response_data}")
+        
+        print(f"✅ Successfully fetched Site LUID: {site_luid}")
+        return site_luid
+        
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Failed to fetch Site LUID from Tableau API: {e}"
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_detail = e.response.json()
+                error_msg += f"\n   API Error Details: {error_detail}"
+            except:
+                error_msg += f"\n   Response Status: {e.response.status_code}"
+                error_msg += f"\n   Response Text: {e.response.text[:200]}"
+        raise Exception(error_msg) from e
+    except (KeyError, ValueError) as e:
+        raise Exception(f"Failed to parse Site LUID from API response: {e}") from e
 
 
 def validate_zip_file(file_path):
@@ -616,6 +685,9 @@ Examples:
   
   # Download from server and generate JSON
   tableau-assess --server --server-url https://tableau.squareshift.dev --username admin --password Squareshift123@ --site-id prod --generate-json
+  
+  # Download from server and generate both JSON files (with PostgreSQL metrics)
+  tableau-assess --server --server-url https://tableau.squareshift.dev --username admin --password Squareshift123@ --site-id prod --generate-json --pg-host 34.46.219.118 --pg-port 8060 --pg-db workgroup --pg-user readonly --pg-password Test@123
         """
     )
     
@@ -653,6 +725,43 @@ Examples:
         "--site-id",
         type=str,
         help="Tableau site ID (required for --server mode)"
+    )
+    
+    # Optional PostgreSQL arguments for metrics generation
+    parser.add_argument(
+        "--pg-host",
+        type=str,
+        help="PostgreSQL host (optional, for metrics generation)"
+    )
+    parser.add_argument(
+        "--pg-port",
+        type=int,
+        help="PostgreSQL port (optional, for metrics generation)"
+    )
+    parser.add_argument(
+        "--pg-db",
+        type=str,
+        help="PostgreSQL database name (optional, for metrics generation)"
+    )
+    parser.add_argument(
+        "--pg-user",
+        type=str,
+        help="PostgreSQL user (optional, for metrics generation)"
+    )
+    parser.add_argument(
+        "--pg-password",
+        type=str,
+        help="PostgreSQL password (optional, for metrics generation)"
+    )
+    parser.add_argument(
+        "--pg-sslmode",
+        type=str,
+        help="PostgreSQL SSL mode (optional, for metrics generation)"
+    )
+    parser.add_argument(
+        "--pg-connect-timeout",
+        type=int,
+        help="PostgreSQL connection timeout in seconds (optional, for metrics generation)"
     )
     
     # JSON generation (required)
@@ -700,6 +809,78 @@ Examples:
             print(f"\n  Files with JSON errors:")
             for error in json_errors:
                 print(f"    - {error['file']}: {error['error_type']} - {error['error_message']}")
+        
+        # Generate metrics JSON if PostgreSQL arguments are provided
+        # Check if any PostgreSQL argument is provided (to determine if metrics should be generated)
+        has_pg_args = any([
+            args.pg_host,
+            args.pg_port,
+            args.pg_db,
+            args.pg_user,
+            args.pg_password,
+            args.pg_sslmode,
+            args.pg_connect_timeout
+        ])
+        
+        if has_pg_args:
+            print("\n" + "="*60)
+            print("MODE: Generating Metrics JSON from PostgreSQL")
+            print("="*60)
+            
+            # Validate all required PostgreSQL parameters are provided
+            required_pg_params = {
+                "pg_host": args.pg_host,
+                "pg_port": args.pg_port,
+                "pg_db": args.pg_db,
+                "pg_user": args.pg_user,
+                "pg_password": args.pg_password,
+            }
+            
+            missing_params = [param for param, value in required_pg_params.items() if not value]
+            if missing_params:
+                print(f"\n❌ Error: Missing required PostgreSQL parameters: {', '.join(missing_params)}")
+                print("   All PostgreSQL parameters must be provided when generating metrics.")
+                print("   Required: --pg-host, --pg-port, --pg-db, --pg-user, --pg-password")
+                print("   Optional: --pg-sslmode (default: 'prefer'), --pg-connect-timeout (default: 15)")
+            else:
+                try:
+                    from tableau_to_looker_parser.metrics import generate_metrics_json
+                    
+                    # Fetch the Site LUID from Tableau API using the site content URL
+                    try:
+                        site_luid = fetch_site_luid(
+                            server_url=args.server_url,
+                            username=args.username,
+                            password=args.password,
+                            site_content_url=args.site_id
+                        )
+                    except Exception as e:
+                        print(f"\n❌ Error fetching Site LUID: {e}")
+                        print("   Skipping metrics generation.")
+                        import traceback
+                        traceback.print_exc()
+                        site_luid = None
+                    
+                    if site_luid:
+                        metrics_file = generate_metrics_json(
+                            site_id=site_luid,  # Use the fetched LUID instead of content URL
+                            pg_host=args.pg_host,
+                            pg_port=args.pg_port,
+                            pg_db=args.pg_db,
+                            pg_user=args.pg_user,
+                            pg_password=args.pg_password,
+                            pg_sslmode=args.pg_sslmode or "prefer",
+                            pg_connect_timeout=args.pg_connect_timeout or 15,
+                            output_dir="output"
+                        )
+                        print(f"\n✅ Metrics JSON generated successfully: {metrics_file}")
+                except ImportError as e:
+                    print(f"\n⚠️  Warning: Could not import metrics module: {e}")
+                    print("   Make sure psycopg is installed: pip install psycopg[binary]")
+                except Exception as e:
+                    print(f"\n❌ Error generating metrics JSON: {e}")
+                    import traceback
+                    traceback.print_exc()
     
     elif args.local:
         # Process local file mode

@@ -1,6 +1,6 @@
 [project]
 name = "tableau-to-looker-parser"
-version = "2.0.4"
+version = "2.0.5"
 description = "Core library for Tableau to LookML migration"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,7 +28,9 @@ dependencies = [
     "wheel",
     "sqlglot>=27.18.0",
     "tableauserverclient>=0.38",
-    "python-slugify>=8.0.4"
+    "python-slugify>=8.0.4",
+    "psycopg[binary]>=3.1.0",
+    "requests>=2.31.0"
 ]
 
 [project.optional-dependencies]
