@@ -1,6 +1,6 @@
 [project]
 name = "tableau-to-looker-parser"
-version = "2.0.5"
+version = "2.0.6"
 description = "Core library for Tableau to LookML migration"
 readme = "README.md"
 requires-python = ">=3.11"

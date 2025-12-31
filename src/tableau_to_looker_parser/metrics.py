@@ -68,26 +68,45 @@ def total_workbooks_query() -> str:
     """
 
 
+def inactive_workbooks_count_query() -> str:
+    """Query to get total count of inactive workbooks (for metrics calculation)."""
+    return """
+WITH recent_workbook_views AS (
+    SELECT DISTINCT w.id AS workbook_id
+    FROM workbooks w
+    INNER JOIN views v ON v.workbook_id = w.id
+    INNER JOIN hist_views hv ON hv.view_id = v.id
+    INNER JOIN historical_events he ON he.hist_view_id = hv.id
+    INNER JOIN historical_event_types het ON he.historical_event_type_id = het.type_id
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE s.luid = %(site_id)s
+      AND het.name IN ('Access View', 'Access Authoring View')
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+)
+SELECT COUNT(DISTINCT w.id) AS inactive_workbooks_count
+FROM workbooks w
+INNER JOIN sites s ON w.site_id = s.id
+WHERE s.luid = %(site_id)s
+  AND w.id NOT IN (SELECT workbook_id FROM recent_workbook_views);
+"""
+
+
 def calculate_inactive_workbooks_metrics(
-    inactive_workbooks: List[Dict[str, Any]], total_workbooks: int
+    inactive_workbooks_count: int, total_workbooks: int
 ) -> Dict[str, Any]:
     """Calculate metrics for inactive workbooks section.
     
     Args:
-        inactive_workbooks: List of inactive workbook records
+        inactive_workbooks_count: Total count of inactive workbooks (from count query)
         total_workbooks: Total number of workbooks in the site
         
     Returns:
         Dict with inactive_count, total_count, and percentage
     """
-    # Count unique workbooks (not views) in inactive list
-    # Note: The query returns individual views/dashboards, but we need to count distinct workbooks
-    # Using set() ensures we count each workbook only once, even if it has multiple views
-    unique_inactive_workbooks = len(set(row.get("workbook_name") for row in inactive_workbooks if row.get("workbook_name")))
-    percentage = (unique_inactive_workbooks / total_workbooks * 100) if total_workbooks > 0 else 0
+    percentage = (inactive_workbooks_count / total_workbooks * 100) if total_workbooks > 0 else 0
     
     return {
-        "inactive_count": unique_inactive_workbooks,
+        "inactive_count": inactive_workbooks_count,
         "total_count": total_workbooks,
         "percentage": round(percentage, 1)
     }
@@ -169,7 +188,7 @@ def generate_table_descriptions(calculated_metrics: Dict[str, Any], results: Dic
     Returns:
         Dict mapping table names to their descriptions
     """
-    inactive_metrics = calculated_metrics.get("inactive_workbooks", {})
+    inactive_metrics = calculated_metrics.get("inactive_workbooks_summary", {})
     content_metrics = calculated_metrics.get("content_creation_rate", {})
     developer_metrics = calculated_metrics.get("developer_activity", {})
     
@@ -184,15 +203,25 @@ def generate_table_descriptions(calculated_metrics: Dict[str, Any], results: Dic
         report_count = len(results["recommended_pilot_reports"])
     
     return {
-        "Most_Used_Workbooks_(Last_60_Days)": (
-            "The following metrics detail which assets are most valuable to the organization "
+        "Most_Used_Workbooks_Summary": (
+            "The following metrics detail which workbooks are most valuable to the organization "
             "and which can be decommissioned to reduce migration scope."
         ),
-        "Inactive_Workbooks": (
+        "Most_Used_Workbooks_Detailed": (
+            "Detailed view-level breakdown of most used workbooks showing individual content items "
+            "(dashboards, views, and stories) that are actively being accessed. This granular view "
+            "helps identify specific high-value content within popular workbooks."
+        ),
+        "Inactive_Workbooks_Summary": (
             f"A significant portion of the content is stale and can be decommissioned. "
             f"Over \"{inactive_metrics.get('percentage', 0)}%\" of all workbooks "
             f"\"({inactive_metrics.get('total_count', 0)} total)\" have not been viewed "
             f"in the last 60 days. This represents a major opportunity to reduce the migration scope."
+        ),
+        "Inactive_Workbooks_Detailed": (
+            "Detailed view-level breakdown of inactive workbooks showing individual content items "
+            "(dashboards and views and stories) that have not been accessed in the last 60 days. This granular view "
+            "helps identify specific content that can be decommissioned."
         ),
         "Content_Creation_Rate": (
             f"The environment is \"{content_metrics.get('activity_level', 'unknown')}\". "
@@ -208,9 +237,15 @@ def generate_table_descriptions(calculated_metrics: Dict[str, Any], results: Dic
             f"This broad, decentralized developer base confirms a strong desire for self-service analytics "
             f"that is currently happening in an ungoverned manner."
         ),
-        "Frequently_Used_Slow_Reports": (
-            "Several heavily-used reports suffer from slow performance, creating a poor user experience "
-            "and representing a key pain point to be solved by the migration."
+        "Frequently_Used_Slow_Reports_Summary": (
+            "Workbook-level summary of frequently used reports with slow performance. These workbooks are "
+            "heavily accessed but suffer from slow load times, creating a poor user experience and representing "
+            "a key pain point to be solved by the migration."
+        ),
+        "Frequently_Used_Slow_Reports_Detailed": (
+            "Detailed view-level breakdown of frequently used slow reports showing individual content items "
+            "(dashboards, views, and stories) that are heavily accessed but have slow load times. This granular view "
+            "helps identify specific high-impact performance issues within popular workbooks."
         ),
         "Recommended_Pilot_Reports": (
             f'The {report_count} reports below are recommended for the pilot migration. '
@@ -221,7 +256,8 @@ def generate_table_descriptions(calculated_metrics: Dict[str, Any], results: Dic
         ),
     }
 
-def most_used_workbooks_query() -> str:
+def most_used_workbooks_summary_query() -> str:
+    """Query for most used workbooks summary (workbook level aggregation)."""
     return """
 WITH workbook_usage AS (
     SELECT
@@ -272,19 +308,135 @@ workbook_totals AS (
       AND het.name IN ('Access View', 'Access Authoring View')
       AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
     GROUP BY w.id, w.name
+),
+workbook_data AS (
+    SELECT
+        wt.workbook_id,
+        wt.workbook_name,
+        wt.total_views AS views_last_60_days,
+        tup.primary_user_names AS primary_user_name
+    FROM workbook_totals wt
+    INNER JOIN top_users_per_workbook tup ON wt.workbook_id = tup.workbook_id
+),
+ranked_workbooks AS (
+    SELECT
+        workbook_name,
+        views_last_60_days,
+        primary_user_name,
+        ROW_NUMBER() OVER (ORDER BY views_last_60_days DESC) AS rank
+    FROM workbook_data
+    ORDER BY views_last_60_days DESC
+    LIMIT 50
 )
 SELECT
-    ROW_NUMBER() OVER (ORDER BY wt.total_views DESC) AS rank,
-    wt.workbook_name,
-    wt.total_views AS views_last_60_days,
-    tup.primary_user_names AS primary_user_name
-FROM workbook_totals wt
-INNER JOIN top_users_per_workbook tup ON wt.workbook_id = tup.workbook_id
-ORDER BY wt.total_views DESC;
+    rank,
+    workbook_name,
+    views_last_60_days,
+    primary_user_name
+FROM ranked_workbooks
+ORDER BY rank;
 """
 
 
-def inactive_workbooks_query() -> str:
+def most_used_workbooks_detailed_query() -> str:
+    """Query for most used workbooks detailed view (view level granularity)."""
+    return """
+WITH view_usage AS (
+    SELECT
+        w.id AS workbook_id,
+        w.name AS workbook_name,
+        v.id AS view_id,
+        v.name AS view_name,
+        v.sheettype AS content_type,
+        he.hist_actor_user_id,
+        COUNT(he.id) AS user_view_count
+    FROM workbooks w
+    INNER JOIN views v ON v.workbook_id = w.id
+    INNER JOIN hist_views hv ON hv.view_id = v.id
+    INNER JOIN historical_events he ON he.hist_view_id = hv.id
+    INNER JOIN historical_event_types het ON he.historical_event_type_id = het.type_id
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE s.luid = %(site_id)s
+      AND het.name IN ('Access View', 'Access Authoring View')
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+    GROUP BY w.id, w.name, v.id, v.name, v.sheettype, he.hist_actor_user_id
+),
+max_views_per_view AS (
+    SELECT 
+        view_id,
+        MAX(user_view_count) AS max_view_count
+    FROM view_usage
+    GROUP BY view_id
+),
+top_users_per_view AS (
+    SELECT 
+        vu.view_id,
+        vu.workbook_id,
+        vu.workbook_name,
+        vu.view_name,
+        vu.content_type,
+        STRING_AGG(hu.name, ', ' ORDER BY hu.name) AS primary_user_names
+    FROM view_usage vu
+    INNER JOIN max_views_per_view mv ON vu.view_id = mv.view_id 
+        AND vu.user_view_count = mv.max_view_count
+    INNER JOIN hist_users hu ON vu.hist_actor_user_id = hu.id
+    GROUP BY vu.view_id, vu.workbook_id, vu.workbook_name, vu.view_name, vu.content_type
+),
+view_totals AS (
+    SELECT
+        w.id AS workbook_id,
+        w.name AS workbook_name,
+        v.id AS view_id,
+        v.name AS view_name,
+        COALESCE(v.sheettype, 'Unknown') AS content_type,
+        COUNT(he.id) AS total_views
+    FROM workbooks w
+    INNER JOIN views v ON v.workbook_id = w.id
+    INNER JOIN hist_views hv ON hv.view_id = v.id
+    INNER JOIN historical_events he ON he.hist_view_id = hv.id
+    INNER JOIN historical_event_types het ON he.historical_event_type_id = het.type_id
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE s.luid = %(site_id)s
+      AND het.name IN ('Access View', 'Access Authoring View')
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+    GROUP BY w.id, w.name, v.id, v.name, v.sheettype
+),
+content_data AS (
+    SELECT
+        vt.workbook_name,
+        vt.view_name AS content_name,
+        vt.content_type,
+        vt.total_views AS views_last_60_days,
+        tuv.primary_user_names AS primary_user_name
+    FROM view_totals vt
+    INNER JOIN top_users_per_view tuv ON vt.view_id = tuv.view_id
+),
+ranked_content AS (
+    SELECT
+        workbook_name,
+        content_name,
+        content_type,
+        views_last_60_days,
+        primary_user_name,
+        ROW_NUMBER() OVER (ORDER BY views_last_60_days DESC, workbook_name, content_type, content_name) AS rank
+    FROM content_data
+    ORDER BY views_last_60_days DESC, workbook_name, content_type, content_name
+    LIMIT 50
+)
+SELECT
+    rank,
+    workbook_name,
+    content_name,
+    content_type,
+    views_last_60_days,
+    primary_user_name
+FROM ranked_content
+ORDER BY rank;
+"""
+
+
+def inactive_workbooks_detailed_query() -> str:
+    """Query for inactive workbooks detailed view (view level granularity)."""
     return """
 WITH recent_workbook_views AS (
     SELECT DISTINCT w.id AS workbook_id
@@ -299,7 +451,7 @@ WITH recent_workbook_views AS (
       AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
 ),
 last_view_access_per_content AS (
-    SELECT 
+    SELECT
         v.id AS view_id,
         v.workbook_id,
         v.name AS view_name,
@@ -309,7 +461,7 @@ last_view_access_per_content AS (
     INNER JOIN sites s ON w.site_id = s.id
     LEFT JOIN hist_views hv ON hv.view_id = v.id
     LEFT JOIN historical_events he ON he.hist_view_id = hv.id
-    LEFT JOIN historical_event_types het 
+    LEFT JOIN historical_event_types het
         ON he.historical_event_type_id = het.type_id
        AND het.name IN ('Access View', 'Access Authoring View')
     WHERE s.luid = %(site_id)s
@@ -321,28 +473,118 @@ inactive_workbooks AS (
     INNER JOIN sites s ON w.site_id = s.id
     WHERE s.luid = %(site_id)s
       AND w.id NOT IN (SELECT workbook_id FROM recent_workbook_views)
+),
+content_data AS (
+    SELECT
+        w.name AS workbook_name,
+        v.name AS content_name,
+        COALESCE(v.sheettype, 'Unknown') AS content_type,
+        CASE
+            WHEN lvapc.last_viewed_at IS NULL
+            THEN EXTRACT(DAY FROM (CURRENT_TIMESTAMP - w.created_at))::INTEGER
+            ELSE EXTRACT(DAY FROM (CURRENT_TIMESTAMP - lvapc.last_viewed_at))::INTEGER
+        END AS days_since_last_view,
+        COALESCE(su.friendly_name, su.name, 'Unknown') AS owner
+    FROM inactive_workbooks iw
+    INNER JOIN workbooks w ON iw.workbook_id = w.id
+    INNER JOIN views v ON v.workbook_id = w.id
+    LEFT JOIN last_view_access_per_content lvapc ON v.id = lvapc.view_id
+    LEFT JOIN users u ON w.owner_id = u.id
+    LEFT JOIN system_users su ON u.system_user_id = su.id
+),
+ranked_content AS (
+    SELECT
+        workbook_name,
+        content_name,
+        content_type,
+        days_since_last_view,
+        owner,
+        ROW_NUMBER() OVER (ORDER BY days_since_last_view DESC, workbook_name, content_type, content_name) AS rank
+    FROM content_data
+    ORDER BY days_since_last_view DESC, workbook_name, content_type, content_name
+    LIMIT 50
 )
-SELECT 
-    w.name AS workbook_name,
-    v.name AS content_name,
-    COALESCE(v.sheettype, 'Unknown') AS content_type,
-    CASE 
-        WHEN lvapc.last_viewed_at IS NULL 
-            THEN CURRENT_DATE - w.created_at::date
-        ELSE CURRENT_DATE - lvapc.last_viewed_at::date
-    END AS days_since_last_view,
-    COALESCE(su.friendly_name, su.name, 'Unknown') AS owner
-FROM inactive_workbooks iw
-INNER JOIN workbooks w ON iw.workbook_id = w.id
-INNER JOIN views v ON v.workbook_id = w.id
-LEFT JOIN last_view_access_per_content lvapc ON v.id = lvapc.view_id
-LEFT JOIN users u ON w.owner_id = u.id
-LEFT JOIN system_users su ON u.system_user_id = su.id
-ORDER BY 
-    days_since_last_view DESC,
-    w.name,
-    v.sheettype,
-    v.name;
+SELECT
+    rank,
+    workbook_name,
+    content_name,
+    content_type,
+    days_since_last_view,
+    owner
+FROM ranked_content
+ORDER BY rank;
+"""
+
+
+def inactive_workbooks_summary_query() -> str:
+    """Query for inactive workbooks summary (workbook level aggregation)."""
+    return """
+WITH recent_workbook_views AS (
+    SELECT DISTINCT w.id AS workbook_id
+    FROM workbooks w
+    INNER JOIN views v ON v.workbook_id = w.id
+    INNER JOIN hist_views hv ON hv.view_id = v.id
+    INNER JOIN historical_events he ON he.hist_view_id = hv.id
+    INNER JOIN historical_event_types het ON he.historical_event_type_id = het.type_id
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE s.luid = %(site_id)s
+      AND het.name IN ('Access View', 'Access Authoring View')
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+),
+last_view_per_workbook AS (
+    SELECT
+        w.id AS workbook_id,
+        MAX(he.created_at) AS last_viewed_at
+    FROM workbooks w
+    INNER JOIN sites s ON w.site_id = s.id
+    INNER JOIN views v ON v.workbook_id = w.id
+    LEFT JOIN hist_views hv ON hv.view_id = v.id
+    LEFT JOIN historical_events he ON he.hist_view_id = hv.id
+    LEFT JOIN historical_event_types het
+        ON he.historical_event_type_id = het.type_id
+       AND het.name IN ('Access View', 'Access Authoring View')
+    WHERE s.luid = %(site_id)s
+    GROUP BY w.id
+),
+inactive_workbooks AS (
+    SELECT DISTINCT w.id AS workbook_id
+    FROM workbooks w
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE s.luid = %(site_id)s
+      AND w.id NOT IN (SELECT workbook_id FROM recent_workbook_views)
+),
+workbook_data AS (
+    SELECT
+        w.name AS workbook_name,
+        CASE
+            WHEN lvpw.last_viewed_at IS NULL
+            THEN EXTRACT(DAY FROM (CURRENT_TIMESTAMP - w.created_at))::INTEGER
+            ELSE EXTRACT(DAY FROM (CURRENT_TIMESTAMP - lvpw.last_viewed_at))::INTEGER
+        END AS days_since_last_view,
+        COALESCE(su.friendly_name, su.name, 'Unknown') AS owner
+    FROM inactive_workbooks iw
+    INNER JOIN workbooks w ON iw.workbook_id = w.id
+    LEFT JOIN last_view_per_workbook lvpw ON w.id = lvpw.workbook_id
+    LEFT JOIN users u ON w.owner_id = u.id
+    LEFT JOIN system_users su ON u.system_user_id = su.id
+),
+ranked_workbooks AS (
+    SELECT
+        workbook_name,
+        days_since_last_view,
+        owner,
+        ROW_NUMBER() OVER (ORDER BY days_since_last_view DESC, workbook_name) AS rank
+    FROM workbook_data
+    ORDER BY days_since_last_view DESC, workbook_name
+    LIMIT 50
+)
+SELECT
+    rank,
+    workbook_name,
+    days_since_last_view,
+    owner
+FROM ranked_workbooks
+ORDER BY rank;
 """
 
 
@@ -407,7 +649,90 @@ ORDER BY ms.month_date DESC;
 """
 
 
-def view_performance_query() -> str:
+def frequently_used_slow_reports_summary_query() -> str:
+    """Query for frequently used slow reports summary (workbook level aggregation)."""
+    return """
+WITH view_load_times AS (
+    SELECT 
+        w.id AS workbook_id,
+        w.name AS workbook_name,
+        AVG(EXTRACT(EPOCH FROM (hr.completed_at - hr.created_at))) AS avg_load_time_seconds,
+        COUNT(hr.id) AS http_request_count
+    FROM http_requests hr
+    INNER JOIN sites s ON hr.site_id = s.id
+    INNER JOIN workbooks w ON w.site_id = s.id
+        -- Try multiple matching strategies for workbook name
+        AND (
+            -- Strategy 1: Direct match
+            SPLIT_PART(hr.currentsheet, '/', 1) = w.name
+            -- Strategy 2: Match after removing numeric suffix only
+            OR REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', '') = w.name
+            -- Strategy 3: Match with all underscores converted to spaces
+            OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ' ') = REPLACE(w.name, '_', ' ')
+            -- Strategy 4: Match with all spaces converted to underscores (reverse)
+            OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), ' ', '_') = REPLACE(w.name, ' ', '_')
+            -- Strategy 5: Match ignoring all spaces and underscores (most flexible)
+            OR REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ''), ' ', '') = 
+               REPLACE(REPLACE(w.name, '_', ''), ' ', '')
+        )
+    WHERE 
+        s.luid = %(site_id)s
+        AND hr.currentsheet IS NOT NULL
+        AND hr.currentsheet LIKE '%%/%%'
+        AND hr.completed_at IS NOT NULL
+        AND hr.created_at IS NOT NULL
+        AND hr.completed_at > hr.created_at
+        AND hr.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+    GROUP BY w.id, w.name
+),
+workbook_access_counts AS (
+    SELECT 
+        w.id AS workbook_id,
+        w.name AS workbook_name,
+        COUNT(he.id) AS view_count
+    FROM historical_events he
+    INNER JOIN historical_event_types het ON he.historical_event_type_id = het.type_id
+    INNER JOIN hist_workbooks hw ON he.hist_workbook_id = hw.id
+    INNER JOIN workbooks w ON hw.workbook_id = w.id
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE 
+        s.luid = %(site_id)s
+        AND het.name IN ('Access View', 'Access Authoring View')
+        AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+    GROUP BY w.id, w.name
+),
+workbook_data AS (
+    SELECT
+        COALESCE(vlt.workbook_name, vac.workbook_name) AS workbook_name,
+        ROUND(vlt.avg_load_time_seconds::numeric, 2) AS avg_load_time_seconds,
+        COALESCE(vac.view_count, 0) AS views_last_60_days
+    FROM workbook_access_counts vac
+    LEFT JOIN view_load_times vlt ON vac.workbook_id = vlt.workbook_id
+    WHERE vlt.avg_load_time_seconds IS NOT NULL
+       OR vac.view_count > 0
+),
+ranked_workbooks AS (
+    SELECT
+        workbook_name,
+        avg_load_time_seconds,
+        views_last_60_days,
+        ROW_NUMBER() OVER (ORDER BY avg_load_time_seconds DESC NULLS LAST, views_last_60_days DESC) AS rank
+    FROM workbook_data
+    ORDER BY avg_load_time_seconds DESC NULLS LAST, views_last_60_days DESC
+    LIMIT 50
+)
+SELECT
+    rank,
+    workbook_name,
+    avg_load_time_seconds,
+    views_last_60_days
+FROM ranked_workbooks
+ORDER BY rank;
+"""
+
+
+def frequently_used_slow_reports_detailed_query() -> str:
+    """Query for frequently used slow reports detailed (view level granularity)."""
     return """
 WITH view_load_times AS (
     SELECT 
@@ -435,7 +760,7 @@ WITH view_load_times AS (
                REPLACE(REPLACE(w.name, '_', ''), ' ', '')
         )
     INNER JOIN views v ON v.workbook_id = w.id
-        -- Flexible view name matching: handle spaces, parentheses, commas, percentage signs, and other special characters
+        -- Flexible view name matching: handle spaces, parentheses, and number variations
         AND (
             -- Strategy 1: Direct match
             SPLIT_PART(hr.currentsheet, '/', 2) = v.name
@@ -458,39 +783,59 @@ WITH view_load_times AS (
         AND hr.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
     GROUP BY w.id, w.name, v.id, v.name
 ),
-view_access_counts AS (
-    SELECT 
+view_totals AS (
+    SELECT
+        w.id AS workbook_id,
         w.name AS workbook_name,
-        hv.name AS view_name,
         v.id AS view_id,
-        v.sheettype,
-        COUNT(he.id) AS view_count
-    FROM historical_events he
+        v.name AS view_name,
+        COALESCE(v.sheettype, 'Unknown') AS content_type,
+        COUNT(he.id) AS total_views
+    FROM workbooks w
+    INNER JOIN views v ON v.workbook_id = w.id
+    INNER JOIN hist_views hv ON hv.view_id = v.id
+    INNER JOIN historical_events he ON he.hist_view_id = hv.id
     INNER JOIN historical_event_types het ON he.historical_event_type_id = het.type_id
-    INNER JOIN hist_views hv ON he.hist_view_id = hv.id
-    INNER JOIN hist_workbooks hw ON he.hist_workbook_id = hw.id
-    INNER JOIN workbooks w ON hw.workbook_id = w.id
     INNER JOIN sites s ON w.site_id = s.id
-    LEFT JOIN views v ON v.workbook_id = w.id AND v.name = hv.name
-    WHERE 
-        s.luid = %(site_id)s
-        AND het.name IN ('Access View', 'Access Authoring View')
-        AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
-    GROUP BY w.name, hv.name, v.id, v.sheettype
+    WHERE s.luid = %(site_id)s
+      AND het.name IN ('Access View', 'Access Authoring View')
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
+    GROUP BY w.id, w.name, v.id, v.name, v.sheettype
+),
+content_data AS (
+    SELECT 
+        vt.workbook_name,
+        vt.view_name AS content_name,
+        vt.content_type,
+        ROUND(vlt.avg_load_time_seconds::numeric, 2) AS avg_load_time_seconds,
+        vt.total_views AS views_last_60_days
+    FROM view_totals vt
+    LEFT JOIN view_load_times vlt 
+        ON vt.workbook_name = vlt.workbook_name 
+       AND vt.view_name = vlt.view_name
+    WHERE vt.total_views > 0
+),
+ranked_content AS (
+    SELECT
+        workbook_name,
+        content_name,
+        content_type,
+        avg_load_time_seconds,
+        views_last_60_days,
+        ROW_NUMBER() OVER (ORDER BY avg_load_time_seconds DESC NULLS LAST, views_last_60_days DESC, workbook_name, content_type, content_name) AS rank
+    FROM content_data
+    ORDER BY avg_load_time_seconds DESC NULLS LAST, views_last_60_days DESC, workbook_name, content_type, content_name
+    LIMIT 50
 )
-SELECT 
-    vac.workbook_name,
-    vac.view_name AS content_name,
-    COALESCE(vac.sheettype, 'Unknown') AS content_type,
-    ROUND(vlt.avg_load_time_seconds::numeric, 2) AS avg_load_time_seconds,
-    vac.view_count AS views_last_60_days
-FROM view_access_counts vac
-LEFT JOIN view_load_times vlt 
-    ON vac.workbook_name = vlt.workbook_name 
-   AND vac.view_name = vlt.view_name
-WHERE vac.view_count > 0
-ORDER BY vlt.avg_load_time_seconds DESC NULLS LAST, vac.view_count DESC
-LIMIT 45;
+SELECT
+    rank,
+    workbook_name,
+    content_name,
+    content_type,
+    avg_load_time_seconds,
+    views_last_60_days
+FROM ranked_content
+ORDER BY rank;
 """
 
 
@@ -596,7 +941,6 @@ LEFT JOIN example_workbooks ew ON da.system_user_id = ew.system_user_id;
 """
 
 
-
 def recommended_pilot_reports_query() -> str:
     return """
 WITH workbook_load_times AS (
@@ -674,7 +1018,6 @@ ORDER BY total_views DESC, avg_load_time_seconds DESC;
 """
 
 
-
 def quick_wins_scatter_data_query() -> str:
     return """
 WITH workbook_load_times AS (
@@ -728,7 +1071,6 @@ ORDER BY cm.total_views DESC, cm.avg_load_time_seconds DESC;
 """
 
 
-
 def build_output_json(
     results: Dict[str, List[Dict[str, Any]]], 
     site_id: str,
@@ -741,11 +1083,17 @@ def build_output_json(
         "calculated_metrics": calculated_metrics,
         "table_descriptions": descriptions,
         "Usage_Statistics": {
-            "Most_Used_Workbooks_(Last_60_Days)": rows_to_indexed_map(
-                results["most_used_workbooks"]
+            "Most_Used_Workbooks_Summary": rows_to_indexed_map(
+                results["most_used_workbooks_summary"]
             ),
-            "Inactive_Workbooks": rows_to_indexed_map(
-                results["inactive_workbooks"]
+            "Most_Used_Workbooks_Detailed": rows_to_indexed_map(
+                results["most_used_workbooks_detailed"]
+            ),
+            "Inactive_Workbooks_Summary": rows_to_indexed_map(
+                results["inactive_workbooks_summary"]
+            ),
+            "Inactive_Workbooks_Detailed": rows_to_indexed_map(
+                results["inactive_workbooks_detailed"]
             ),
             "Content_Creation_Rate": rows_to_indexed_map(
                 results["content_creation_rate"]
@@ -756,14 +1104,14 @@ def build_output_json(
             "Developer_Activity": rows_to_indexed_map(results["developer_activity"]),
         },
         "Performance_Statistics": {
-            "Frequently_Used_Slow_Reports": rows_to_indexed_map(results["view_performance"]),
+            "Frequently_Used_Slow_Reports_Summary": rows_to_indexed_map(results["frequently_used_slow_reports_summary"]),
+            "Frequently_Used_Slow_Reports_Detailed": rows_to_indexed_map(results["frequently_used_slow_reports_detailed"]),
         },
         "Quick_Wins_For_Migration": {
             "Recommended_Pilot_Reports": rows_to_indexed_map(results["recommended_pilot_reports"]),
             "Quick_Wins_Scatter_Data": rows_to_indexed_map(results["quick_wins_scatter_data"]),
         }
     }
-
 
 
 def write_output_json(payload: Dict[str, Any], site_id: str, output_dir: str = ".") -> str:
@@ -836,10 +1184,13 @@ def generate_metrics_json(
     conn = pg_connect(db_cfg)
     print("Running PostgreSQL metrics...")
     queries = {
-        "most_used_workbooks": most_used_workbooks_query(),
-        "inactive_workbooks": inactive_workbooks_query(),
+        "most_used_workbooks_summary": most_used_workbooks_summary_query(),
+        "most_used_workbooks_detailed": most_used_workbooks_detailed_query(),
+        "inactive_workbooks_summary": inactive_workbooks_summary_query(),
+        "inactive_workbooks_detailed": inactive_workbooks_detailed_query(),
         "content_creation_rate": content_creation_rate_query(),
-        "view_performance": view_performance_query(),
+        "frequently_used_slow_reports_summary": frequently_used_slow_reports_summary_query(),
+        "frequently_used_slow_reports_detailed": frequently_used_slow_reports_detailed_query(),
         "top_users_activity": top_users_activity_query(),
         "developer_activity": developer_activity_query(),
         "recommended_pilot_reports": recommended_pilot_reports_query(),
@@ -858,7 +1209,7 @@ def generate_metrics_json(
             # Record the error in the output so JSON still generates.
             results[key] = [{"error": err_msg}]
 
-    # Get total workbooks count for calculations
+    # Get total workbooks count and inactive workbooks count for calculations
     print("Calculating metrics...")
     total_workbooks = 0
     try:
@@ -868,10 +1219,18 @@ def generate_metrics_json(
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: Could not get total workbooks count: {exc}")
 
+    inactive_workbooks_count = 0
+    try:
+        inactive_count_result = run_query(inactive_workbooks_count_query(), site_id, conn)
+        if inactive_count_result and "error" not in inactive_count_result[0]:
+            inactive_workbooks_count = int(inactive_count_result[0].get("inactive_workbooks_count", 0))
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: Could not get inactive workbooks count: {exc}")
+
     # Calculate all metrics
     calculated_metrics = {
-        "inactive_workbooks": calculate_inactive_workbooks_metrics(
-            results.get("inactive_workbooks", []),
+        "inactive_workbooks_summary": calculate_inactive_workbooks_metrics(
+            inactive_workbooks_count,
             total_workbooks
         ),
         "content_creation_rate": calculate_content_creation_rate_metrics(
@@ -894,4 +1253,3 @@ def generate_metrics_json(
 
 # Note: This module is designed to be called from main.py via generate_metrics_json()
 # All credentials must be provided via command line arguments - no defaults or env variables
-
