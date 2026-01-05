@@ -30,7 +30,13 @@ dependencies = [
     "tableauserverclient>=0.38",
     "python-slugify>=8.0.4",
     "psycopg[binary]>=3.1.0",
-    "requests>=2.31.0"
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "fuzzywuzzy>=0.18.0",
+    "flask>=2.3.0",
+    "flask-cors>=4.0.0",
+    "google-cloud-bigquery>=3.0.0"
 ]
 
 [project.optional-dependencies]
