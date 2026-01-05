@@ -35,7 +35,7 @@ def recommendation():
     if not WORKBOOK_DIR.exists():
         print(f"Warning: Workbook directory {WORKBOOK_DIR} does not exist.")
         WORKBOOK_DIR.mkdir(parents=True, exist_ok=True)
-        return pd.DataFrame(columns=["Complexity", "Description", "Feature", "Reason", "Recommended Approach", "Workbook", "Dashboard Name"])
+        return pd.DataFrame(columns=["Complexity", "Description", "Feature", "Recommended Approach", "Workbook", "Dashboard Name"])
 
     # --- Dashboard-level feature extraction from JSON: one row per (feature, workbook, dashboard) ---
     results = []
@@ -44,7 +44,7 @@ def recommendation():
     
     if not workbook_folders:
         print(f"Warning: No workbook folders found in {WORKBOOK_DIR}")
-        return pd.DataFrame(columns=["Complexity", "Description", "Feature", "Reason", "Recommended Approach", "Workbook", "Dashboard Name"])
+        return pd.DataFrame(columns=["Complexity", "Description", "Feature", "Recommended Approach", "Workbook", "Dashboard Name"])
     
     print(f"Processing {len(workbook_folders)} workbook folder(s) from {WORKBOOK_DIR}")
     
@@ -102,7 +102,7 @@ def recommendation():
     # --- Create DataFrame from results ---
     if not results:
         print("Warning: No features detected in any dashboards.")
-        return pd.DataFrame(columns=["Complexity", "Description", "Feature", "Reason", "Recommended Approach", "Workbook", "Dashboard Name"])
+        return pd.DataFrame(columns=["Complexity", "Description", "Feature", "Recommended Approach", "Workbook", "Dashboard Name"])
     
     df = pd.DataFrame(results)
     print(f"Detected {len(df)} feature occurrences across all dashboards")
@@ -132,9 +132,9 @@ def recommendation():
     )
 
     final_df = merged_df[[
-        "Feature", "Workbook", "Dashboard Name", "Complexity", "Reason", "Recommended_Approach", "Description"
+        "Feature", "Workbook", "Dashboard Name", "Complexity", "Recommended_Approach", "Description"
     ]]
-    final_df = final_df.dropna(subset=["Reason", "Recommended_Approach"])
+    final_df = final_df.dropna(subset=["Recommended_Approach"])
     # Dashboard Name should always be present since we process from JSON, but keep filter for safety
     final_df = final_df[final_df["Dashboard Name"].notnull() & (final_df["Dashboard Name"] != "")]
 
@@ -145,7 +145,7 @@ def recommendation():
     final_df["Workbook"] = final_df["Workbook"].apply(clean_workbook_name)
 
     final_df = final_df.rename(columns={"Recommended_Approach": "Recommended Approach"})
-    column_order = ["Complexity", "Description", "Feature", "Reason", "Recommended Approach", "Workbook", "Dashboard Name"]
+    column_order = ["Complexity", "Description", "Feature", "Recommended Approach", "Workbook", "Dashboard Name"]
     final_df = final_df[column_order]
         
     def clean_multiline(text):
@@ -153,7 +153,7 @@ def recommendation():
             return ""
         return str(text).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ').strip()
 
-    for col in ["Description", "Reason", "Recommended Approach"]:
+    for col in ["Description", "Recommended Approach"]:
         final_df[col] = final_df[col].apply(clean_multiline)
     # final_df.to_csv("recommendation_analysis_output.csv", index=False)
 
