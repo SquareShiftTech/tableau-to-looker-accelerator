@@ -1289,7 +1289,16 @@ def generate_metrics_json(
     for key, sql in queries.items():
         print(f"Executing query: {key}")
         try:
-            results[key] = run_query(sql, site_id, conn)
+            query_results = run_query(sql, site_id, conn)
+            # Convert avg_load_time_seconds from string to float if present
+            for row in query_results:
+                if "avg_load_time_seconds" in row and row["avg_load_time_seconds"] is not None:
+                    try:
+                        row["avg_load_time_seconds"] = float(row["avg_load_time_seconds"])
+                    except (ValueError, TypeError):
+                        # If conversion fails, keep original value
+                        pass
+            results[key] = query_results
             print(f" - rows returned: {len(results[key])}")
         except Exception as exc:  # noqa: BLE001
             err_msg = f"{exc}"
