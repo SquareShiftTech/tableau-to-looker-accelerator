@@ -434,7 +434,6 @@ FROM ranked_content
 ORDER BY rank;
 """
 
-
 def inactive_workbooks_detailed_query() -> str:
     """Query for inactive workbooks detailed view (view level granularity)."""
     return """
@@ -587,7 +586,6 @@ FROM ranked_workbooks
 ORDER BY rank;
 """
 
-
 def content_creation_rate_query() -> str:
     return """
 WITH month_series AS (
@@ -648,7 +646,6 @@ LEFT JOIN examples e ON ms.month_date = e.month_date
 ORDER BY ms.month_date DESC;
 """
 
-
 def frequently_used_slow_reports_summary_query() -> str:
     """Query for frequently used slow reports summary (workbook level aggregation)."""
     return """
@@ -671,9 +668,15 @@ WITH view_load_times AS (
             OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ' ') = REPLACE(w.name, '_', ' ')
             -- Strategy 4: Match with all spaces converted to underscores (reverse)
             OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), ' ', '_') = REPLACE(w.name, ' ', '_')
-            -- Strategy 5: Match ignoring all spaces and underscores (most flexible)
+            -- Strategy 5: Match ignoring all spaces and underscores
             OR REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ''), ' ', '') = 
                REPLACE(REPLACE(w.name, '_', ''), ' ', '')
+            -- Strategy 6: Match ignoring parentheses, hyphens, ampersands, and spaces
+            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), ' ', '')
+            -- Strategy 7: Match ignoring all special characters (most comprehensive)
+            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '') = 
+               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '')
         )
     WHERE 
         s.luid = %(site_id)s
@@ -755,12 +758,18 @@ WITH view_load_times AS (
             OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ' ') = REPLACE(w.name, '_', ' ')
             -- Strategy 4: Match with all spaces converted to underscores (reverse)
             OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), ' ', '_') = REPLACE(w.name, ' ', '_')
-            -- Strategy 5: Match ignoring all spaces and underscores (most flexible)
+            -- Strategy 5: Match ignoring all spaces and underscores
             OR REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ''), ' ', '') = 
                REPLACE(REPLACE(w.name, '_', ''), ' ', '')
+            -- Strategy 6: Match ignoring parentheses, hyphens, ampersands, and spaces
+            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), ' ', '')
+            -- Strategy 7: Match ignoring all special characters (most comprehensive)
+            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '') = 
+               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '')
         )
     INNER JOIN views v ON v.workbook_id = w.id
-        -- Flexible view name matching: handle spaces, parentheses, and number variations
+        -- Flexible view name matching: ignore ALL special characters
         AND (
             -- Strategy 1: Direct match
             SPLIT_PART(hr.currentsheet, '/', 2) = v.name
@@ -769,9 +778,12 @@ WITH view_load_times AS (
             -- Strategy 3: Match ignoring spaces, parentheses, and underscores
             OR REPLACE(REPLACE(REPLACE(SPLIT_PART(hr.currentsheet, '/', 2), ' ', ''), '(', ''), ')', '') = 
                REPLACE(REPLACE(REPLACE(v.name, ' ', ''), '(', ''), ')', '')
-            -- Strategy 4: Match with number normalization (handle "2" vs "(2)" vs " 2")
-            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(SPLIT_PART(hr.currentsheet, '/', 2), ' ', ''), '(', ''), ')', ''), '([0-9]+)', '\\1') = 
-               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(v.name, ' ', ''), '(', ''), ')', ''), '([0-9]+)', '\\1')
+            -- Strategy 4: Match ignoring spaces, parentheses, commas, and underscores
+            OR REPLACE(REPLACE(REPLACE(REPLACE(SPLIT_PART(hr.currentsheet, '/', 2), ' ', ''), '(', ''), ')', ''), ',', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(v.name, ' ', ''), '(', ''), ')', ''), ',', '')
+            -- Strategy 5: Ignore ALL special characters - pure alphanumeric comparison (case insensitive)
+            OR REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 2)), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(LOWER(v.name), '[^a-zA-Z0-9]', '')
         )
     WHERE 
         s.luid = %(site_id)s
@@ -812,7 +824,17 @@ content_data AS (
     FROM view_totals vt
     LEFT JOIN view_load_times vlt 
         ON vt.workbook_name = vlt.workbook_name 
-       AND vt.view_name = vlt.view_name
+       AND (
+           -- Use flexible matching for view names
+           vt.view_name = vlt.view_name
+           OR REPLACE(vt.view_name, ' ', '') = REPLACE(vlt.view_name, ' ', '')
+           OR REPLACE(REPLACE(REPLACE(vt.view_name, ' ', ''), '(', ''), ')', '') = 
+              REPLACE(REPLACE(REPLACE(vlt.view_name, ' ', ''), '(', ''), ')', '')
+           OR REPLACE(REPLACE(REPLACE(REPLACE(vt.view_name, ' ', ''), '(', ''), ')', ''), ',', '') = 
+              REPLACE(REPLACE(REPLACE(REPLACE(vlt.view_name, ' ', ''), '(', ''), ')', ''), ',', '')
+           OR REGEXP_REPLACE(LOWER(vt.view_name), '[^a-zA-Z0-9]', '') = 
+              REGEXP_REPLACE(LOWER(vlt.view_name), '[^a-zA-Z0-9]', '')
+       )
     WHERE vt.total_views > 0
 ),
 ranked_content AS (
@@ -837,7 +859,6 @@ SELECT
 FROM ranked_content
 ORDER BY rank;
 """
-
 
 def top_users_activity_query() -> str:
     return """
@@ -886,7 +907,6 @@ FROM user_actions ua
 LEFT JOIN most_viewed_per_user mv ON ua.unique_user_id = mv.unique_user_id
 ORDER BY ua.total_actions DESC;
 """
-
 
 def developer_activity_query() -> str:
     return """
@@ -955,15 +975,43 @@ WITH workbook_load_times AS (
         AND (
             -- Strategy 1: Direct match
             SPLIT_PART(hr.currentsheet, '/', 1) = w.name
-            -- Strategy 2: Match after removing numeric suffix only
+            -- Strategy 2: Case-insensitive direct match
+            OR LOWER(SPLIT_PART(hr.currentsheet, '/', 1)) = LOWER(w.name)
+            -- Strategy 3: Match after removing file extensions (.twbx, .twb, etc.) - case insensitive
+            OR LOWER(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '\\.(twbx|twb)$', '', 'i')) = LOWER(REGEXP_REPLACE(w.name, '\\.(twbx|twb)$', '', 'i'))
+            -- Strategy 4: Remove file extensions, then remove trailing numbers, then remove all non-alphanumeric (FIXED ORDER)
+            OR REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 1)), '\\.(twbx|twb)$', '', 'i'), '[0-9]+$', ''), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(w.name), '\\.(twbx|twb)$', '', 'i'), '[0-9]+$', ''), '[^a-zA-Z0-9]', '')
+            -- Strategy 5: Remove trailing numbers (including after underscore), then remove extensions, then normalize
+            OR REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 1)), '[0-9]+$', ''), '\\.(twbx|twb)$', '', 'i'), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(w.name), '[0-9]+$', ''), '\\.(twbx|twb)$', '', 'i'), '[^a-zA-Z0-9]', '')
+            -- Strategy 6: Most comprehensive - remove extensions first, then trailing numbers/underscores, then all special chars
+            OR REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 1)), '\\.(twbx|twb)$', '', 'i'), '[_0-9]+$', ''), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(w.name), '\\.(twbx|twb)$', '', 'i'), '[_0-9]+$', ''), '[^a-zA-Z0-9]', '')
+            -- Strategy 7: Match after removing numeric suffix only (original)
             OR REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', '') = w.name
-            -- Strategy 3: Match with all underscores converted to spaces
+            -- Strategy 8: Match with all underscores converted to spaces
             OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ' ') = REPLACE(w.name, '_', ' ')
-            -- Strategy 4: Match with all spaces converted to underscores (reverse)
+            -- Strategy 9: Match with all spaces converted to underscores (reverse)
             OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), ' ', '_') = REPLACE(w.name, ' ', '_')
-            -- Strategy 5: Match ignoring all spaces and underscores (most flexible)
+            -- Strategy 10: Match ignoring all spaces and underscores
             OR REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ''), ' ', '') = 
                REPLACE(REPLACE(w.name, '_', ''), ' ', '')
+            -- Strategy 11: Match ignoring parentheses, hyphens, ampersands, and spaces
+            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), ' ', '')
+            -- Strategy 12: Match ignoring all special characters (most comprehensive)
+            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '') = 
+               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '')
+            -- Strategy 13: Match ignoring hash symbols, periods, and spaces
+            OR REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '#', ''), '.', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(w.name, '#', ''), '.', ''), ' ', '')
+            -- Strategy 14: Match ignoring hash, period, underscore, and normalize spaces
+            OR REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '#', ''), '.', ''), '_', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(w.name, '#', ''), '.', ''), '_', ''), ' ', '')
+            -- Strategy 15: Match ignoring all special characters including hash and period (most comprehensive)
+            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), '#', ''), '.', ''), '_', ''), ' ', '') = 
+               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), '#', ''), '.', ''), '_', ''), ' ', '')
         )
     WHERE s.luid = %(site_id)s
       AND hr.currentsheet IS NOT NULL
@@ -1020,21 +1068,70 @@ ORDER BY total_views DESC, avg_load_time_seconds DESC;
 
 def quick_wins_scatter_data_query() -> str:
     return """
-WITH workbook_load_times AS (
+WITH all_workbooks AS (
+    SELECT 
+        w.id AS workbook_id,
+        w.name AS workbook_name
+    FROM workbooks w
+    INNER JOIN sites s ON w.site_id = s.id
+    WHERE s.luid = %(site_id)s
+),
+workbook_load_times AS (
     SELECT 
         w.id AS workbook_id,
         w.name AS workbook_name,
         AVG(EXTRACT(EPOCH FROM (hr.completed_at - hr.created_at))) AS avg_load_time_seconds
     FROM http_requests hr
     INNER JOIN sites s ON hr.site_id = s.id
-    INNER JOIN workbooks w ON SPLIT_PART(hr.currentsheet, '/', 1) = w.name AND w.site_id = s.id
+    INNER JOIN workbooks w ON w.site_id = s.id
+        -- Try multiple matching strategies for workbook name
+        AND (
+            -- Strategy 1: Direct match
+            SPLIT_PART(hr.currentsheet, '/', 1) = w.name
+            -- Strategy 2: Case-insensitive direct match
+            OR LOWER(SPLIT_PART(hr.currentsheet, '/', 1)) = LOWER(w.name)
+            -- Strategy 3: Match after removing file extensions (.twbx, .twb, etc.) - case insensitive
+            OR LOWER(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '\\.(twbx|twb)$', '', 'i')) = LOWER(REGEXP_REPLACE(w.name, '\\.(twbx|twb)$', '', 'i'))
+            -- Strategy 4: Remove file extensions, then remove trailing numbers, then remove all non-alphanumeric (FIXED ORDER)
+            OR REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 1)), '\\.(twbx|twb)$', '', 'i'), '[0-9]+$', ''), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(w.name), '\\.(twbx|twb)$', '', 'i'), '[0-9]+$', ''), '[^a-zA-Z0-9]', '')
+            -- Strategy 5: Remove trailing numbers (including after underscore), then remove extensions, then normalize
+            OR REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 1)), '[0-9]+$', ''), '\\.(twbx|twb)$', '', 'i'), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(w.name), '[0-9]+$', ''), '\\.(twbx|twb)$', '', 'i'), '[^a-zA-Z0-9]', '')
+            -- Strategy 6: Most comprehensive - remove extensions first, then trailing numbers/underscores, then all special chars
+            OR REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(SPLIT_PART(hr.currentsheet, '/', 1)), '\\.(twbx|twb)$', '', 'i'), '[_0-9]+$', ''), '[^a-zA-Z0-9]', '') = 
+               REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(w.name), '\\.(twbx|twb)$', '', 'i'), '[_0-9]+$', ''), '[^a-zA-Z0-9]', '')
+            -- Strategy 7: Match after removing numeric suffix only (original)
+            OR REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', '') = w.name
+            -- Strategy 8: Match with all underscores converted to spaces
+            OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ' ') = REPLACE(w.name, '_', ' ')
+            -- Strategy 9: Match with all spaces converted to underscores (reverse)
+            OR REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), ' ', '_') = REPLACE(w.name, ' ', '_')
+            -- Strategy 10: Match ignoring all spaces and underscores
+            OR REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '_', ''), ' ', '') = 
+               REPLACE(REPLACE(w.name, '_', ''), ' ', '')
+            -- Strategy 11: Match ignoring parentheses, hyphens, ampersands, and spaces
+            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), ' ', '')
+            -- Strategy 12: Match ignoring all special characters (most comprehensive)
+            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '') = 
+               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), '_', ''), ' ', '')
+            -- Strategy 13: Match ignoring hash symbols, periods, and spaces
+            OR REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '#', ''), '.', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(w.name, '#', ''), '.', ''), ' ', '')
+            -- Strategy 14: Match ignoring hash, period, underscore, and normalize spaces
+            OR REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '#', ''), '.', ''), '_', ''), ' ', '') = 
+               REPLACE(REPLACE(REPLACE(REPLACE(w.name, '#', ''), '.', ''), '_', ''), ' ', '')
+            -- Strategy 15: Match ignoring all special characters including hash and period (most comprehensive)
+            OR REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REGEXP_REPLACE(SPLIT_PART(hr.currentsheet, '/', 1), '_[0-9]+$', ''), '(', ''), ')', ''), '-', ''), '&', ''), '#', ''), '.', ''), '_', ''), ' ', '') = 
+               REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(w.name, '(', ''), ')', ''), '-', ''), '&', ''), '#', ''), '.', ''), '_', ''), ' ', '')
+        )
     WHERE s.luid = %(site_id)s
       AND hr.currentsheet IS NOT NULL
       AND hr.currentsheet LIKE '%%/%%'
       AND hr.completed_at IS NOT NULL
       AND hr.created_at IS NOT NULL
       AND hr.completed_at > hr.created_at
-      AND hr.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
     GROUP BY w.id, w.name
 ),
 workbook_usage AS (
@@ -1051,25 +1148,16 @@ workbook_usage AS (
       AND het.name IN ('Access View', 'Access Authoring View')
       AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '60 days'
     GROUP BY w.id, w.name
-),
-combined_metrics AS (
-    SELECT 
-        COALESCE(wu.workbook_id, wlt.workbook_id) AS workbook_id,
-        COALESCE(wu.workbook_name, wlt.workbook_name) AS workbook_name,
-        COALESCE(wu.total_views, 0) AS total_views,
-        COALESCE(wlt.avg_load_time_seconds, 0) AS avg_load_time_seconds
-    FROM workbook_usage wu
-    FULL OUTER JOIN workbook_load_times wlt ON wu.workbook_id = wlt.workbook_id
-    WHERE COALESCE(wu.total_views, 0) > 0 OR COALESCE(wlt.avg_load_time_seconds, 0) > 0
 )
 SELECT 
-    cm.workbook_name,
-    cm.total_views AS views_60_days,
-    ROUND(cm.avg_load_time_seconds::numeric, 2) AS avg_load_time_seconds
-FROM combined_metrics cm
-ORDER BY cm.total_views DESC, cm.avg_load_time_seconds DESC;
+    aw.workbook_name,
+    COALESCE(wu.total_views, 0) AS views_60_days,
+    ROUND(COALESCE(wlt.avg_load_time_seconds, 0)::numeric, 2) AS avg_load_time_seconds
+FROM all_workbooks aw
+LEFT JOIN workbook_usage wu ON aw.workbook_id = wu.workbook_id
+LEFT JOIN workbook_load_times wlt ON aw.workbook_id = wlt.workbook_id
+ORDER BY wu.total_views DESC NULLS LAST, wlt.avg_load_time_seconds DESC NULLS LAST;
 """
-
 
 def build_output_json(
     results: Dict[str, List[Dict[str, Any]]], 
@@ -1201,7 +1289,16 @@ def generate_metrics_json(
     for key, sql in queries.items():
         print(f"Executing query: {key}")
         try:
-            results[key] = run_query(sql, site_id, conn)
+            query_results = run_query(sql, site_id, conn)
+            # Convert avg_load_time_seconds from string to float if present
+            for row in query_results:
+                if "avg_load_time_seconds" in row and row["avg_load_time_seconds"] is not None:
+                    try:
+                        row["avg_load_time_seconds"] = float(row["avg_load_time_seconds"])
+                    except (ValueError, TypeError):
+                        # If conversion fails, keep original value
+                        pass
+            results[key] = query_results
             print(f" - rows returned: {len(results[key])}")
         except Exception as exc:  # noqa: BLE001
             err_msg = f"{exc}"

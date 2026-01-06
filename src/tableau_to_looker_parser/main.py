@@ -288,8 +288,9 @@ def process_local_twb_file(twb_file: str, output_dir: str = "output") -> dict:
     Returns:
         dict: Processing result
     """
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
+    # Create workbook output directory structure
+    workbook_output_dir = Path(output_dir) / "workbook"
+    workbook_output_dir.mkdir(parents=True, exist_ok=True)
     
     twb_path = Path(twb_file)
     if not twb_path.exists():
@@ -300,8 +301,8 @@ def process_local_twb_file(twb_file: str, output_dir: str = "output") -> dict:
     print(f"{'='*60}\n")
     
     try:
-        # Generate JSON for the file
-        file_output_dir = output_path / twb_path.stem
+        # Generate JSON for the file - save in workbook subdirectory
+        file_output_dir = workbook_output_dir / twb_path.stem
         json_result = generate_json_from_twb(str(twb_path), str(file_output_dir))
         json_file = str(file_output_dir / "processed_pipeline_output.json")
         
@@ -573,8 +574,9 @@ def download_workbooks_from_server(
     print(f"Generating JSON from downloaded workbooks...")
     print(f"{'='*60}")
     
-    json_output_dir = Path(json_output_dir)
-    json_output_dir.mkdir(parents=True, exist_ok=True)
+    # Create workbook output directory structure
+    workbook_output_dir = Path(json_output_dir) / "workbook"
+    workbook_output_dir.mkdir(parents=True, exist_ok=True)
     
     # Find all downloaded files and convert .twbx to .twb automatically
     downloaded_files = []
@@ -601,10 +603,10 @@ def download_workbooks_from_server(
             file_stem = twb_file.stem
             if file_stem.endswith('.twb'):
                 # Already has extension in stem, use it as is
-                file_output_dir = json_output_dir / file_stem
+                file_output_dir = workbook_output_dir / file_stem
             else:
                 # Use the stem normally
-                file_output_dir = json_output_dir / twb_file.stem
+                file_output_dir = workbook_output_dir / twb_file.stem
             
             generate_json_from_twb(str(twb_file), str(file_output_dir))
             json_files.append(str(file_output_dir / "processed_pipeline_output.json"))
@@ -639,7 +641,7 @@ def download_workbooks_from_server(
     print(f"  Total files processed: {len(downloaded_files)}")
     print(f"  ✅ Successfully converted: {len(json_files)}")
     print(f"  ❌ Failed conversions: {len(json_errors)}")
-    print(f"  Output directory: {json_output_dir}")
+    print(f"  Output directory: {workbook_output_dir}")
     
     # Print detailed error information if any failures occurred
     if json_errors:
@@ -793,6 +795,12 @@ Examples:
         print("="*60)
         print("MODE: Download from Tableau Server")
         print("="*60)
+        # Create output directory structure (workbook and metrics folders)
+        output_base = Path("output")
+        output_base.mkdir(parents=True, exist_ok=True)
+        (output_base / "workbook").mkdir(parents=True, exist_ok=True)
+        (output_base / "metrics").mkdir(parents=True, exist_ok=True)
+        
         result = download_workbooks_from_server(
             server_url=args.server_url,
             username=args.username,
@@ -871,7 +879,7 @@ Examples:
                             pg_password=args.pg_password,
                             pg_sslmode=args.pg_sslmode or "prefer",
                             pg_connect_timeout=args.pg_connect_timeout or 15,
-                            output_dir="output"
+                            output_dir="output/metrics"
                         )
                         print(f"\n✅ Metrics JSON generated successfully: {metrics_file}")
                 except ImportError as e:
@@ -887,6 +895,13 @@ Examples:
         print("="*60)
         print("MODE: Process Local TWB File")
         print("="*60)
+        
+        # Create output directory structure (workbook and metrics folders)
+        output_base = Path("output")
+        output_base.mkdir(parents=True, exist_ok=True)
+        (output_base / "workbook").mkdir(parents=True, exist_ok=True)
+        (output_base / "metrics").mkdir(parents=True, exist_ok=True)
+        
         result = process_local_twb_file(
             twb_file=args.local,
             output_dir="output"
