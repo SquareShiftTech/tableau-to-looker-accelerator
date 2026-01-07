@@ -49,18 +49,39 @@ def extract_field(field):
     }
 
 def extract_visualization(viz):
-    """Extract chart_type, show_labels, and is_dual_axis from visualization"""
+    """Extract chart_type, show_labels, is_dual_axis, and raw_config from visualization"""
     if not viz:
         return {
             "chart_type": "",
             "show_labels": False,
-            "is_dual_axis": False
+            "is_dual_axis": False,
+            "raw_config": {}
         }
-    return {
+    result = {
         "chart_type": viz.get("chart_type", ""),
         "show_labels": viz.get("show_labels", False),
         "is_dual_axis": viz.get("is_dual_axis", False)
     }
+    # Include raw_config if it exists, but only chart_type and chart_type_extracted fields
+    # The raw_config may be nested (raw_config.raw_config) or at top level
+    raw_config = viz.get("raw_config", {})
+    if raw_config:
+        # Extract only chart_type and chart_type_extracted from raw_config
+        extracted_raw_config = {}
+        
+        # Check nested raw_config first
+        nested_raw_config = raw_config.get("raw_config", {})
+        source_config = nested_raw_config if nested_raw_config else raw_config
+        
+        # Only extract chart_type and chart_type_extracted
+        if "chart_type" in source_config:
+            extracted_raw_config["chart_type"] = source_config["chart_type"]
+        if "chart_type_extracted" in source_config:
+            extracted_raw_config["chart_type_extracted"] = source_config["chart_type_extracted"]
+        
+        if extracted_raw_config:
+            result["raw_config"] = extracted_raw_config
+    return result
 
 def extract_parameter(param):
     """Extract only specified fields from parameter"""
