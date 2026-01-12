@@ -253,6 +253,10 @@ def generate_table_descriptions(calculated_metrics: Dict[str, Any], results: Dic
             f'solve key performance pain points but also establish a trusted semantic layer for future '
             f'conversational analytics and self-service exploration.'
         ),
+        "Quick_Wins_Scatter_Data": (
+            "A pilot program focused on high-value, high-visibility reports is the most effective way to demonstrate the power of Looker. "
+            "The scatter plot below identifies the best candidates for this program based on usage and performance metrics."
+        ),
     }
 
 def most_used_workbooks_summary_query() -> str:

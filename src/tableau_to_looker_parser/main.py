@@ -11,6 +11,7 @@ import sys
 import zipfile
 import time
 import json
+import shutil
 import requests
 from pathlib import Path
 import tableauserverclient as TSC
@@ -86,6 +87,85 @@ def fetch_site_luid(server_url: str, username: str, password: str, site_content_
         raise Exception(error_msg) from e
     except (KeyError, ValueError) as e:
         raise Exception(f"Failed to parse Site LUID from API response: {e}") from e
+
+
+def upload_output_to_gcs(gcp_project: str, bucket_name: str, output_dir: str = "output"):
+    """
+    Upload the entire output folder to GCS bucket.
+    Deletes and recreates the bucket every time (even if it already exists).
+    
+    Args:
+        gcp_project: GCP project ID
+        bucket_name: GCS bucket name
+        output_dir: Local output directory to upload (default: "output")
+        
+    Returns:
+        str: GCS bucket path where files were uploaded
+    """
+    try:
+        from google.cloud import storage
+        from google.cloud.exceptions import NotFound
+    except ImportError:
+        raise ImportError(
+            "google-cloud-storage is required for GCS upload. "
+            "Install it with: pip install google-cloud-storage"
+        )
+    
+    output_path = Path(output_dir)
+    if not output_path.exists():
+        raise FileNotFoundError(f"Output directory not found: {output_dir}")
+    
+    print(f"\n{'='*60}")
+    print(f"Uploading output to GCS bucket")
+    print(f"{'='*60}")
+    print(f"  GCP Project: {gcp_project}")
+    print(f"  Bucket Name: {bucket_name}")
+    print(f"  Source: {output_path.absolute()}")
+    
+    # Initialize GCS client
+    client = storage.Client(project=gcp_project)
+    
+    # Always delete and recreate the bucket (even if it exists)
+    try:
+        bucket = client.bucket(bucket_name)
+        bucket.reload()  # Check if bucket exists
+        print(f"  Deleting existing bucket: {bucket_name}")
+        try:
+            # Delete all blobs in the bucket first
+            for blob in bucket.list_blobs():
+                blob.delete()
+            # Delete the bucket
+            bucket.delete()
+            print(f"  ✓ Bucket deleted successfully")
+        except Exception as e:
+            raise Exception(f"Failed to delete bucket '{bucket_name}': {e}")
+    except NotFound:
+        print(f"  Bucket does not exist, will create new one")
+    
+    # Create new bucket
+    print(f"  Creating new bucket: {bucket_name}")
+    try:
+        bucket = client.create_bucket(bucket_name, location="us-central1")
+        print(f"  ✓ Bucket created successfully")
+    except Exception as e:
+        raise Exception(f"Failed to create bucket '{bucket_name}': {e}")
+    
+    # Upload all files recursively
+    uploaded_count = 0
+    for file_path in output_path.rglob("*"):
+        if file_path.is_file():
+            # Get relative path from output directory
+            relative_path = file_path.relative_to(output_path)
+            blob_path = str(relative_path).replace("\\", "/")  # Use forward slashes for GCS
+            
+            # Create blob and upload
+            blob = bucket.blob(blob_path)
+            blob.upload_from_filename(str(file_path))
+            uploaded_count += 1
+    
+    gcs_path = f"gs://{bucket_name}/"
+    print(f"\n✅ Successfully uploaded {uploaded_count} file(s) to {gcs_path}")
+    return gcs_path
 
 
 def validate_zip_file(file_path):
@@ -208,13 +288,13 @@ def extract_twb_xml(file_path):
         return ""
 
 
-def generate_json_from_twb(twb_file_path: str, output_dir: str = "output") -> dict:
+def generate_json_from_twb(twb_file_path: str, output_file_path: str) -> dict:
     """
     Generate JSON from a local TWB file using MigrationEngine.
     
     Args:
         twb_file_path: Path to .twb or .twbx file
-        output_dir: Directory to save JSON output
+        output_file_path: Full path to save JSON output file (including filename)
         
     Returns:
         dict: Migration result with statistics
@@ -238,31 +318,55 @@ def generate_json_from_twb(twb_file_path: str, output_dir: str = "output") -> di
         print(f"❌ Error initializing engine: {e}")
         raise
     
+    # Create output directory if it doesn't exist
+    output_path = Path(output_file_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Use a temporary directory for migration engine (it always saves as processed_pipeline_output.json)
+    temp_output_dir = output_path.parent / f".temp_{output_path.stem}"
+    temp_output_dir.mkdir(parents=True, exist_ok=True)
+    
     # Generate JSON
     print(f"\n🚀 Generating JSON from TWB file...")
     try:
-        result = engine.migrate_file(str(twb_path), output_dir)
+        result = engine.migrate_file(str(twb_path), str(temp_output_dir))
         print("✅ JSON generation completed successfully")
         
-        # Display summary
-        output_path = Path(output_dir) / "processed_pipeline_output.json"
-        if output_path.exists():
-            print(f"\n📊 Generated JSON file: {output_path}")
-            print(f"   File size: {output_path.stat().st_size / 1024:.2f} KB")
-            
+        # Move and rename the generated file
+        temp_json_file = temp_output_dir / "processed_pipeline_output.json"
+        if temp_json_file.exists():
             # Transform the JSON to extract only specified fields
             print(f"\n🔄 Transforming JSON to extract specified fields...")
             try:
-                transform_json(str(output_path), str(output_path), quiet=True)
+                transform_json(str(temp_json_file), str(temp_json_file), quiet=True)
                 print(f"✅ JSON transformation completed")
             except Exception as e:
                 print(f"⚠️  Warning: JSON transformation failed: {e}")
-                print(f"   Original JSON file is still available at: {output_path}")
+            
+            # Move and rename to final location
+            temp_json_file.rename(output_path)
+            print(f"\n📊 Generated JSON file: {output_path}")
+            print(f"   File size: {output_path.stat().st_size / 1024:.2f} KB")
+            
+            # Clean up temp directory
+            try:
+                temp_output_dir.rmdir()
+            except:
+                pass  # Directory might not be empty, ignore
+        else:
+            raise FileNotFoundError(f"Generated JSON file not found at: {temp_json_file}")
         
         return result
     except Exception as e:
         error_msg = str(e)
         print(f"❌ Error generating JSON: {error_msg}")
+        
+        # Clean up temp directory on error
+        try:
+            if temp_output_dir.exists():
+                shutil.rmtree(temp_output_dir)
+        except:
+            pass
         
         # Check for common validation errors and provide helpful messages
         if "RangeParameterSettings" in error_msg and "max" in error_msg:
@@ -301,19 +405,19 @@ def process_local_twb_file(twb_file: str, output_dir: str = "output") -> dict:
     print(f"{'='*60}\n")
     
     try:
-        # Generate JSON for the file - save in workbook subdirectory
-        file_output_dir = workbook_output_dir / twb_path.stem
-        json_result = generate_json_from_twb(str(twb_path), str(file_output_dir))
-        json_file = str(file_output_dir / "processed_pipeline_output.json")
+        # Generate JSON for the file - save directly in workbook folder with workbook name
+        workbook_name = twb_path.stem
+        json_file_path = workbook_output_dir / f"{workbook_name}.json"
+        json_result = generate_json_from_twb(str(twb_path), str(json_file_path))
         
         print(f"\n{'='*60}")
         print(f"✅ Processing complete!")
-        print(f"  JSON file: {json_file}")
+        print(f"  JSON file: {json_file_path}")
         print(f"{'='*60}")
         
         return {
             "status": "success",
-            "json_file": json_file
+            "json_file": str(json_file_path)
         }
     except Exception as e:
         error_msg = f"Error processing {twb_path.name}: {str(e)}"
@@ -602,14 +706,16 @@ def download_workbooks_from_server(
             # Remove double extension if present (e.g., .twb.twb -> .twb)
             file_stem = twb_file.stem
             if file_stem.endswith('.twb'):
-                # Already has extension in stem, use it as is
-                file_output_dir = workbook_output_dir / file_stem
+                # Already has extension in stem, remove it
+                workbook_name = file_stem[:-4] if file_stem.endswith('.twb') else file_stem
             else:
                 # Use the stem normally
-                file_output_dir = workbook_output_dir / twb_file.stem
+                workbook_name = file_stem
             
-            generate_json_from_twb(str(twb_file), str(file_output_dir))
-            json_files.append(str(file_output_dir / "processed_pipeline_output.json"))
+            # Save directly in workbook folder with workbook name
+            json_file_path = workbook_output_dir / f"{workbook_name}.json"
+            generate_json_from_twb(str(twb_file), str(json_file_path))
+            json_files.append(str(json_file_path))
             print(f"  ✅ Successfully generated and transformed JSON for {twb_file.name}")
         except Exception as e:
             import traceback
@@ -774,6 +880,18 @@ Examples:
         help="Generate JSON output using MigrationEngine (required)"
     )
     
+    # Optional GCS upload arguments
+    parser.add_argument(
+        "--gcp-project",
+        type=str,
+        help="GCP project ID for uploading output to GCS bucket (optional)"
+    )
+    parser.add_argument(
+        "--bucket-name",
+        type=str,
+        help="GCS bucket name for uploading output (optional, requires --gcp-project)"
+    )
+    
     args = parser.parse_args()
     
     # Validate --generate-json is always provided
@@ -795,11 +913,10 @@ Examples:
         print("="*60)
         print("MODE: Download from Tableau Server")
         print("="*60)
-        # Create output directory structure (workbook and metrics folders)
+        # Create output directory structure (workbook folder always, metrics folder only if needed)
         output_base = Path("output")
         output_base.mkdir(parents=True, exist_ok=True)
         (output_base / "workbook").mkdir(parents=True, exist_ok=True)
-        (output_base / "metrics").mkdir(parents=True, exist_ok=True)
         
         result = download_workbooks_from_server(
             server_url=args.server_url,
@@ -831,6 +948,8 @@ Examples:
         ])
         
         if has_pg_args:
+            # Create metrics folder only when metrics will be generated
+            (output_base / "metrics").mkdir(parents=True, exist_ok=True)
             print("\n" + "="*60)
             print("MODE: Generating Metrics JSON from PostgreSQL")
             print("="*60)
@@ -889,6 +1008,21 @@ Examples:
                     print(f"\n❌ Error generating metrics JSON: {e}")
                     import traceback
                     traceback.print_exc()
+        
+        # Upload to GCS if arguments provided
+        if args.gcp_project and args.bucket_name:
+            try:
+                upload_output_to_gcs(
+                    gcp_project=args.gcp_project,
+                    bucket_name=args.bucket_name,
+                    output_dir="output"
+                )
+            except Exception as e:
+                print(f"\n❌ Error uploading to GCS: {e}")
+                import traceback
+                traceback.print_exc()
+        elif args.gcp_project or args.bucket_name:
+            print(f"\n⚠️  Warning: Both --gcp-project and --bucket-name are required for GCS upload")
     
     elif args.local:
         # Process local file mode
@@ -896,11 +1030,10 @@ Examples:
         print("MODE: Process Local TWB File")
         print("="*60)
         
-        # Create output directory structure (workbook and metrics folders)
+        # Create output directory structure (workbook folder only, no metrics for local mode)
         output_base = Path("output")
         output_base.mkdir(parents=True, exist_ok=True)
         (output_base / "workbook").mkdir(parents=True, exist_ok=True)
-        (output_base / "metrics").mkdir(parents=True, exist_ok=True)
         
         result = process_local_twb_file(
             twb_file=args.local,
@@ -910,6 +1043,21 @@ Examples:
         print(f"  Status: {result['status']}")
         if result['status'] == 'success':
             print(f"  JSON file: {result['json_file']}")
+        
+        # Upload to GCS if arguments provided
+        if args.gcp_project and args.bucket_name:
+            try:
+                upload_output_to_gcs(
+                    gcp_project=args.gcp_project,
+                    bucket_name=args.bucket_name,
+                    output_dir="output"
+                )
+            except Exception as e:
+                print(f"\n❌ Error uploading to GCS: {e}")
+                import traceback
+                traceback.print_exc()
+        elif args.gcp_project or args.bucket_name:
+            print(f"\n⚠️  Warning: Both --gcp-project and --bucket-name are required for GCS upload")
 
 
 if __name__ == "__main__":
