@@ -159,22 +159,21 @@ def calculate_developer_activity_metrics(
     """Calculate metrics for developer activity section.
     
     Args:
-        developer_activity: List of developer activity records (should have number_of_active_developers)
-        
+        developer_activity: List of developer activity records (individual user rows with user_name, workbooks_published)
+    
     Returns:
         Dict with developer_count and time_period_days
     """
     if not developer_activity:
-        return {"developer_count": 0, "time_period_days": 90}
+        return {"developer_count": 0, "time_period_days": 100}
     
-    # Extract from first row (aggregated result)
-    first_row = developer_activity[0]
-    dev_count = int(first_row.get("number_of_active_developers", 0))
+    # Count distinct users from the individual rows
+    dev_count = len(developer_activity)
     
-    # Time period is 90 days based on the query (90 days for examples, 300 for main)
+    # Time period is 100 days based on the query
     return {
         "developer_count": dev_count,
-        "time_period_days": 90
+        "time_period_days": 100
     }
 
 
@@ -287,7 +286,7 @@ top_users_per_workbook AS (
     SELECT 
         wu.workbook_id,
         wu.workbook_name,
-        STRING_AGG(hu.name, ', ' ORDER BY hu.name) AS primary_user_names
+        STRING_AGG(INITCAP(hu.name), ', ' ORDER BY hu.name) AS primary_user_names
     FROM workbook_usage wu
     INNER JOIN max_views_per_workbook mv ON wu.workbook_id = mv.workbook_id 
         AND wu.user_view_count = mv.max_view_count
@@ -375,7 +374,7 @@ top_users_per_view AS (
         vu.workbook_name,
         vu.view_name,
         vu.content_type,
-        STRING_AGG(hu.name, ', ' ORDER BY hu.name) AS primary_user_names
+        STRING_AGG(INITCAP(hu.name), ', ' ORDER BY hu.name) AS primary_user_names
     FROM view_usage vu
     INNER JOIN max_views_per_view mv ON vu.view_id = mv.view_id 
         AND vu.user_view_count = mv.max_view_count
@@ -924,7 +923,7 @@ WITH developer_activity AS (
     INNER JOIN sites s ON w.site_id = s.id
     WHERE s.luid = %(site_id)s
       AND het.name = 'Publish Workbook'
-      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '300 days'
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '100 days'
     GROUP BY su.id, su.friendly_name, su.name
     HAVING COUNT(DISTINCT he.hist_workbook_id) >= 1
 ),
@@ -943,7 +942,7 @@ example_workbooks_raw AS (
     INNER JOIN sites s ON w.site_id = s.id
     WHERE s.luid = %(site_id)s
       AND het.name = 'Publish Workbook'
-      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '90 days'
+      AND he.created_at >= CURRENT_TIMESTAMP - INTERVAL '100 days'
 ),
 example_workbooks AS (
     SELECT 
@@ -954,10 +953,12 @@ example_workbooks AS (
     GROUP BY system_user_id
 )
 SELECT 
-    COUNT(DISTINCT da.system_user_id) AS number_of_active_developers,
-    STRING_AGG(DISTINCT ew.example_reports, '; ') AS example_reports_published
+    da.user_name,
+    da.workbooks_published,
+    COALESCE(ew.example_reports, 'No examples available') AS example_workbooks_published
 FROM developer_activity da
-LEFT JOIN example_workbooks ew ON da.system_user_id = ew.system_user_id;
+LEFT JOIN example_workbooks ew ON da.system_user_id = ew.system_user_id
+ORDER BY da.workbooks_published DESC, da.user_name;
 """
 
 
